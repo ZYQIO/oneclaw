@@ -16,14 +16,14 @@
 
 ## 颜色与主题
 
-应用使用暖金色/琥珀色主色的 Material 3 主题。主题文件从 Material Theme Builder 导出，存储在 `/material-theme/` 中。
+应用使用暖金色/琥珀色主色的 Material 3 主题。主题文件从 Material Theme Builder 导出，存储在 `docs/design/material-theme/` 中。
 
 - **主色**: `#6D5E0F`（暖金色/琥珀色）
 - **Tertiary**: 绿色强调色
 - **变体**: 亮色、暗色、中对比度、高对比度
 - **动态颜色**: Android 12+ 上启用（跟随用户壁纸）；旧设备回退到定义的配色方案
 
-详见 `material-theme/ui/theme/Color.kt` 的完整颜色定义。
+详见 `docs/design/material-theme/ui/theme/Color.kt` 的完整颜色定义。
 
 ## 排版
 
@@ -31,7 +31,7 @@
 - **体系**: 标准 Material 3 排版体系
 - Display、Headline、Title、Body、Label 各层级按 Material 3 定义
 
-详见 `material-theme/ui/theme/Type.kt` 的定义。
+详见 `docs/design/material-theme/ui/theme/Type.kt` 的定义。
 
 ## 形状
 

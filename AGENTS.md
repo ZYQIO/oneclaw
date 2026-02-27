@@ -107,9 +107,6 @@ After writing the report, update `docs/testing/manual-test-guide.md` (and `-zh.m
 - `AppResult<T>` for all fallible operations
 - UI style: Material 3, gold/amber accent `#6D5E0F`, Google Gemini app style
 
-### Project Location
-`/Users/huagong/Developer/oneclaw/oneclaw-shadow-1`
-
 ### Test Commands
 ```bash
 # Build

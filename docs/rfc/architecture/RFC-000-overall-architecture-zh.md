@@ -1218,7 +1218,7 @@ enum class ErrorCode {
 
 ## UI 主题
 
-应用使用从 Material Theme Builder 生成的 Material 3 主题。主题文件存储在 `/material-theme/` 中，构建时应复制到项目中。
+应用使用从 Material Theme Builder 生成的 Material 3 主题。主题文件存储在 `docs/design/material-theme/` 中，构建时应复制到项目中。
 
 ### 主题概要
 - **配色方案**：暖金色/琥珀色主色（`#6D5E0F`），绿色 tertiary 强调色
@@ -1228,10 +1228,10 @@ enum class ErrorCode {
 - **排版**：标准 Material 3 排版体系，所有层级应用 Roboto
 
 ### 主题文件
-- `material-theme/ui/theme/Color.kt` - 所有颜色定义
-- `material-theme/ui/theme/Theme.kt` - 带动态颜色支持的主题组合
-- `material-theme/ui/theme/Type.kt` - 排版定义
-- `material-theme/res/values-v23/font_certs.xml` - Google Fonts 证书
+- `docs/design/material-theme/ui/theme/Color.kt` - 所有颜色定义
+- `docs/design/material-theme/ui/theme/Theme.kt` - 带动态颜色支持的主题组合
+- `docs/design/material-theme/ui/theme/Type.kt` - 排版定义
+- `docs/design/material-theme/res/values-v23/font_certs.xml` - Google Fonts 证书
 
 ### 集成方式
 创建 Android 项目时：

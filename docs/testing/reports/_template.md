@@ -61,7 +61,7 @@ Notable test classes added or modified in this RFC:
 
 #### [ScreenName] — [variant]
 
-![ScreenName](screenshots/RFC-XXX_ScreenName.png)
+<img src="screenshots/RFC-XXX_ScreenName.png" width="250">
 
 Visual check: [describe what you see and confirm it matches expectations]
 

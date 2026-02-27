@@ -16,14 +16,14 @@
 
 ## Color & Theme
 
-The app uses a Material 3 theme with warm gold/amber primary color. Theme files are exported from Material Theme Builder and stored in `/material-theme/`.
+The app uses a Material 3 theme with warm gold/amber primary color. Theme files are exported from Material Theme Builder and stored in `docs/design/material-theme/`.
 
 - **Primary**: `#6D5E0F` (warm gold/amber)
 - **Tertiary**: Green accent
 - **Variants**: Light, Dark, Medium Contrast, High Contrast
 - **Dynamic Color**: Enabled on Android 12+ (follows user wallpaper); falls back to defined scheme on older devices
 
-See `material-theme/ui/theme/Color.kt` for full color definitions.
+See `docs/design/material-theme/ui/theme/Color.kt` for full color definitions.
 
 ## Typography
 
@@ -31,7 +31,7 @@ See `material-theme/ui/theme/Color.kt` for full color definitions.
 - **Scale**: Standard Material 3 typography scale
 - Display, Headline, Title, Body, Label levels as defined in Material 3
 
-See `material-theme/ui/theme/Type.kt` for definitions.
+See `docs/design/material-theme/ui/theme/Type.kt` for definitions.
 
 ## Shapes
 

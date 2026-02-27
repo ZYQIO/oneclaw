@@ -14,7 +14,7 @@ This is an experimental project exploring a new development paradigm in the AI e
 ## Project Structure
 
 ```
-oneclaw-shadow-1/
+oneclaw-shadow/
 ├── docs/                  # Documentation Center (Core)
 │   ├── prd/              # Product Requirements Documents
 │   ├── rfc/              # Technical Design Documents

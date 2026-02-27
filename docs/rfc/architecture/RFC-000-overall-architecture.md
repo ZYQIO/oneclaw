@@ -1218,7 +1218,7 @@ enum class ErrorCode {
 
 ## UI Theme
 
-The app uses a Material 3 theme generated from Material Theme Builder. The theme files are stored in `/material-theme/` and should be copied into the project at build time.
+The app uses a Material 3 theme generated from Material Theme Builder. The theme files are stored in `docs/design/material-theme/` and should be copied into the project at build time.
 
 ### Theme Summary
 - **Color scheme**: Warm gold/amber primary (`#6D5E0F`), with green tertiary accent
@@ -1228,10 +1228,10 @@ The app uses a Material 3 theme generated from Material Theme Builder. The theme
 - **Typography**: Standard Material 3 typography scale with Roboto applied to all levels
 
 ### Theme Files
-- `material-theme/ui/theme/Color.kt` - All color definitions
-- `material-theme/ui/theme/Theme.kt` - Theme composition with dynamic color support
-- `material-theme/ui/theme/Type.kt` - Typography definitions
-- `material-theme/res/values-v23/font_certs.xml` - Google Fonts certificate
+- `docs/design/material-theme/ui/theme/Color.kt` - All color definitions
+- `docs/design/material-theme/ui/theme/Theme.kt` - Theme composition with dynamic color support
+- `docs/design/material-theme/ui/theme/Type.kt` - Typography definitions
+- `docs/design/material-theme/res/values-v23/font_certs.xml` - Google Fonts certificate
 
 ### Integration
 When creating the Android project:
