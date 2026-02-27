@@ -89,7 +89,11 @@ fun SessionDrawerContentInternal(
     onConfirmRename: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxHeight()) {
+    Surface(
+        modifier = modifier.fillMaxHeight(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+    Column(modifier = Modifier.fillMaxHeight()) {
         // Selection mode toolbar OR New Conversation button
         if (uiState.isSelectionMode) {
             SelectionModeToolbar(
@@ -151,13 +155,14 @@ fun SessionDrawerContentInternal(
                                 }
                             },
                             onSwipeDelete = { onDeleteSession(session.id) },
-                            onRename = { onShowRenameDialog(session.id, session.title) }
+                             onRename = { onShowRenameDialog(session.id, session.title) }
                         )
                     }
                 }
             }
         }
-    }
+    } // end Column
+    } // end Surface
 
     // Rename dialog
     uiState.renameDialog?.let { renameState ->

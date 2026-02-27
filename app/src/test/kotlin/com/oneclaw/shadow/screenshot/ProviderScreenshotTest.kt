@@ -29,7 +29,7 @@ class ProviderScreenshotTest {
 
     private fun themed(content: @Composable () -> Unit) {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = false) {
+            OneClawShadowTheme(darkTheme = false, dynamicColor = false) {
                 content()
             }
         }
@@ -125,7 +125,7 @@ class ProviderScreenshotTest {
     @Test
     fun providerListScreen_darkTheme() {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = true) {
+            OneClawShadowTheme(darkTheme = true, dynamicColor = false) {
                 ProviderListScreenContent(
                     uiState = ProviderListUiState(
                         providers = listOf(

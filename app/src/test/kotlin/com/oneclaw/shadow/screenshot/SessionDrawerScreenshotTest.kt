@@ -58,7 +58,7 @@ class SessionDrawerScreenshotTest {
 
     private fun themed(content: @Composable () -> Unit) {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = false) {
+            OneClawShadowTheme(darkTheme = false, dynamicColor = false) {
                 content()
             }
         }
@@ -194,7 +194,7 @@ class SessionDrawerScreenshotTest {
     @Test
     fun sessionDrawer_darkTheme() {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = true) {
+            OneClawShadowTheme(darkTheme = true, dynamicColor = false) {
                 SessionDrawerContentInternal(
                     uiState = SessionListUiState(sessions = sampleSessions, isLoading = false),
                     onNewConversation = {},

@@ -74,7 +74,7 @@ Note: `RenameSessionDialog` (uses `AlertDialog`) was excluded from screenshot te
 
 ![SessionDrawer_populated](../../app/src/test/screenshots/SessionDrawer_populated.png)
 
-Shows "New conversation" button at top, three session list items with title, message preview, relative timestamp, and agent name chip. Layout and typography correct.
+Shows "New conversation" button at top, three session list items with title, message preview, relative timestamp, and agent name chip. Background is warm cream (`#FFF9EE`), custom gold/amber theme applied correctly (not Android Dynamic Color). Layout and typography correct.
 
 ### SessionDrawer — selectionMode
 
@@ -104,7 +104,7 @@ Shows two remaining sessions after one was deleted (undo state is in ViewModel, 
 
 ![SessionDrawer_dark](../../app/src/test/screenshots/SessionDrawer_dark.png)
 
-Dark background with correct Material 3 dark color scheme applied throughout.
+Dark background (`#15130B` near-black with warm brown tint), unified color throughout — no white/split background. Custom dark scheme (`darkScheme`) applied, not Android Dynamic Color.
 
 ## Layer 2: adb Visual Verification
 
@@ -121,3 +121,4 @@ No issues found.
 | Date | Change |
 |------|--------|
 | 2026-02-27 | Initial report |
+| 2026-02-27 | Fix: add Surface background to SessionDrawerContentInternal; fix screenshot tests to use dynamicColor=false; re-record baselines |
