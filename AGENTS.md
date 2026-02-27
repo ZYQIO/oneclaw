@@ -12,121 +12,92 @@
 
 - Communicate with the user in Chinese (中文).
 
+## Testing Rules (After Every RFC Implementation)
+
+After completing all implementation tasks for an RFC, the following testing steps must be executed in order. Do not skip any step that is feasible given the current state of the app.
+
+### Step 1: Layer 1A — JVM Unit Tests
+```bash
+./gradlew test
+```
+All tests must pass before proceeding. Fix any failures first.
+
+### Step 2: Layer 1B — Instrumented DAO + UI Tests
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew connectedAndroidTest
+```
+Requires emulator running. If emulator is not available, note it in the test report and skip.
+
+### Step 3: Layer 1C — Roborazzi Screenshot Tests
+- If new Composable screens were added or modified in this RFC, add or update screenshot tests in `app/src/test/kotlin/com/oneclaw/shadow/screenshot/`.
+- Run: `./gradlew recordRoborazziDebug` to record baselines (first time for new screens).
+- Read each generated PNG file and verify the UI looks correct visually.
+- Run: `./gradlew verifyRoborazziDebug` to confirm verification mode passes.
+- If no UI was added or changed in this RFC, this step can be skipped (note it in the report).
+
+### Step 4: Layer 2 — adb Visual Verification
+- Execute the flows from `docs/testing/strategy.md` that are applicable given the current implementation state.
+- Requires: emulator running + API keys set as env vars (`ONECLAW_ANTHROPIC_API_KEY`, etc.).
+- If API keys are not set or the relevant features (e.g., chat) are not yet implemented, note it in the report and skip.
+- Save screenshots to `screenshots/layer2/` with descriptive names.
+
+### Step 5: Write Test Report
+After completing all feasible testing steps, write a test report to:
+```
+docs/testing/reports/RFC-XXX-<rfc-name>-report.md
+docs/testing/reports/RFC-XXX-<rfc-name>-report-zh.md
+```
+Use the template at `docs/testing/reports/_template.md`. The report must:
+- List each test step with PASS / SKIP (with reason) / FAIL (with details)
+- Include links to any Roborazzi screenshots (relative paths)
+- Include inline screenshots for Layer 2 adb results if taken
+- Record test counts (e.g., "181 unit tests, 47 DAO tests")
+
+### Step 6: Update Manual Test Guide
+After writing the report, update `docs/testing/manual-test-guide.md` (and `-zh.md`) to reflect the current cumulative state of the app:
+- Add new user flows introduced by this RFC
+- Update or remove flows that changed due to this RFC
+- Keep the guide accurate as a complete description of how to manually test the current app from a fresh install
+
 ## Current Implementation Status
 
 ### Git Log
 - `6d505ac` — init commit (all documentation, bilingual EN+ZH)
 - `02e44d7` — Phase 1: Project foundation (Android project, domain models, Room DB, repositories, DI, navigation, tests)
+- `70a350f` + `10ebbbd` — Phase 2: RFC-003 Provider Management (all implementation + tests)
+- `ca5e281` — Phase 3: RFC-004 Tool System (all implementation + 181 unit tests)
+- `4dbe9c3` — Phase 3 Layer 1 testing: Roborazzi screenshot tests, ProviderDaoTest fix, junit-vintage-engine
 
-### Phase 1: COMPLETE
-All Phase 1 tasks are done and committed. The app builds cleanly (`./gradlew assembleDebug` passes, zero warnings).
+### Phase 1: COMPLETE (commit 02e44d7)
+- Gradle project, domain models, Room DB (6 entities/DAOs), repositories (5), API adapter stubs
+- ApiKeyStorage, Koin DI (6 modules), Navigation, Material 3 theme
+- 57 JVM unit tests passing
 
-**What was built:**
-- Gradle project: Kotlin 2.0.21, Compose BOM 2024.12, Room 2.6.1, Koin 3.5.6, OkHttp 4.12
-- Domain models: `Agent`, `AiModel`, `Message`, `Provider`, `Session`, `ToolDefinition`, `ToolResult`, `ResolvedModel`, `AppResult`, `ConnectionTestResult`
-- Room: 6 entities, 6 DAOs, `AppDatabase` with seed callback (3 providers + General Assistant agent), `Converters`
-- Repository interfaces (5) + implementations (5)
-- API adapter stubs: `OpenAiAdapter`, `AnthropicAdapter`, `GeminiAdapter` (all methods currently `TODO` / return "Not implemented")
-- `ApiKeyStorage` (EncryptedSharedPreferences with `MasterKey.Builder`)
-- Koin DI: 6 modules (App, Database, Network, Repository, Tool, Feature)
-- Navigation: `NavGraph` with placeholder screens, `Routes` sealed class
-- Theme: Material 3, gold/amber accent (#6D5E0F)
-- JVM unit tests: 57 tests, all pass (`./gradlew testDebugUnitTest`)
-- Instrumented DAO tests: 47 tests written + compiled, **pending emulator run** (`./gradlew connectedAndroidTest`)
+### Phase 2: COMPLETE (commits 70a350f, 10ebbbd) — RFC-003 Provider Management
+- ConnectionErrorType enum, API response DTOs (OpenAI/Anthropic/Gemini)
+- Adapter listModels() + testConnection() implemented for all 3 providers
+- AppDatabase seed: 8 preset models added
+- ProviderRepositoryImpl updated with delete guards, duplicate checks
+- Use cases: TestConnectionUseCase, FetchModelsUseCase, SetDefaultModelUseCase
+- UI: ProviderListScreen, ProviderDetailScreen, SetupScreen, SettingsScreen
+- ViewModels: ProviderListViewModel, ProviderDetailViewModel, SetupViewModel
+- NavGraph wired; first-launch detection
+- Unit tests: all passing
 
-### Phase 2: NOT STARTED — next task
-**RFC:** RFC-003 Provider Management (FEAT-003)
+### Phase 3: COMPLETE (commits ca5e281, 4dbe9c3) — RFC-004 Tool System + Layer 1 testing
+- Tool interface, ToolRegistry, ToolSchemaSerializer, ToolCallModels
+- PermissionChecker with Activity lifecycle
+- ToolExecutionEngine (lookup, availability, validation, permissions, timeout, parallel)
+- Built-in tools: GetCurrentTimeTool, ReadFileTool, WriteFileTool, HttpRequestTool
+- formatToolDefinitions() in all 3 adapters
+- ToolModule Koin DI, MainActivity wired
+- 181 JVM unit tests passing
+- Layer 1B: 47 DAO instrumented tests passing (emulator-5554)
+- Layer 1C: Roborazzi screenshot tests — 5 baselines recorded and verified
+  - SettingsScreen, ProviderListScreen (loading/populated/empty/dark)
+- Test report: `docs/testing/reports/phase1-3-report.md`
 
-**What needs to be built (in order):**
-
-#### 2.1 — Add `ConnectionErrorType` enum to `core/model/ConnectionTestResult.kt`
-Currently `ConnectionTestResult` has no `errorType` field. RFC-003 defines:
-```kotlin
-enum class ConnectionErrorType { AUTH_FAILURE, NETWORK_FAILURE, TIMEOUT, UNKNOWN }
-// Add field: val errorType: ConnectionErrorType? to ConnectionTestResult
-```
-
-#### 2.2 — Create API response DTOs
-New package: `data/remote/dto/`
-- `data/remote/dto/openai/OpenAiModelListResponse.kt` — `OpenAiModelListResponse`, `OpenAiModelDto`
-- `data/remote/dto/anthropic/AnthropicModelListResponse.kt` — `AnthropicModelListResponse`, `AnthropicModelDto`
-- `data/remote/dto/gemini/GeminiModelListResponse.kt` — `GeminiModelListResponse`, `GeminiModelDto`
-
-All use `@Serializable` (kotlinx.serialization).
-
-#### 2.3 — Implement adapter `listModels()` + `testConnection()`
-Replace stubs in `data/remote/adapter/`:
-- `OpenAiAdapter`: GET `{base}/models`, header `Authorization: Bearer {key}`, filter with `isRelevantOpenAiModel()` (keep `gpt-`, `o1`, `o3`, `o4`, `chatgpt-` prefixes), format name with `formatOpenAiModelName()`
-- `AnthropicAdapter`: GET `{base}/models`, headers `x-api-key: {key}` + `anthropic-version: 2023-06-01`, filter `type == "model"`
-- `GeminiAdapter`: GET `{base}/models?key={key}` (key in query param, not header), filter `"generateContent" in supportedGenerationMethods`, strip `"models/"` prefix from id
-- Error handling: 401/403 → `AUTH_ERROR`, `UnknownHostException` → `NETWORK_ERROR`, `SocketTimeoutException` → `TIMEOUT_ERROR`
-- `testConnection()` delegates to `listModels()`, wraps result in `ConnectionTestResult`
-- `sendMessageStream()` should throw `NotImplementedError("implemented in RFC-001")` (NOT return stub flow)
-
-**IMPORTANT base URL corrections vs Phase 1 seed data:**
-- Anthropic: `https://api.anthropic.com` (no `/v1` suffix — the adapter appends `/models` directly)
-- Gemini: `https://generativelanguage.googleapis.com/v1beta` (RFC-003 uses `/v1beta`)
-
-#### 2.4 — Update `AppDatabase` seed callback
-Current seed has wrong Anthropic URL and missing preset models. Fix:
-- Anthropic base URL: `https://api.anthropic.com` (current code has this correct already)
-- Add preset models INSERT statements for all 8 models:
-  - OpenAI: `gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`
-  - Anthropic: `claude-sonnet-4-20250514`, `claude-haiku-4-20250414`
-  - Gemini: `gemini-2.0-flash`, `gemini-2.5-pro`
-- Also seed the General Assistant agent (already done in Phase 1)
-
-#### 2.5 — Update `ProviderRepositoryImpl`
-Current impl is basic. RFC-003 has more complete version with:
-- `deleteProvider()` checks if deleted provider has the global default model (block if so)
-- `deleteProvider()` uses `providerDao.deleteCustomProvider(id)` which only deletes non-pre-configured providers (returns affected rows count)
-- `addManualModel()` checks for duplicate before inserting
-- `deleteManualModel()` checks model exists, is MANUAL source, is not default
-- `fetchModelsFromApi()` sets `providerId` on returned models: `result.data.map { it.copy(providerId = providerId) }`
-
-#### 2.6 — Create Use Cases
-New package: `feature/provider/usecase/`
-- `TestConnectionUseCase(providerRepository)` — delegates to `providerRepository.testConnection()`
-- `FetchModelsUseCase(providerRepository)` — fetches, falls back to existing if fetch fails + models exist
-- `SetDefaultModelUseCase(providerRepository)` — validates model + provider exist and provider is active
-
-#### 2.7 — Create UI State classes
-New file: `feature/provider/ProviderUiState.kt`
-- `ProviderListUiState(providers: List<ProviderListItem>, isLoading: Boolean)`
-- `ProviderListItem(id, name, type, modelCount, isActive, isPreConfigured, hasApiKey, connectionStatus)`
-- `ConnectionStatus` enum: `CONNECTED`, `NOT_CONFIGURED`, `DISCONNECTED`
-- `ProviderDetailUiState(provider, models, globalDefaultModelId, globalDefaultProviderId, apiKeyMasked, apiKeyVisible, apiKeyFull, isEditingApiKey, apiKeyInput, isTestingConnection, connectionTestResult, isRefreshingModels, isActive, isPreConfigured, showAddModelDialog, manualModelIdInput, isLoading, errorMessage, successMessage)`
-- `SetupUiState(step, selectedProviderType, selectedProviderId, apiKeyInput, isTestingConnection, connectionTestResult, models, selectedDefaultModelId, errorMessage)`
-- `SetupStep` enum: `CHOOSE_PROVIDER`, `ENTER_API_KEY`, `SELECT_MODEL`
-
-#### 2.8 — Create ViewModels
-New package: `feature/provider/`
-- `ProviderListViewModel(providerRepository, apiKeyStorage)` — collects `getAllProviders()` flow, builds `ProviderListItem` list
-- `ProviderDetailViewModel(providerRepository, apiKeyStorage, testConnectionUseCase, fetchModelsUseCase, setDefaultModelUseCase, savedStateHandle)` — reads `providerId` from `savedStateHandle["providerId"]`; full actions: `saveApiKey`, `toggleApiKeyVisibility`, `testConnection`, `refreshModels`, `setDefaultModel`, `toggleProviderActive`, `addManualModel`, `deleteManualModel`, `deleteProvider`, `clearError`, `clearSuccess`, `maskApiKey`
-- `SetupViewModel(providerRepository, apiKeyStorage, testConnectionUseCase, fetchModelsUseCase, setDefaultModelUseCase, settingsRepository)` — manages 3-step flow, marks `has_completed_setup = true` on finish or skip
-
-#### 2.9 — Create UI Screens
-New package: `feature/provider/`
-- `ProviderListScreen.kt` — `Scaffold` + `LazyColumn`, pre-configured section + custom section, each item shows name, status chip (Not configured / Connected / Disconnected), model count
-- `ProviderDetailScreen.kt` — sections: API Key (input + eye toggle + save + format warning), Test Connection (button + result card), Available Models (list with source label + star for default + delete for MANUAL), Refresh Models button, Add Manual Model button, Active toggle, Delete Provider button (custom only)
-- `SetupScreen.kt` — 3-step pager/flow: Step 1 choose provider type, Step 2 enter key + test, Step 3 select default model + "Get Started"; "Skip for now" always visible
-- `SettingsScreen.kt` — basic: list item "Manage Providers [>]" → navigates to ProviderList, list item "Default Model [>]" → shows current default, tapping opens model picker
-
-#### 2.10 — Update NavGraph + first-launch detection
-- `NavGraph.kt`: replace `PlaceholderScreen` for `Route.ProviderList`, `Route.ProviderDetail`, `Route.Setup`, `Route.Settings` with real screens
-- First-launch: on `NavGraph` init, read `settingsRepository.getBoolean("has_completed_setup", false)`. If false → `startDestination = Route.Setup.path`. If true → `startDestination = Route.Chat.path`
-- `Route.Settings` needs to be added if not already present
-
-#### 2.11 — Update Koin DI
-- `FeatureModule.kt`: add `factory { TestConnectionUseCase(get()) }`, `factory { FetchModelsUseCase(get()) }`, `factory { SetDefaultModelUseCase(get()) }`, `viewModel { ProviderListViewModel(get(), get()) }`, `viewModel { parameters -> ProviderDetailViewModel(get(), get(), get(), get(), get(), get(parameters)) }`, `viewModel { SetupViewModel(get(), get(), get(), get(), get(), get()) }`
-
-#### 2.12 — Write unit tests for Phase 2
-Per testing strategy `docs/testing/strategy.md`:
-- `TestConnectionUseCaseTest` — success, no API key, network failure
-- `FetchModelsUseCaseTest` — fetch + save, failure with existing models (fallback), failure with no models
-- `SetDefaultModelUseCaseTest` — success, model not found, inactive provider
-- `ProviderDetailViewModelTest` — state updates for all actions
-- `ProviderListViewModelTest` — loads sessions from repository
+### Next Phase: Discuss with user before starting.
 
 ### Key Technical Decisions (do not change without discussion)
 - `ProviderType`: only `OPENAI`, `ANTHROPIC`, `GEMINI` — no `CUSTOM`
@@ -144,12 +115,17 @@ Per testing strategy `docs/testing/strategy.md`:
 # Build
 ./gradlew assembleDebug
 
-# JVM unit tests (57 tests, all pass)
-./gradlew testDebugUnitTest
+# Layer 1A: JVM unit tests
+./gradlew test
 
-# Instrumented tests (need emulator)
-./gradlew connectedAndroidTest
+# Layer 1B: Instrumented tests (requires emulator-5554)
+ANDROID_SERIAL=emulator-5554 ./gradlew connectedAndroidTest
 
-# Compile check for androidTest
+# Layer 1C: Roborazzi screenshot tests
+./gradlew recordRoborazziDebug     # record baselines
+./gradlew verifyRoborazziDebug     # verify against baselines
+
+# Compile checks
+./gradlew compileDebugUnitTestKotlin
 ./gradlew compileDebugAndroidTestKotlin
 ```

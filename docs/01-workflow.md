@@ -480,33 +480,61 @@ cp docs/prd/_template.md docs/prd/features/FEAT-001-your-feature.md
 
 ---
 
-#### Phase 6: Verification and Delivery
+#### Phase 6: Testing, Reporting, and Delivery
 
 **Steps**:
 
-1. **Run All Tests**
+1. **Run Layer 1A — JVM Unit Tests**
    ```bash
-   ./scripts/run-tests.sh
+   ./gradlew test
    ```
+   All tests must pass before proceeding.
 
-2. **Check Test Coverage**
-   - Target: > 80%
-   - Focus on covering business logic
+2. **Run Layer 1B — Instrumented Tests**
+   ```bash
+   ANDROID_SERIAL=emulator-5554 ./gradlew connectedAndroidTest
+   ```
+   Requires emulator. Skip and note in the report if emulator is unavailable.
 
-3. **Manually Verify Critical Flows**
-   - Although automated tests exist, manually test critical flows once
-   - Primarily check if UI/UX meets expectations
+3. **Run Layer 1C — Screenshot Tests**
 
-4. **Update Document Status**
+   If this RFC added or changed any Compose screens:
+   ```bash
+   ./gradlew recordRoborazziDebug   # first time for new screens
+   ./gradlew verifyRoborazziDebug   # verify against baselines
+   ```
+   Read each generated PNG to visually verify the UI is correct. Skip and note in the report if no UI changes were made.
+
+4. **Run Layer 2 — adb Visual Verification**
+
+   Execute applicable flows from `docs/testing/strategy.md`. Requires emulator + API keys set as env vars. Skip and note in the report if the relevant app features are not yet implemented.
+
+5. **Write Test Report**
+
+   Create a new report in `docs/testing/reports/`:
+   ```bash
+   # Use the template
+   cp docs/testing/reports/_template.md docs/testing/reports/RFC-XXX-name-report.md
+   cp docs/testing/reports/_template-zh.md docs/testing/reports/RFC-XXX-name-report-zh.md
+   ```
+   The report must:
+   - Record results for each layer (PASS / SKIP with reason / FAIL with details)
+   - Link to any Roborazzi screenshots
+   - Record test counts
+
+6. **Update Manual Test Guide**
+
+   Update `docs/testing/manual-test-guide.md` (and `-zh.md`) to reflect the new or changed user flows introduced by this RFC. Keep it accurate as a complete picture of the current app.
+
+7. **Update Document Status**
    - PRD status -> "Completed"
    - RFC status -> "Completed"
    - Add completion date
 
-5. **Commit Code**
+8. **Commit Code and Docs**
    ```bash
    git add .
-   git commit -m "feat: implement XXX feature (FEAT-XXX)"
-   git push
+   git commit -m "feat: implement RFC-XXX (FEAT-XXX)"
    ```
 
 ---

@@ -480,33 +480,60 @@ cp docs/prd/_template.md docs/prd/features/FEAT-001-your-feature.md
 
 ---
 
-#### 阶段6：验证和交付
+#### 阶段6：测试、报告与交付
 
 **步骤**：
 
-1. **运行所有测试**
+1. **运行第一层 A — JVM 单元测试**
    ```bash
-   ./scripts/run-tests.sh
+   ./gradlew test
    ```
+   所有测试必须通过，才能继续下一步。
 
-2. **检查测试覆盖率**
-   - 目标：> 80%
-   - 重点覆盖业务逻辑
+2. **运行第一层 B — 设备端测试**
+   ```bash
+   ANDROID_SERIAL=emulator-5554 ./gradlew connectedAndroidTest
+   ```
+   需要模拟器。如果模拟器不可用，在报告中注明并跳过。
 
-3. **手动验证关键流程**
-   - 虽然有自动化测试，但关键流程还是手动测一次
-   - 主要看UI/UX是否符合预期
+3. **运行第一层 C — 截图测试**
 
-4. **更新文档状态**
-   - PRD状态 → "已完成"
-   - RFC状态 → "已完成"
+   如果本次 RFC 新增或修改了 Compose 界面：
+   ```bash
+   ./gradlew recordRoborazziDebug   # 首次为新界面录制基线
+   ./gradlew verifyRoborazziDebug   # 与基线对比验证
+   ```
+   读取生成的 PNG 文件，目视确认 UI 正确。如果本次 RFC 没有 UI 变更，注明并跳过。
+
+4. **运行第二层 — adb 视觉验证**
+
+   执行 `docs/testing/strategy.md` 中适用的验证流程。需要模拟器 + 已设置 API key 环境变量。如果相关 App 功能尚未实现，注明并跳过。
+
+5. **撰写测试报告**
+
+   在 `docs/testing/reports/` 下新建报告：
+   ```bash
+   cp docs/testing/reports/_template.md docs/testing/reports/RFC-XXX-name-report.md
+   cp docs/testing/reports/_template-zh.md docs/testing/reports/RFC-XXX-name-report-zh.md
+   ```
+   报告必须：
+   - 记录每个层级的结果（通过 / 跳过并说明原因 / 失败并说明详情）
+   - 链接到 Roborazzi 截图
+   - 记录测试数量
+
+6. **更新人工测试手册**
+
+   更新 `docs/testing/manual-test-guide.md`（以及 `-zh.md`），反映本次 RFC 引入的新增或修改的用户流程。保持手册准确，使其成为当前 App 完整状态的真实描述。
+
+7. **更新文档状态**
+   - PRD 状态 → "已完成"
+   - RFC 状态 → "已完成"
    - 添加完成日期
 
-5. **提交代码**
+8. **提交代码和文档**
    ```bash
    git add .
-   git commit -m "feat: 实现XXX功能 (FEAT-XXX)"
-   git push
+   git commit -m "feat: 实现 RFC-XXX (FEAT-XXX)"
    ```
 
 ---
