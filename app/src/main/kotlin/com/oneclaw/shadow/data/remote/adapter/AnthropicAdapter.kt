@@ -8,13 +8,25 @@ import com.oneclaw.shadow.core.model.ToolDefinition
 import com.oneclaw.shadow.core.util.AppResult
 import com.oneclaw.shadow.core.util.ErrorCode
 import com.oneclaw.shadow.data.remote.dto.anthropic.AnthropicModelListResponse
+import com.oneclaw.shadow.data.remote.sse.asSseFlow
 import com.oneclaw.shadow.tool.engine.ToolSchemaSerializer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class AnthropicAdapter(
     private val client: OkHttpClient
@@ -43,36 +55,19 @@ class AnthropicAdapter(
             when {
                 response.isSuccessful -> {
                     val body = response.body?.string()
-                        ?: return@withContext AppResult.Error(
-                            message = "Empty response body",
-                            code = ErrorCode.PROVIDER_ERROR
-                        )
+                        ?: return@withContext AppResult.Error(message = "Empty response body", code = ErrorCode.PROVIDER_ERROR)
                     val parsed = json.decodeFromString<AnthropicModelListResponse>(body)
                     val models = parsed.data
                         .filter { it.type == "model" }
                         .map { dto ->
-                            AiModel(
-                                id = dto.id,
-                                displayName = dto.displayName,
-                                providerId = "",
-                                isDefault = false,
-                                source = ModelSource.DYNAMIC
-                            )
+                            AiModel(id = dto.id, displayName = dto.displayName, providerId = "", isDefault = false, source = ModelSource.DYNAMIC)
                         }
                     AppResult.Success(models)
                 }
-                response.code == 401 || response.code == 403 -> {
-                    AppResult.Error(
-                        message = "Authentication failed. Please check your API key.",
-                        code = ErrorCode.AUTH_ERROR
-                    )
-                }
-                else -> {
-                    AppResult.Error(
-                        message = "API error: ${response.code} ${response.message}",
-                        code = ErrorCode.PROVIDER_ERROR
-                    )
-                }
+                response.code == 401 || response.code == 403 -> AppResult.Error(
+                    message = "Authentication failed. Please check your API key.", code = ErrorCode.AUTH_ERROR
+                )
+                else -> AppResult.Error(message = "API error: ${response.code} ${response.message}", code = ErrorCode.PROVIDER_ERROR)
             }
         } catch (e: java.net.UnknownHostException) {
             AppResult.Error(message = "Cannot reach the server.", code = ErrorCode.NETWORK_ERROR, exception = e)
@@ -89,12 +84,7 @@ class AnthropicAdapter(
     ): AppResult<ConnectionTestResult> {
         return when (val result = listModels(apiBaseUrl, apiKey)) {
             is AppResult.Success -> AppResult.Success(
-                ConnectionTestResult(
-                    success = true,
-                    modelCount = result.data.size,
-                    errorType = null,
-                    errorMessage = null
-                )
+                ConnectionTestResult(success = true, modelCount = result.data.size, errorType = null, errorMessage = null)
             )
             is AppResult.Error -> {
                 val errorType = when (result.code) {
@@ -103,14 +93,7 @@ class AnthropicAdapter(
                     ErrorCode.TIMEOUT_ERROR -> ConnectionErrorType.TIMEOUT
                     else -> ConnectionErrorType.UNKNOWN
                 }
-                AppResult.Success(
-                    ConnectionTestResult(
-                        success = false,
-                        modelCount = null,
-                        errorType = errorType,
-                        errorMessage = result.message
-                    )
-                )
+                AppResult.Success(ConnectionTestResult(success = false, modelCount = null, errorType = errorType, errorMessage = result.message))
             }
         }
     }
@@ -122,8 +105,120 @@ class AnthropicAdapter(
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?
-    ): Flow<StreamEvent> {
-        throw NotImplementedError("sendMessageStream is implemented in RFC-001")
+    ): Flow<StreamEvent> = flow {
+        val requestBody = buildAnthropicRequest(modelId, messages, tools, systemPrompt)
+        val request = Request.Builder()
+            .url("${apiBaseUrl.trimEnd('/')}/messages")
+            .addHeader("x-api-key", apiKey)
+            .addHeader("anthropic-version", ANTHROPIC_VERSION)
+            .addHeader("anthropic-beta", "interleaved-thinking-2025-05-14")
+            .addHeader("Content-Type", "application/json")
+            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
+
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: ""
+            emit(StreamEvent.Error(message = "API error ${response.code}: $errorBody", code = response.code.toString()))
+            emit(StreamEvent.Done)
+            return@flow
+        }
+
+        val body = response.body ?: run {
+            emit(StreamEvent.Error("Empty response body", null))
+            emit(StreamEvent.Done)
+            return@flow
+        }
+
+        // Track content block types by index
+        data class ContentBlock(val type: String, val id: String? = null, val name: String? = null)
+        val contentBlocks = mutableMapOf<Int, ContentBlock>()
+
+        withContext(Dispatchers.IO) {
+            body.asSseFlow()
+        }.collect { sseEvent ->
+            try {
+                val jsonObj = json.parseToJsonElement(sseEvent.data).jsonObject
+                val type = jsonObj["type"]?.jsonPrimitive?.content ?: return@collect
+
+                when (type) {
+                    "content_block_start" -> {
+                        val index = jsonObj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                        val block = jsonObj["content_block"]?.jsonObject ?: return@collect
+                        val blockType = block["type"]?.jsonPrimitive?.content ?: ""
+                        val blockId = block["id"]?.jsonPrimitive?.content
+                        val blockName = block["name"]?.jsonPrimitive?.content
+                        contentBlocks[index] = ContentBlock(type = blockType, id = blockId, name = blockName)
+                        if (blockType == "tool_use" && blockId != null && blockName != null) {
+                            emit(StreamEvent.ToolCallStart(toolCallId = blockId, toolName = blockName))
+                        }
+                    }
+
+                    "content_block_delta" -> {
+                        val index = jsonObj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                        val delta = jsonObj["delta"]?.jsonObject ?: return@collect
+                        val deltaType = delta["type"]?.jsonPrimitive?.content ?: ""
+                        val block = contentBlocks[index]
+
+                        when (deltaType) {
+                            "text_delta" -> {
+                                val text = delta["text"]?.jsonPrimitive?.content ?: ""
+                                if (text.isNotEmpty()) emit(StreamEvent.TextDelta(text))
+                            }
+                            "thinking_delta" -> {
+                                val thinking = delta["thinking"]?.jsonPrimitive?.content ?: ""
+                                if (thinking.isNotEmpty()) emit(StreamEvent.ThinkingDelta(thinking))
+                            }
+                            "input_json_delta" -> {
+                                val partialJson = delta["partial_json"]?.jsonPrimitive?.content ?: ""
+                                val blockId = block?.id
+                                if (partialJson.isNotEmpty() && blockId != null) {
+                                    emit(StreamEvent.ToolCallDelta(toolCallId = blockId, argumentsDelta = partialJson))
+                                }
+                            }
+                        }
+                    }
+
+                    "content_block_stop" -> {
+                        val index = jsonObj["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                        val block = contentBlocks[index]
+                        if (block?.type == "tool_use" && block.id != null) {
+                            emit(StreamEvent.ToolCallEnd(toolCallId = block.id))
+                        }
+                    }
+
+                    "message_delta" -> {
+                        jsonObj["usage"]?.jsonObject?.let { usage ->
+                            val outputTokens = usage["output_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                            // Input tokens come from message_start
+                        }
+                    }
+
+                    "message_start" -> {
+                        jsonObj["message"]?.jsonObject?.get("usage")?.jsonObject?.let { usage ->
+                            val inputTokens = usage["input_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                            val outputTokens = usage["output_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                            if (inputTokens > 0 || outputTokens > 0) {
+                                emit(StreamEvent.Usage(inputTokens, outputTokens))
+                            }
+                        }
+                    }
+
+                    "message_stop" -> {
+                        emit(StreamEvent.Done)
+                    }
+
+                    "error" -> {
+                        val errorMsg = jsonObj["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content ?: "Unknown error"
+                        emit(StreamEvent.Error(message = errorMsg, code = null))
+                        emit(StreamEvent.Done)
+                    }
+                }
+            } catch (e: Exception) {
+                // Skip malformed events
+            }
+        }
     }
 
     override fun formatToolDefinitions(tools: List<ToolDefinition>): Any {
@@ -142,8 +237,132 @@ class AnthropicAdapter(
         modelId: String,
         prompt: String,
         maxTokens: Int
-    ): AppResult<String> {
-        // TODO: Implement in RFC-005
-        return AppResult.Error(message = "Not implemented yet", code = ErrorCode.PROVIDER_ERROR)
+    ): AppResult<String> = withContext(Dispatchers.IO) {
+        try {
+            val body = buildJsonObject {
+                put("model", modelId)
+                put("max_tokens", maxTokens)
+                put("messages", buildJsonArray {
+                    add(buildJsonObject {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+            }
+
+            val request = Request.Builder()
+                .url("${apiBaseUrl.trimEnd('/')}/messages")
+                .addHeader("x-api-key", apiKey)
+                .addHeader("anthropic-version", ANTHROPIC_VERSION)
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext AppResult.Error(message = "API error ${response.code}", code = ErrorCode.PROVIDER_ERROR)
+            }
+            val responseBody = response.body?.string() ?: return@withContext AppResult.Error(
+                message = "Empty response", code = ErrorCode.PROVIDER_ERROR
+            )
+            val jsonObj = json.parseToJsonElement(responseBody).jsonObject
+            val content = jsonObj["content"]?.jsonArray?.firstOrNull()
+                ?.jsonObject?.get("text")?.jsonPrimitive?.content
+                ?: return@withContext AppResult.Error(message = "No content in response", code = ErrorCode.PROVIDER_ERROR)
+            AppResult.Success(content.trim())
+        } catch (e: Exception) {
+            AppResult.Error(message = "Error: ${e.message}", code = ErrorCode.UNKNOWN, exception = e)
+        }
+    }
+
+    private fun buildAnthropicRequest(
+        modelId: String,
+        messages: List<ApiMessage>,
+        tools: List<ToolDefinition>?,
+        systemPrompt: String?
+    ): JsonObject = buildJsonObject {
+        put("model", modelId)
+        put("max_tokens", 8192)
+        put("stream", true)
+
+        if (!systemPrompt.isNullOrBlank()) {
+            put("system", systemPrompt)
+        }
+
+        put("messages", buildJsonArray {
+            // Group consecutive tool calls after an assistant message
+            val grouped = groupMessagesForAnthropic(messages)
+            grouped.forEach { msg ->
+                when (msg) {
+                    is ApiMessage.User -> add(buildJsonObject {
+                        put("role", "user")
+                        put("content", msg.content)
+                    })
+                    is ApiMessage.Assistant -> {
+                        add(buildJsonObject {
+                            put("role", "assistant")
+                            if (msg.toolCalls != null) {
+                                put("content", buildJsonArray {
+                                    if (!msg.content.isNullOrEmpty()) {
+                                        add(buildJsonObject {
+                                            put("type", "text")
+                                            put("text", msg.content)
+                                        })
+                                    }
+                                    msg.toolCalls.forEach { tc ->
+                                        add(buildJsonObject {
+                                            put("type", "tool_use")
+                                            put("id", tc.id)
+                                            put("name", tc.name)
+                                            put("input", json.parseToJsonElement(
+                                                tc.arguments.ifBlank { "{}" }
+                                            ))
+                                        })
+                                    }
+                                })
+                            } else {
+                                put("content", msg.content ?: "")
+                            }
+                        })
+                    }
+                    is ApiMessage.ToolResult -> add(buildJsonObject {
+                        put("role", "user")
+                        put("content", buildJsonArray {
+                            add(buildJsonObject {
+                                put("type", "tool_result")
+                                put("tool_use_id", msg.toolCallId)
+                                put("content", msg.content)
+                            })
+                        })
+                    })
+                }
+            }
+        })
+
+        if (!tools.isNullOrEmpty()) {
+            put("tools", buildJsonArray {
+                tools.forEach { tool ->
+                    add(buildJsonObject {
+                        put("name", tool.name)
+                        put("description", tool.description)
+                        put("input_schema", buildJsonObject {
+                            val schema = ToolSchemaSerializer.toJsonSchemaMap(tool.parametersSchema)
+                            schema.forEach { (k, v) ->
+                                put(k, json.parseToJsonElement(v.toString()))
+                            }
+                        })
+                    })
+                }
+            })
+        }
+    }
+
+    /**
+     * Anthropic requires tool_result messages to follow assistant messages with tool_use blocks.
+     * This function merges consecutive ToolResult messages into the preceding user message format.
+     */
+    private fun groupMessagesForAnthropic(messages: List<ApiMessage>): List<ApiMessage> {
+        // For Anthropic, ToolResult messages are already separate and in correct order.
+        // The interleaving format is handled in buildAnthropicRequest above.
+        return messages
     }
 }

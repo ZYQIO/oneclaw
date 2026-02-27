@@ -8,13 +8,26 @@ import com.oneclaw.shadow.core.model.ToolDefinition
 import com.oneclaw.shadow.core.util.AppResult
 import com.oneclaw.shadow.core.util.ErrorCode
 import com.oneclaw.shadow.data.remote.dto.openai.OpenAiModelListResponse
+import com.oneclaw.shadow.data.remote.sse.asSseFlow
 import com.oneclaw.shadow.tool.engine.ToolSchemaSerializer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class OpenAiAdapter(
     private val client: OkHttpClient
@@ -56,37 +69,21 @@ class OpenAiAdapter(
                         }
                     AppResult.Success(models)
                 }
-                response.code == 401 || response.code == 403 -> {
-                    AppResult.Error(
-                        message = "Authentication failed. Please check your API key.",
-                        code = ErrorCode.AUTH_ERROR
-                    )
-                }
-                else -> {
-                    AppResult.Error(
-                        message = "API error: ${response.code} ${response.message}",
-                        code = ErrorCode.PROVIDER_ERROR
-                    )
-                }
+                response.code == 401 || response.code == 403 -> AppResult.Error(
+                    message = "Authentication failed. Please check your API key.",
+                    code = ErrorCode.AUTH_ERROR
+                )
+                else -> AppResult.Error(
+                    message = "API error: ${response.code} ${response.message}",
+                    code = ErrorCode.PROVIDER_ERROR
+                )
             }
         } catch (e: java.net.UnknownHostException) {
-            AppResult.Error(
-                message = "Cannot reach the server. Please check the URL and your network.",
-                code = ErrorCode.NETWORK_ERROR,
-                exception = e
-            )
+            AppResult.Error(message = "Cannot reach the server. Please check the URL and your network.", code = ErrorCode.NETWORK_ERROR, exception = e)
         } catch (e: java.net.SocketTimeoutException) {
-            AppResult.Error(
-                message = "Connection timed out.",
-                code = ErrorCode.TIMEOUT_ERROR,
-                exception = e
-            )
+            AppResult.Error(message = "Connection timed out.", code = ErrorCode.TIMEOUT_ERROR, exception = e)
         } catch (e: Exception) {
-            AppResult.Error(
-                message = "Unexpected error: ${e.message}",
-                code = ErrorCode.UNKNOWN,
-                exception = e
-            )
+            AppResult.Error(message = "Unexpected error: ${e.message}", code = ErrorCode.UNKNOWN, exception = e)
         }
     }
 
@@ -96,12 +93,7 @@ class OpenAiAdapter(
     ): AppResult<ConnectionTestResult> {
         return when (val result = listModels(apiBaseUrl, apiKey)) {
             is AppResult.Success -> AppResult.Success(
-                ConnectionTestResult(
-                    success = true,
-                    modelCount = result.data.size,
-                    errorType = null,
-                    errorMessage = null
-                )
+                ConnectionTestResult(success = true, modelCount = result.data.size, errorType = null, errorMessage = null)
             )
             is AppResult.Error -> {
                 val errorType = when (result.code) {
@@ -110,14 +102,7 @@ class OpenAiAdapter(
                     ErrorCode.TIMEOUT_ERROR -> ConnectionErrorType.TIMEOUT
                     else -> ConnectionErrorType.UNKNOWN
                 }
-                AppResult.Success(
-                    ConnectionTestResult(
-                        success = false,
-                        modelCount = null,
-                        errorType = errorType,
-                        errorMessage = result.message
-                    )
-                )
+                AppResult.Success(ConnectionTestResult(success = false, modelCount = null, errorType = errorType, errorMessage = result.message))
             }
         }
     }
@@ -129,8 +114,88 @@ class OpenAiAdapter(
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?
-    ): Flow<StreamEvent> {
-        throw NotImplementedError("sendMessageStream is implemented in RFC-001")
+    ): Flow<StreamEvent> = flow {
+        val requestBody = buildOpenAiRequest(modelId, messages, tools, systemPrompt)
+        val request = Request.Builder()
+            .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
+
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: ""
+            val code = response.code.toString()
+            emit(StreamEvent.Error(message = "API error ${response.code}: $errorBody", code = code))
+            emit(StreamEvent.Done)
+            return@flow
+        }
+
+        val body = response.body ?: run {
+            emit(StreamEvent.Error("Empty response body", null))
+            emit(StreamEvent.Done)
+            return@flow
+        }
+
+        // Track tool calls by index (OpenAI streams tool calls with index)
+        val toolCallBuilders = mutableMapOf<Int, ToolCallBuilder>()
+
+        withContext(Dispatchers.IO) {
+            body.asSseFlow()
+        }.collect { sseEvent ->
+            val data = sseEvent.data
+            if (data == "[DONE]") {
+                // Finalize any pending tool calls
+                for ((_, tc) in toolCallBuilders) {
+                    emit(StreamEvent.ToolCallEnd(tc.id))
+                }
+                emit(StreamEvent.Done)
+                return@collect
+            }
+
+            try {
+                val jsonObj = json.parseToJsonElement(data).jsonObject
+
+                // Usage
+                jsonObj["usage"]?.jsonObject?.let { usage ->
+                    val inputTokens = usage["prompt_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    val outputTokens = usage["completion_tokens"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    emit(StreamEvent.Usage(inputTokens, outputTokens))
+                }
+
+                val choice = jsonObj["choices"]?.jsonArray?.firstOrNull()?.jsonObject ?: return@collect
+                val delta = choice["delta"]?.jsonObject ?: return@collect
+
+                // Text delta
+                delta["content"]?.jsonPrimitive?.content?.let { text ->
+                    if (text.isNotEmpty()) emit(StreamEvent.TextDelta(text))
+                }
+
+                // Tool calls
+                delta["tool_calls"]?.jsonArray?.forEach { tcElement ->
+                    val tc = tcElement.jsonObject
+                    val index = tc["index"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+
+                    if (!toolCallBuilders.containsKey(index)) {
+                        val id = tc["id"]?.jsonPrimitive?.content ?: "call_$index"
+                        val name = tc["function"]?.jsonObject?.get("name")?.jsonPrimitive?.content ?: ""
+                        toolCallBuilders[index] = ToolCallBuilder(id = id, name = name)
+                        emit(StreamEvent.ToolCallStart(toolCallId = id, toolName = name))
+                    }
+
+                    val argsDelta = tc["function"]?.jsonObject?.get("arguments")?.jsonPrimitive?.content ?: ""
+                    if (argsDelta.isNotEmpty()) {
+                        val tcBuilder = toolCallBuilders[index]!!
+                        tcBuilder.arguments.append(argsDelta)
+                        emit(StreamEvent.ToolCallDelta(toolCallId = tcBuilder.id, argumentsDelta = argsDelta))
+                    }
+                }
+            } catch (e: Exception) {
+                // Skip malformed SSE events
+            }
+        }
     }
 
     override fun formatToolDefinitions(tools: List<ToolDefinition>): Any {
@@ -152,9 +217,121 @@ class OpenAiAdapter(
         modelId: String,
         prompt: String,
         maxTokens: Int
-    ): AppResult<String> {
-        // TODO: Implement in RFC-005
-        return AppResult.Error(message = "Not implemented yet", code = ErrorCode.PROVIDER_ERROR)
+    ): AppResult<String> = withContext(Dispatchers.IO) {
+        try {
+            val body = buildJsonObject {
+                put("model", modelId)
+                put("messages", buildJsonArray {
+                    add(buildJsonObject {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+                put("max_tokens", maxTokens)
+                put("stream", false)
+            }
+
+            val request = Request.Builder()
+                .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
+                .addHeader("Authorization", "Bearer $apiKey")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext AppResult.Error(
+                    message = "API error ${response.code}",
+                    code = ErrorCode.PROVIDER_ERROR
+                )
+            }
+            val responseBody = response.body?.string() ?: return@withContext AppResult.Error(
+                message = "Empty response",
+                code = ErrorCode.PROVIDER_ERROR
+            )
+            val jsonObj = json.parseToJsonElement(responseBody).jsonObject
+            val content = jsonObj["choices"]?.jsonArray?.firstOrNull()
+                ?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.content
+                ?: return@withContext AppResult.Error(message = "No content in response", code = ErrorCode.PROVIDER_ERROR)
+            AppResult.Success(content.trim())
+        } catch (e: Exception) {
+            AppResult.Error(message = "Error: ${e.message}", code = ErrorCode.UNKNOWN, exception = e)
+        }
+    }
+
+    private fun buildOpenAiRequest(
+        modelId: String,
+        messages: List<ApiMessage>,
+        tools: List<ToolDefinition>?,
+        systemPrompt: String?
+    ): JsonObject = buildJsonObject {
+        put("model", modelId)
+        put("stream", true)
+        put("stream_options", buildJsonObject { put("include_usage", true) })
+
+        put("messages", buildJsonArray {
+            if (!systemPrompt.isNullOrBlank()) {
+                add(buildJsonObject {
+                    put("role", "system")
+                    put("content", systemPrompt)
+                })
+            }
+            messages.forEach { msg ->
+                when (msg) {
+                    is ApiMessage.User -> add(buildJsonObject {
+                        put("role", "user")
+                        put("content", msg.content)
+                    })
+                    is ApiMessage.Assistant -> {
+                        if (msg.toolCalls != null) {
+                            add(buildJsonObject {
+                                put("role", "assistant")
+                                if (!msg.content.isNullOrEmpty()) put("content", msg.content)
+                                put("tool_calls", buildJsonArray {
+                                    msg.toolCalls.forEach { tc ->
+                                        add(buildJsonObject {
+                                            put("id", tc.id)
+                                            put("type", "function")
+                                            put("function", buildJsonObject {
+                                                put("name", tc.name)
+                                                put("arguments", tc.arguments)
+                                            })
+                                        })
+                                    }
+                                })
+                            })
+                        } else {
+                            add(buildJsonObject {
+                                put("role", "assistant")
+                                put("content", msg.content ?: "")
+                            })
+                        }
+                    }
+                    is ApiMessage.ToolResult -> add(buildJsonObject {
+                        put("role", "tool")
+                        put("tool_call_id", msg.toolCallId)
+                        put("content", msg.content)
+                    })
+                }
+            }
+        })
+
+        if (!tools.isNullOrEmpty()) {
+            put("tools", buildJsonArray {
+                tools.forEach { tool ->
+                    add(buildJsonObject {
+                        put("type", "function")
+                        put("function", buildJsonObject {
+                            put("name", tool.name)
+                            put("description", tool.description)
+                            put("parameters", JsonObject(ToolSchemaSerializer.toJsonSchemaMap(tool.parametersSchema).mapValues { (_, v) ->
+                                json.parseToJsonElement(v.toString())
+                            }))
+                        })
+                    })
+                }
+            })
+            put("tool_choice", "auto")
+        }
     }
 
     private fun isRelevantOpenAiModel(modelId: String): Boolean {
@@ -163,8 +340,8 @@ class OpenAiAdapter(
     }
 
     private fun formatOpenAiModelName(modelId: String): String {
-        return modelId
-            .replace("gpt-", "GPT-")
-            .replace("-mini", " Mini")
+        return modelId.replace("gpt-", "GPT-").replace("-mini", " Mini")
     }
+
+    private data class ToolCallBuilder(val id: String, val name: String, val arguments: StringBuilder = StringBuilder())
 }

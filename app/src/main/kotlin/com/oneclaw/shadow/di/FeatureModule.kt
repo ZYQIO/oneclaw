@@ -1,5 +1,14 @@
 package com.oneclaw.shadow.di
 
+import com.oneclaw.shadow.feature.agent.AgentDetailViewModel
+import com.oneclaw.shadow.feature.agent.AgentListViewModel
+import com.oneclaw.shadow.feature.agent.usecase.CloneAgentUseCase
+import com.oneclaw.shadow.feature.agent.usecase.CreateAgentUseCase
+import com.oneclaw.shadow.feature.agent.usecase.DeleteAgentUseCase
+import com.oneclaw.shadow.feature.agent.usecase.GetAgentToolsUseCase
+import com.oneclaw.shadow.feature.agent.usecase.ResolveModelUseCase
+import com.oneclaw.shadow.feature.chat.ChatViewModel
+import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
 import com.oneclaw.shadow.feature.provider.ProviderDetailViewModel
 import com.oneclaw.shadow.feature.provider.ProviderListViewModel
 import com.oneclaw.shadow.feature.provider.SetupViewModel
@@ -17,17 +26,17 @@ import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.dsl.module
 
 val featureModule = module {
-    // Phase 2: Provider feature use cases
+    // RFC-003: Provider feature use cases
     factory { TestConnectionUseCase(get()) }
     factory { FetchModelsUseCase(get()) }
     factory { SetDefaultModelUseCase(get()) }
 
-    // Phase 2: Provider feature view models
+    // RFC-003: Provider feature view models
     viewModelOf(::ProviderListViewModel)
     viewModelOf(::ProviderDetailViewModel)
     viewModelOf(::SetupViewModel)
 
-    // Phase 4 (RFC-005): Session feature use cases
+    // RFC-005: Session feature use cases
     factory { CreateSessionUseCase(get()) }
     factory { DeleteSessionUseCase(get()) }
     factory { BatchDeleteSessionsUseCase(get()) }
@@ -35,6 +44,23 @@ val featureModule = module {
     factory { GenerateTitleUseCase(get(), get(), get(), get()) }
     factory { CleanupSoftDeletedUseCase(get()) }
 
-    // Phase 4 (RFC-005): Session feature view model
+    // RFC-005: Session feature view model
     viewModelOf(::SessionListViewModel)
+
+    // RFC-002: Agent feature use cases
+    factory { CreateAgentUseCase(get()) }
+    factory { CloneAgentUseCase(get()) }
+    factory { DeleteAgentUseCase(get(), get()) }
+    factory { GetAgentToolsUseCase(get(), get()) }
+    factory { ResolveModelUseCase(get(), get()) }
+
+    // RFC-002: Agent feature view models
+    viewModelOf(::AgentListViewModel)
+    viewModelOf(::AgentDetailViewModel)
+
+    // RFC-001: Chat feature use cases
+    factory { SendMessageUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
+
+    // RFC-001: Chat feature view model
+    viewModelOf(::ChatViewModel)
 }

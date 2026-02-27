@@ -76,13 +76,25 @@ class AgentDaoTest {
     }
 
     @Test
-    fun deleteAgent() = runTest {
-        val agent = createAgent()
+    fun deleteCustomAgent() = runTest {
+        val agent = createAgent(isBuiltIn = false)
         agentDao.insert(agent)
-        agentDao.delete("agent-test")
+        val deleted = agentDao.deleteCustomAgent("agent-test")
 
+        assertEquals(1, deleted)
         val result = agentDao.getAgentById("agent-test")
         assertNull(result)
+    }
+
+    @Test
+    fun deleteCustomAgent_doesNotDeleteBuiltIn() = runTest {
+        val agent = createAgent(isBuiltIn = true)
+        agentDao.insert(agent)
+        val deleted = agentDao.deleteCustomAgent("agent-test")
+
+        assertEquals(0, deleted)
+        val result = agentDao.getAgentById("agent-test")
+        assertNotNull(result)
     }
 
     @Test

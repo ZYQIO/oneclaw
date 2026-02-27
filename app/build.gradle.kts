@@ -53,6 +53,10 @@ android {
         unitTests.all {
             // JUnit 5 platform with vintage engine enabled for JUnit 4 (Robolectric screenshot tests)
             it.useJUnitPlatform()
+            // Roborazzi/Robolectric screenshot tests only run under the debug variant
+            if (it.name.contains("Release", ignoreCase = true)) {
+                it.exclude("**/screenshot/**")
+            }
         }
         unitTests {
             isIncludeAndroidResources = true

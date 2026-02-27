@@ -7,6 +7,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.oneclaw.shadow.core.repository.SettingsRepository
+import com.oneclaw.shadow.feature.agent.AgentDetailScreen
+import com.oneclaw.shadow.feature.agent.AgentListScreen
+import com.oneclaw.shadow.feature.chat.ChatScreen
 import com.oneclaw.shadow.feature.provider.ProviderDetailScreen
 import com.oneclaw.shadow.feature.provider.ProviderListScreen
 import com.oneclaw.shadow.feature.provider.SetupScreen
@@ -36,25 +39,38 @@ fun AppNavGraph(
         modifier = modifier
     ) {
         composable(Route.Chat.path) {
-            PlaceholderScreen("Chat (New)")
+            ChatScreen(
+                onNavigateToSettings = { navController.navigate(Route.Settings.path) }
+            )
         }
 
         composable(Route.ChatSession.PATH) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId") ?: ""
-            PlaceholderScreen("Chat: $sessionId")
+            ChatScreen(
+                onNavigateToSettings = { navController.navigate(Route.Settings.path) }
+            )
         }
 
         composable(Route.AgentList.path) {
-            PlaceholderScreen("Agent List")
+            AgentListScreen(
+                onAgentClick = { agentId ->
+                    navController.navigate(Route.AgentDetail.create(agentId))
+                },
+                onCreateAgent = { navController.navigate(Route.AgentCreate.path) },
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable(Route.AgentDetail.PATH) { backStackEntry ->
-            val agentId = backStackEntry.arguments?.getString("agentId") ?: ""
-            PlaceholderScreen("Agent Detail: $agentId")
+            AgentDetailScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable(Route.AgentCreate.path) {
-            PlaceholderScreen("Create Agent")
+            AgentDetailScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable(Route.ProviderList.path) {
@@ -85,18 +101,9 @@ fun AppNavGraph(
         composable(Route.Settings.path) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onManageProviders = { navController.navigate(Route.ProviderList.path) }
+                onManageProviders = { navController.navigate(Route.ProviderList.path) },
+                onManageAgents = { navController.navigate(Route.AgentList.path) }
             )
         }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(title: String) {
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier.then(Modifier),
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
-        androidx.compose.material3.Text(text = title)
     }
 }

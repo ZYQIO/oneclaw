@@ -116,13 +116,16 @@ class OpenAiAdapterTest {
     }
 
     @Test
-    fun `sendMessageStream throws NotImplementedError`() {
-        val thrown = try {
-            adapter.sendMessageStream("url", "key", "gpt-4o", emptyList(), null, null)
+    fun `sendMessageStream returns a Flow without throwing`() {
+        // sendMessageStream is now implemented; calling it should return a Flow, not throw
+        val flow = adapter.sendMessageStream(
+            server.url("/").toString().trimEnd('/'),
+            "test-key",
+            "gpt-4o",
+            emptyList(),
+            null,
             null
-        } catch (e: NotImplementedError) {
-            e
-        }
-        assertTrue(thrown != null)
+        )
+        assertTrue(flow != null)
     }
 }

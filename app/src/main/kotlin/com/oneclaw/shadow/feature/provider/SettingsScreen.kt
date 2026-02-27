@@ -26,7 +26,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onManageProviders: () -> Unit
+    onManageProviders: () -> Unit,
+    onManageAgents: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -45,6 +46,12 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            SettingsItem(
+                title = "Manage Agents",
+                subtitle = "Create and configure AI agents",
+                onClick = onManageAgents
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             SettingsItem(
                 title = "Manage Providers",
                 subtitle = "Add API keys, configure models",
