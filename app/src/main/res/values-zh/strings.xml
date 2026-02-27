@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">OneClaw Shadow</string>
+    <string name="new_chat">新对话</string>
+    <string name="settings">设置</string>
+    <string name="agents">智能体</string>
+    <string name="providers">提供商</string>
+    <string name="sessions">会话</string>
+    <string name="send">发送</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="save">保存</string>
+    <string name="ok">确定</string>
+    <string name="error">错误</string>
+    <string name="loading">加载中...</string>
+    <string name="no_provider_configured">未配置提供商。请在设置中添加提供商。</string>
+    <string name="type_a_message">输入消息...</string>
+</resources>

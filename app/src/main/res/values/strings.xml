@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">OneClaw Shadow</string>
+    <string name="new_chat">New Chat</string>
+    <string name="settings">Settings</string>
+    <string name="agents">Agents</string>
+    <string name="providers">Providers</string>
+    <string name="sessions">Sessions</string>
+    <string name="send">Send</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="ok">OK</string>
+    <string name="error">Error</string>
+    <string name="loading">Loading...</string>
+    <string name="no_provider_configured">No provider configured. Please set up a provider in Settings.</string>
+    <string name="type_a_message">Type a message...</string>
+</resources>
