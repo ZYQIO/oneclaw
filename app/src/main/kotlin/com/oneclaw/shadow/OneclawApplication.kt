@@ -7,10 +7,16 @@ import com.oneclaw.shadow.di.featureModule
 import com.oneclaw.shadow.di.networkModule
 import com.oneclaw.shadow.di.repositoryModule
 import com.oneclaw.shadow.di.toolModule
+import com.oneclaw.shadow.feature.session.usecase.CleanupSoftDeletedUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
+import org.koin.java.KoinJavaComponent.get
 
 class OneclawApplication : Application() {
     override fun onCreate() {
@@ -28,6 +34,8 @@ class OneclawApplication : Application() {
             )
         }
 
-        // TODO: Phase 5 - Add CleanupSoftDeletedUseCase call on startup
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            get<CleanupSoftDeletedUseCase>(CleanupSoftDeletedUseCase::class.java)()
+        }
     }
 }

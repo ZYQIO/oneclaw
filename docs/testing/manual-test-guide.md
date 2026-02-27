@@ -13,8 +13,8 @@ This document is the cumulative, always-up-to-date guide for manually testing th
 |-------|-------|
 | Last updated | 2026-02-27 |
 | App version | 0.1.0 |
-| Last RFC implemented | RFC-004 (Tool System) |
-| Status | Provider Management + Tool System implemented; Chat not yet implemented |
+| Last RFC implemented | RFC-005 (Session Management) |
+| Status | Provider Management + Tool System + Session Management backend implemented; Chat not yet implemented |
 
 ---
 
@@ -37,14 +37,15 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 
 ## Current App State
 
-As of the last implemented RFC (RFC-004), the app supports:
+As of the last implemented RFC (RFC-005), the app supports:
 - First-launch setup flow (choose provider, enter API key, select default model)
 - Provider management (list, detail, API key, connection test, model list)
 - Settings screen
 - Tool system (backend only — no UI for tool configuration yet)
+- Session management (backend + drawer UI ready, but not yet wired to MainActivity nav graph)
 - Chat screen (placeholder — sending messages not yet functional)
 
-**Not yet implemented:** Chat message sending and streaming (RFC-001), Agent management UI (RFC-002), Session management UI (RFC-005).
+**Not yet implemented:** Chat message sending and streaming (RFC-001), Agent management UI (RFC-002), Session drawer wired to chat (RFC-001 integration point).
 
 ---
 
@@ -269,8 +270,11 @@ Tap the hamburger icon (top-left).
 
 **Verify:**
 - Drawer opens
-- "New Conversation" option may be visible
-- Any existing sessions are listed (initially empty)
+- "New Conversation" button is visible at the top
+- Any existing sessions are listed (initially empty on fresh install)
+- Session items (once created) show: title, message preview, relative timestamp, agent name chip
+- Long-pressing a session item enters selection mode (checkboxes appear, bulk-delete toolbar shown)
+- Swiping a session item to the left reveals delete action
 
 ---
 
@@ -281,7 +285,7 @@ Tap the hamburger icon (top-left).
 | Sending chat messages | Not implemented | RFC-001 |
 | Streaming AI response | Not implemented | RFC-001 |
 | Agent creation/management UI | Not implemented | RFC-002 |
-| Session list with history | Not implemented | RFC-005 |
+| Session drawer wired to nav graph | Not implemented | RFC-001 integration |
 | Tool call visualization in chat | Not implemented | RFC-001 + RFC-004 |
 
 ---
@@ -291,3 +295,4 @@ Tap the hamburger icon (top-left).
 | Date | RFC | Changes |
 |------|-----|---------|
 | 2026-02-27 | RFC-003, RFC-004 | Initial guide — covers Setup, Settings, Provider management flows |
+| 2026-02-27 | RFC-005 | Updated current state, Flow 6.2 session drawer detail, known limitations |

@@ -13,8 +13,8 @@
 |------|------|
 | 最后更新 | 2026-02-27 |
 | App 版本 | 0.1.0 |
-| 最后实现的 RFC | RFC-004（Tool 系统） |
-| 当前状态 | Provider 管理 + Tool 系统已实现；Chat 功能尚未实现 |
+| 最后实现的 RFC | RFC-005（Session 管理） |
+| 当前状态 | Provider 管理 + Tool 系统 + Session 管理后端已实现；Chat 功能尚未实现 |
 
 ---
 
@@ -37,14 +37,15 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 
 ## 当前 App 状态
 
-截至最后实现的 RFC（RFC-004），App 支持以下功能：
+截至最后实现的 RFC（RFC-005），App 支持以下功能：
 - 首次启动引导流程（选择 Provider、输入 API key、选择默认模型）
 - Provider 管理（列表、详情、API key、连接测试、模型列表）
 - 设置界面
 - Tool 系统（仅后端实现，暂无 Tool 配置 UI）
+- Session 管理（后端 + 抽屉 UI 已就绪，但尚未接入 MainActivity 导航图）
 - Chat 界面（占位符状态，发送消息功能尚未实现）
 
-**尚未实现：** Chat 消息发送和流式响应（RFC-001）、Agent 管理 UI（RFC-002）、Session 管理 UI（RFC-005）。
+**尚未实现：** Chat 消息发送和流式响应（RFC-001）、Agent 管理 UI（RFC-002）、Session 抽屉接入导航图（RFC-001 集成点）。
 
 ---
 
@@ -269,8 +270,11 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 
 **验证：**
 - 抽屉打开
-- 可能显示"New Conversation"选项
-- 列出已有 Session（初始状态下为空）
+- 顶部显示"New Conversation"按钮
+- 列出已有 Session（全新安装时为空）
+- 已有 Session 项（创建后）显示：标题、消息预览、相对时间戳、Agent 名称标签
+- 长按某个 Session 项可进入选择模式（显示复选框和批量删除工具栏）
+- 向左滑动 Session 项可触发删除操作
 
 ---
 
@@ -281,7 +285,7 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 | 发送 Chat 消息 | 未实现 | RFC-001 |
 | 流式 AI 响应 | 未实现 | RFC-001 |
 | Agent 创建/管理 UI | 未实现 | RFC-002 |
-| 带历史记录的 Session 列表 | 未实现 | RFC-005 |
+| Session 抽屉接入导航图 | 未实现 | RFC-001 集成 |
 | Chat 中的 Tool 调用可视化 | 未实现 | RFC-001 + RFC-004 |
 
 ---
@@ -291,3 +295,4 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 | 日期 | RFC | 变更内容 |
 |------|-----|---------|
 | 2026-02-27 | RFC-003、RFC-004 | 初始版本，涵盖 Setup、Settings、Provider 管理流程 |
+| 2026-02-27 | RFC-005 | 更新当前状态，补充步骤 6.2 Session 抽屉细节，更新已知限制表 |
