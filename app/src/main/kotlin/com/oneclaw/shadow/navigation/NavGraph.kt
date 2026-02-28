@@ -19,7 +19,8 @@ import org.koin.compose.koinInject
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    notificationSessionId: String? = null
 ) {
     val settingsRepository: SettingsRepository = koinInject()
 
@@ -28,6 +29,11 @@ fun AppNavGraph(
         val hasCompletedSetup = settingsRepository.getBoolean("has_completed_setup", false)
         if (!hasCompletedSetup) {
             navController.navigate(Route.Setup.path) {
+                popUpTo(Route.Chat.path) { inclusive = true }
+            }
+        } else if (notificationSessionId != null) {
+            // RFC-008: Navigate to session from notification tap
+            navController.navigate(Route.ChatSession.create(notificationSessionId)) {
                 popUpTo(Route.Chat.path) { inclusive = true }
             }
         }

@@ -1,6 +1,8 @@
 package com.oneclaw.shadow
 
 import android.app.Application
+import com.oneclaw.shadow.core.lifecycle.AppLifecycleObserver
+import com.oneclaw.shadow.core.notification.NotificationHelper
 import com.oneclaw.shadow.core.theme.ThemeManager
 import com.oneclaw.shadow.di.appModule
 import com.oneclaw.shadow.di.databaseModule
@@ -34,6 +36,12 @@ class OneclawApplication : Application() {
                 featureModule
             )
         }
+
+        // RFC-008: Register app lifecycle observer for foreground detection
+        get<AppLifecycleObserver>(AppLifecycleObserver::class.java).register()
+
+        // RFC-008: Create notification channel (required for Android 8+)
+        get<NotificationHelper>(NotificationHelper::class.java).createNotificationChannel()
 
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             get<CleanupSoftDeletedUseCase>(CleanupSoftDeletedUseCase::class.java)()

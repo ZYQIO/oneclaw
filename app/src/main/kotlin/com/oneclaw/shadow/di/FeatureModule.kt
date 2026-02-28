@@ -1,5 +1,7 @@
 package com.oneclaw.shadow.di
 
+import com.oneclaw.shadow.core.lifecycle.AppLifecycleObserver
+import com.oneclaw.shadow.core.notification.NotificationHelper
 import com.oneclaw.shadow.feature.agent.AgentDetailViewModel
 import com.oneclaw.shadow.feature.agent.AgentListViewModel
 import com.oneclaw.shadow.feature.agent.usecase.CloneAgentUseCase
@@ -23,10 +25,15 @@ import com.oneclaw.shadow.feature.session.usecase.CreateSessionUseCase
 import com.oneclaw.shadow.feature.session.usecase.DeleteSessionUseCase
 import com.oneclaw.shadow.feature.session.usecase.GenerateTitleUseCase
 import com.oneclaw.shadow.feature.session.usecase.RenameSessionUseCase
+import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.dsl.module
 
 val featureModule = module {
+    // RFC-008: Notification dependencies
+    single { AppLifecycleObserver() }
+    single { NotificationHelper(androidContext()) }
+
     // RFC-003: Provider feature use cases
     factory { TestConnectionUseCase(get()) }
     factory { FetchModelsUseCase(get()) }

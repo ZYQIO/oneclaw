@@ -7,6 +7,8 @@ import com.oneclaw.shadow.core.model.Message
 import com.oneclaw.shadow.core.model.MessageType
 import com.oneclaw.shadow.core.model.ToolCallStatus
 import com.oneclaw.shadow.core.model.ToolResultStatus
+import com.oneclaw.shadow.core.lifecycle.AppLifecycleObserver
+import com.oneclaw.shadow.core.notification.NotificationHelper
 import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.core.repository.MessageRepository
 import com.oneclaw.shadow.core.repository.ProviderRepository
@@ -32,7 +34,9 @@ class ChatViewModel(
     private val agentRepository: AgentRepository,
     private val providerRepository: ProviderRepository,
     private val createSessionUseCase: CreateSessionUseCase,
-    private val generateTitleUseCase: GenerateTitleUseCase
+    private val generateTitleUseCase: GenerateTitleUseCase,
+    private val appLifecycleObserver: AppLifecycleObserver,
+    private val notificationHelper: NotificationHelper
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -254,6 +258,11 @@ class ChatViewModel(
             }
             is ChatEvent.ResponseComplete -> {
                 finishStreaming(sessionId)
+                // RFC-008: Notify if app is in background
+                if (!appLifecycleObserver.isInForeground) {
+                    val preview = event.message.content
+                    notificationHelper.sendTaskCompletedNotification(sessionId, preview)
+                }
             }
             is ChatEvent.CompactStarted -> {
                 _uiState.update { it.copy(isCompacting = true) }
@@ -267,6 +276,10 @@ class ChatViewModel(
             }
             is ChatEvent.Error -> {
                 handleError(sessionId, event)
+                // RFC-008: Notify if app is in background
+                if (!appLifecycleObserver.isInForeground) {
+                    notificationHelper.sendTaskFailedNotification(sessionId, event.message)
+                }
             }
         }
     }
