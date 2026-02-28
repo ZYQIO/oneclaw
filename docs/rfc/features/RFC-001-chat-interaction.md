@@ -2367,6 +2367,123 @@ val featureModule = module {
 - Tool call with malformed JSON arguments
 - Model returns empty response
 
+### Layer 2 Visual Verification Flows
+
+Each flow is independent. Run them in any order. Preconditions must be satisfied before starting a flow.
+
+---
+
+**Flow 1-1: Send message — streaming response appears**
+
+Preconditions: App installed fresh. At least one provider configured with a valid API key and a default model set.
+
+1. Launch the app. Verify the chat screen opens (TopAppBar visible, input field at bottom).
+2. Tap the input field and type: `Hello, who are you?`
+3. Tap the Send button (paper plane icon).
+4. Screenshot: capture the chat screen within 2 seconds of tapping Send. Verify: user message bubble appears right-aligned, streaming AI bubble appears below it with a blinking cursor, Stop button (square icon) is visible in the input area.
+5. Wait for streaming to complete (Stop button disappears, Send button reappears).
+6. Screenshot: capture the final state. Verify: AI response bubble shows non-empty text, action row (copy icon, regenerate icon, model badge) is visible below the AI bubble.
+
+---
+
+**Flow 1-2: Streaming completes — action row and model badge appear**
+
+Preconditions: A completed AI message already exists in the current session (can reuse session from Flow 1-1, or start fresh and wait for any message to complete).
+
+1. Open the app to a session that has at least one completed AI message.
+2. Screenshot: capture the last AI message bubble. Verify: below the bubble there is a row containing at minimum a copy icon and a regenerate icon. A model badge (text showing model name) is also visible to the right.
+3. Verify the Stop button is NOT visible — Send button is visible instead.
+
+---
+
+**Flow 1-3: Stop generation — button reverts, partial text preserved**
+
+Preconditions: Valid API key configured. A model that produces long responses (e.g., ask it to write a detailed essay).
+
+1. Open the app to a fresh chat (no messages).
+2. Type: `Write a 500-word essay about the history of the internet.` and tap Send.
+3. Immediately after the AI begins streaming (streaming bubble appears), tap the Stop button.
+4. Screenshot immediately after tapping Stop. Verify: Stop button changes back to Send button within 1 second.
+5. Wait 1 second. Screenshot again. Verify: the partial AI response text (whatever was streamed before Stop) is visible as a completed message bubble, and the input field is enabled.
+
+---
+
+**Flow 1-4: Regenerate response**
+
+Preconditions: A session with at least one completed AI response. No streaming in progress.
+
+1. Open the app to a session with a completed AI message.
+2. Locate the last AI message bubble. Verify the regenerate icon (circular arrows) is visible in the action row.
+3. Tap the regenerate icon.
+4. Screenshot within 2 seconds. Verify: the previous AI response is removed, a streaming bubble with blinking cursor appears in its place, the Stop button is visible.
+5. Wait for streaming to complete.
+6. Screenshot. Verify: a new AI response bubble is shown, the action row (copy, regenerate, model badge) is visible again.
+
+---
+
+**Flow 1-5: Keyboard appears — TopAppBar stays visible**
+
+Preconditions: Any session open (empty or with messages).
+
+1. Open the app to the chat screen. Verify the TopAppBar (hamburger menu, agent name, settings icon) is fully visible at the top.
+2. Tap the input text field to bring up the software keyboard.
+3. Screenshot with keyboard open. Verify: the TopAppBar is still fully visible at the top of the screen — it must not be pushed off-screen or obscured by the keyboard.
+4. Verify the input field and Send button are visible above the keyboard.
+
+---
+
+**Flow 1-6: Long-press copy on user message**
+
+Preconditions: A session with at least one user message.
+
+1. Open the app to a session containing a user message bubble.
+2. Long-press the user message bubble.
+3. Screenshot immediately after long-press. Verify: a system copy action is triggered (either a toast "Copied", a snackbar, or the OS clipboard popup appears — exact appearance depends on Android version).
+4. Open any other app with a text field (e.g., the address bar of a browser or a notes app). Paste. Verify the pasted text matches the original message content.
+
+---
+
+**Flow 1-7: Tool call loop — ToolCallCard and ToolResultCard visible**
+
+Preconditions: An agent with the `get_current_time` tool enabled is configured as default (or selected). Valid API key set.
+
+1. Open the app to a fresh chat. Verify the agent name in the TopAppBar includes a tool-enabled agent.
+2. Type: `What time is it right now?` and tap Send.
+3. Screenshot within 3 seconds. Verify: below the streaming AI bubble, a ToolCallCard appears showing the tool name (`get_current_time`) and a spinning progress indicator.
+4. Wait for tool execution to complete.
+5. Screenshot. Verify: the ToolCallCard now shows a checkmark icon (SUCCESS), and a ToolResultCard appears below it showing the tool result output (a timestamp string).
+6. Wait for the final AI response to stream and complete.
+7. Screenshot. Verify: the final AI message mentions the current time, and the action row is visible.
+
+---
+
+**Flow 1-8: Error message — error card and Retry button visible**
+
+Preconditions: A provider is configured with an INVALID API key (e.g., set the key to `invalid-key-123`).
+
+1. Open the app to a fresh chat session.
+2. Type: `Hello` and tap Send.
+3. Wait up to 10 seconds for the error response.
+4. Screenshot. Verify: an error card (red/error-colored surface) appears in the message list. The error text mentions authentication or API key. A "Retry" button is visible inside the error card.
+5. Tap the Retry button.
+6. Screenshot within 2 seconds. Verify: the error card disappears and a new streaming attempt begins (Stop button visible) — OR the same error card reappears if the key is still invalid. Either outcome is acceptable as long as Retry triggers a new attempt.
+
+---
+
+**Flow 1-9: Thinking block — collapse and expand**
+
+Preconditions: An Anthropic provider configured with a model that supports extended thinking (e.g., `claude-opus-4-5-20251101`). Valid API key. Extended thinking enabled in agent or model settings.
+
+1. Open the app to a fresh chat.
+2. Type: `Solve this step by step: What is 17 × 23?` and tap Send.
+3. Wait for the response to complete.
+4. Screenshot. Verify: above the AI response bubble, a "Thinking..." collapsed block is visible (shows a chevron icon and the label "Thinking..."). The block is collapsed by default — the thinking content is not shown.
+5. Tap the "Thinking..." block header.
+6. Screenshot immediately after tapping. Verify: the block expands, showing the model's internal reasoning text in a smaller font below the "Thinking..." label.
+7. Tap the block header again. Verify the block collapses back.
+
+---
+
 ## Security Considerations
 
 1. **API keys**: Only used inside adapters for HTTP requests. Never logged, never stored in messages.

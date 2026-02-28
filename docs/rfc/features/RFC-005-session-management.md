@@ -1785,6 +1785,159 @@ AI title generation is designed to be resilient:
 - Batch delete all sessions, undo
 - Session with 10,000+ messages (list render performance)
 
+### Layer 2 Visual Verification Flows
+
+Each flow is independent. All flows that involve sending messages require a configured provider with a valid API key.
+Screenshot after each numbered step that says "Screenshot".
+
+---
+
+#### Flow 5-1: Session Drawer Opens and Displays Sessions
+
+**Precondition:** At least one session exists (send one message first if needed).
+
+```
+Goal: Verify the session drawer opens from the hamburger icon and lists sessions correctly.
+
+Steps:
+1. Navigate to the Chat screen.
+2. Tap the hamburger icon (top-left).
+3. Screenshot -> Verify:
+   - Drawer slides in from the left.
+   - "New Conversation" button at the top.
+   - Session list shows at least one session with: title, message preview, relative timestamp, agent chip.
+4. Tap outside the drawer (or swipe left) to close it.
+5. Screenshot -> Verify: Drawer is closed, Chat screen visible.
+```
+
+---
+
+#### Flow 5-2: Lazy Session Creation — Session Appears After First Message
+
+**Precondition:** Valid API key configured. Start a new conversation (empty chat, no session ID yet).
+
+```
+Goal: Verify that no session is created until the first message is sent, then it appears in the drawer.
+
+Steps:
+1. Start a new conversation (tap "New Conversation" in the drawer, or on fresh launch).
+2. Open the drawer.
+3. Screenshot -> Verify: The current (empty) conversation does NOT appear in the session list yet.
+4. Close the drawer. Type a message and tap Send.
+5. Wait for the AI to respond (streaming completes).
+6. Open the drawer.
+7. Screenshot -> Verify:
+   - The new session now appears in the session list.
+   - Title is a truncated version of the first message (Phase 1 title).
+```
+
+---
+
+#### Flow 5-3: AI Title Generation After First Response
+
+**Precondition:** Valid API key configured. Send one message and wait for a full response.
+
+```
+Goal: Verify the session title updates to an AI-generated title after the first exchange.
+
+Steps:
+1. Send a distinctive message: "Tell me about the history of the Eiffel Tower."
+2. Wait for streaming to complete fully.
+3. Open the session drawer.
+4. Screenshot -> Verify:
+   - Session title has been updated from the truncated message to a meaningful AI-generated title
+     (e.g., "Eiffel Tower History" or similar — not the raw message text truncated).
+   Note: AI title is generated asynchronously; allow a few seconds after streaming ends.
+```
+
+---
+
+#### Flow 5-4: Switch Between Sessions
+
+**Precondition:** At least two sessions exist with different messages.
+
+```
+Goal: Verify tapping a session in the drawer switches the chat to that session's messages.
+
+Steps:
+1. Open the drawer.
+2. Note the titles of at least two sessions.
+3. Tap the second session.
+4. Screenshot -> Verify:
+   - Drawer closed.
+   - Chat shows that session's messages (correct content visible).
+   - Top bar shows the correct session's agent name.
+5. Open the drawer and tap the first session.
+6. Screenshot -> Verify: Chat switches back to the first session's messages.
+```
+
+---
+
+#### Flow 5-5: Swipe to Delete a Session — With Undo
+
+**Precondition:** At least one session exists in the drawer.
+
+```
+Goal: Verify swipe-to-delete removes the session and the Undo snackbar appears.
+
+Steps:
+1. Open the drawer.
+2. Swipe a session item to the left.
+3. Screenshot -> Verify:
+   - Session is removed from the list.
+   - A Snackbar appears at the bottom with an "Undo" action.
+4. Tap "Undo" in the Snackbar.
+5. Screenshot -> Verify: The session reappears in the list (deletion undone).
+6. Swipe the same session again.
+7. Wait for the Snackbar to auto-dismiss (do NOT tap Undo).
+8. Screenshot -> Verify: Session remains gone; Snackbar dismissed (hard-deleted).
+```
+
+---
+
+#### Flow 5-6: Rename a Session
+
+**Precondition:** At least one session exists.
+
+```
+Goal: Verify renaming a session via long-press updates the title in the drawer.
+
+Steps:
+1. Open the drawer.
+2. Long-press a session item.
+3. Screenshot -> Verify: Selection mode entered — checkboxes appear on session items.
+   Note: Rename may be accessible via a context menu or toolbar button in selection mode.
+   (If rename is via long-press context menu instead, adapt steps accordingly.)
+4. Find and tap the Rename option.
+5. Screenshot -> Verify: Rename dialog/input appears with current title pre-filled.
+6. Clear the field and enter "My Renamed Session".
+7. Tap "Save" (or "OK").
+8. Screenshot -> Verify: Session item in the drawer now shows "My Renamed Session".
+```
+
+---
+
+#### Flow 5-7: Batch Delete Sessions
+
+**Precondition:** At least two sessions exist.
+
+```
+Goal: Verify long-press selection mode enables batch deletion of multiple sessions.
+
+Steps:
+1. Open the drawer.
+2. Long-press a session to enter selection mode.
+3. Screenshot -> Verify: Checkboxes visible; at least one session selected (highlighted).
+4. Tap another session to select it too.
+5. Screenshot -> Verify: Two sessions selected (both highlighted/checked).
+6. Tap the Delete (trash) icon in the toolbar.
+7. Screenshot -> Verify:
+   - Both sessions removed from the list.
+   - Snackbar appears with "Undo" action.
+8. Tap "Undo".
+9. Screenshot -> Verify: Both sessions reappear.
+```
+
 ## Security Considerations
 
 1. **No sensitive data in sessions**: Session metadata (title, agent ID, timestamps) is not sensitive.

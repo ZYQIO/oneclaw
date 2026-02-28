@@ -1489,6 +1489,113 @@ The app never crashes from a tool error. The model always gets a result (success
 - Concurrent permission requests (should be serialized)
 - Tool execution cancelled (coroutine cancellation)
 
+### Layer 2 Visual Verification Flows
+
+Each flow is independent. All flows require a configured provider with a valid API key.
+Screenshot after each numbered step that says "Screenshot".
+
+---
+
+#### Flow 4-1: get_current_time Tool — Single Tool Call
+
+**Precondition:** Valid API key configured. Navigate to Chat screen.
+
+```
+Goal: Verify the get_current_time tool executes and its result appears in the chat.
+
+Steps:
+1. Send message: "What is the current time?"
+2. Screenshot -> Verify: User message bubble visible on the right.
+3. Wait for tool call to start (up to 5 seconds).
+4. Screenshot -> Verify: Tool call card visible showing:
+   - Tool name: "get_current_time"
+   - Status: PENDING or EXECUTING (spinner or indicator)
+5. Wait for tool to complete (up to 5 seconds).
+6. Screenshot -> Verify:
+   - Tool call card status updated to SUCCESS (green or checkmark).
+   - Tool result shown (current time string).
+   - Final AI response visible referencing the current time.
+```
+
+---
+
+#### Flow 4-2: read_file Tool — File Read
+
+**Precondition:** Valid API key configured. A known file path exists on the device
+(e.g., create one first: `adb shell "echo 'hello world' > /sdcard/test.txt"`).
+
+```
+Goal: Verify the read_file tool reads a file and returns its content to the model.
+
+Steps:
+1. adb shell "echo 'hello world' > /sdcard/test.txt"
+2. Send message: "Please read the file at /sdcard/test.txt and tell me what it says."
+3. Wait for tool call to appear.
+4. Screenshot -> Verify: Tool call card for "read_file" with status PENDING/EXECUTING.
+5. Wait for completion.
+6. Screenshot -> Verify:
+   - Tool call card shows SUCCESS.
+   - Final AI response mentions "hello world" (the file content).
+```
+
+---
+
+#### Flow 4-3: http_request Tool — HTTP GET
+
+**Precondition:** Valid API key configured. Device has internet access.
+
+```
+Goal: Verify the http_request tool performs a GET request and returns the response.
+
+Steps:
+1. Send message: "Make an HTTP GET request to https://httpbin.org/get and show me the response."
+2. Wait for tool call to appear.
+3. Screenshot -> Verify: Tool call card for "http_request" with status PENDING/EXECUTING.
+4. Wait for completion (up to 15 seconds — network dependent).
+5. Screenshot -> Verify:
+   - Tool call card shows SUCCESS.
+   - Final AI response contains content from the httpbin response (e.g., "url", "headers").
+```
+
+---
+
+#### Flow 4-4: Parallel Tool Calls
+
+**Precondition:** Valid API key configured. Test file exists (run Flow 4-2 precondition first).
+
+```
+Goal: Verify multiple tool calls in one model response are executed and displayed.
+
+Steps:
+1. Send message: "Do two things at once: (1) what is the current time, and (2) read /sdcard/test.txt"
+2. Wait for the model to issue tool calls.
+3. Screenshot -> Verify: Two tool call cards visible (get_current_time and read_file), both PENDING or EXECUTING.
+4. Wait for both to complete.
+5. Screenshot -> Verify:
+   - Both tool call cards show SUCCESS.
+   - Final AI response references both results (current time AND file content).
+```
+
+---
+
+#### Flow 4-5: Tool Call Error — Restricted File Path
+
+**Precondition:** Valid API key configured.
+
+```
+Goal: Verify that attempting to read a restricted path returns an error result, not a crash.
+
+Steps:
+1. Send message: "Please read the file /data/data/com.oneclaw.shadow/databases/oneclaw.db"
+2. Wait for tool call to appear.
+3. Screenshot -> Verify: Tool call card for "read_file" appears.
+4. Wait for result.
+5. Screenshot -> Verify:
+   - Tool call card shows ERROR status (red or error icon).
+   - Error message in the card indicates access denied or restricted path.
+   - Final AI response acknowledges the error gracefully (no app crash).
+```
+
 ## Security Considerations
 
 1. **File access boundaries**: `ReadFileTool` and `WriteFileTool` block access to `/data/data/`, `/data/user/`, `/system/`, `/proc/`, `/sys/` via path canonicalization and prefix checking.

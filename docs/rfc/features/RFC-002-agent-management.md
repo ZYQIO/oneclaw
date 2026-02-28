@@ -1615,6 +1615,153 @@ object AgentValidator {
 - Create two agents with the same name
 - Agent with empty tool set (chat-only mode)
 
+### Layer 2 Visual Verification Flows
+
+Each flow is independent. State the preconditions before running.
+Screenshot after each numbered step that says "Screenshot".
+
+---
+
+#### Flow 2-1: Agent List — Built-in Agents Appear on First Launch
+
+**Precondition:** App installed. Navigate: Settings -> Manage Agents.
+
+```
+Goal: Verify the agent list shows the built-in "General Assistant" agent in the BUILT-IN section.
+
+Steps:
+1. Open Settings screen.
+2. Tap "Manage Agents".
+3. Screenshot -> Verify:
+   - "BUILT-IN" section header visible.
+   - "General Assistant" entry visible with a "Built-in" chip label.
+   - Tool count shown below the agent name.
+   - No "CUSTOM" section (or empty CUSTOM section).
+```
+
+---
+
+#### Flow 2-2: View Built-in Agent — Read-Only
+
+**Precondition:** Agent list visible (Flow 2-1 passed).
+
+```
+Goal: Verify built-in agent detail is read-only (no edit, no delete).
+
+Steps:
+1. Tap "General Assistant" in the agent list.
+2. Screenshot -> Verify:
+   - Name field is NOT editable (no cursor, grayed out or read-only style).
+   - System prompt field is NOT editable.
+   - Tool checkboxes are NOT tappable.
+   - "Clone" button is visible.
+   - No "Save" button.
+   - No "Delete Agent" button.
+```
+
+---
+
+#### Flow 2-3: Create a Custom Agent
+
+**Precondition:** Agent list visible.
+
+```
+Goal: Verify a new custom agent can be created and appears in the CUSTOM section.
+
+Steps:
+1. Tap the "+" (create) button on the agent list screen.
+2. Screenshot -> Verify: "Create Agent" form shown; all fields empty; Save button disabled.
+3. Enter name: "Test Agent".
+4. Enter system prompt: "You are a test assistant."
+5. Screenshot -> Verify: Save button is now enabled.
+6. Tap "Save".
+7. Screenshot -> Verify:
+   - Returned to agent list.
+   - "CUSTOM" section now visible.
+   - "Test Agent" entry appears in the CUSTOM section.
+```
+
+---
+
+#### Flow 2-4: Edit a Custom Agent
+
+**Precondition:** "Test Agent" exists (Flow 2-3 passed).
+
+```
+Goal: Verify custom agent fields are editable and changes persist.
+
+Steps:
+1. Tap "Test Agent" in the CUSTOM section.
+2. Screenshot -> Verify: "Edit Agent" form with editable fields; Save button disabled (no changes yet).
+3. Change the name to "Test Agent v2".
+4. Screenshot -> Verify: Save button is now enabled.
+5. Tap "Save".
+6. Screenshot -> Verify: Agent list shows "Test Agent v2" in CUSTOM section.
+```
+
+---
+
+#### Flow 2-5: Clone a Built-in Agent
+
+**Precondition:** Agent list visible.
+
+```
+Goal: Verify cloning creates a new custom agent with the correct name prefix.
+
+Steps:
+1. Tap "General Assistant".
+2. Tap "Clone".
+3. Screenshot -> Verify:
+   - Returned to agent list (or edit form of cloned agent).
+   - "CUSTOM" section shows a new entry with name starting with "Copy of" (e.g., "Copy of General Assistant").
+4. Tap the cloned agent.
+5. Screenshot -> Verify: All fields match the original but the agent is now editable (Save/Delete buttons visible).
+```
+
+---
+
+#### Flow 2-6: Delete a Custom Agent — Confirmation Dialog
+
+**Precondition:** At least one custom agent exists (Flow 2-3 or 2-5 passed).
+
+```
+Goal: Verify deleting a custom agent shows a confirmation dialog and removes it on confirm.
+
+Steps:
+1. Tap a custom agent (e.g., "Test Agent v2").
+2. Tap "Delete Agent".
+3. Screenshot -> Verify: Confirmation dialog appears with a warning message.
+   Expected: Dialog mentions that sessions using this agent will fall back to General Assistant.
+4. Tap "Cancel".
+5. Screenshot -> Verify: Agent still exists in the list (deletion cancelled).
+6. Re-open the agent detail and tap "Delete Agent" again.
+7. Tap "Confirm" (or "Delete") in the dialog.
+8. Screenshot -> Verify: Agent removed from the CUSTOM section in the list.
+```
+
+---
+
+#### Flow 2-7: Agent Selector in Chat — Switch Agent
+
+**Precondition:** At least one custom agent exists. A provider with a valid API key is configured.
+
+```
+Goal: Verify the agent selector bottom sheet appears and switching agents works.
+
+Steps:
+1. Navigate to the Chat screen.
+2. Note the current agent name in the top bar (e.g., "General Assistant").
+3. Tap the agent name / dropdown chevron in the top bar.
+4. Screenshot -> Verify:
+   - Bottom sheet appears with a list of all agents.
+   - Current agent is highlighted/selected.
+5. Tap a different agent (e.g., a custom agent).
+6. Screenshot -> Verify:
+   - Bottom sheet dismissed.
+   - Top bar agent name updated to the new agent.
+   - A system message "Switched to [agent name]" appears in the chat.
+```
+
 ## Security Considerations
 
 1. **No sensitive data in agents**: Agent data (name, prompt, tool list) is not sensitive. No encryption needed.

@@ -1614,6 +1614,153 @@ object AgentValidator {
 - 创建两个同名 Agent
 - 工具集为空的 Agent（纯聊天模式）
 
+### 第二层视觉验证流程
+
+每个流程相互独立，运行前请确认前置条件。
+每个标注"截图"的步骤后截图并验证。
+
+---
+
+#### 流程 2-1：Agent 列表 — 内置 Agent 在首次启动时显示
+
+**前置条件：** 应用已安装。通过 设置 -> 管理 Agent 导航。
+
+```
+目标：验证 Agent 列表的 BUILT-IN 区显示内置"General Assistant" Agent。
+
+步骤：
+1. 打开设置界面。
+2. 点击"管理 Agent"。
+3. 截图 -> 验证：
+   - "BUILT-IN"区域标题可见。
+   - "General Assistant"条目可见，带有"Built-in" chip 标签。
+   - Agent 名称下方显示工具数量。
+   - 无"CUSTOM"区（或 CUSTOM 区为空）。
+```
+
+---
+
+#### 流程 2-2：查看内置 Agent — 只读
+
+**前置条件：** Agent 列表可见（流程 2-1 通过）。
+
+```
+目标：验证内置 Agent 详情为只读（不可编辑、不可删除）。
+
+步骤：
+1. 点击"General Assistant"。
+2. 截图 -> 验证：
+   - 名称字段不可编辑（无光标、置灰或只读样式）。
+   - 系统 prompt 字段不可编辑。
+   - 工具复选框不可点击。
+   - "Clone"按钮可见。
+   - 无"Save"按钮。
+   - 无"Delete Agent"按钮。
+```
+
+---
+
+#### 流程 2-3：创建自定义 Agent
+
+**前置条件：** Agent 列表可见。
+
+```
+目标：验证可创建新的自定义 Agent 并在 CUSTOM 区显示。
+
+步骤：
+1. 点击 Agent 列表界面的"+"（创建）按钮。
+2. 截图 -> 验证：显示"Create Agent"表单；所有字段为空；Save 按钮禁用。
+3. 输入名称："Test Agent"。
+4. 输入系统 prompt："You are a test assistant."
+5. 截图 -> 验证：Save 按钮现在已启用。
+6. 点击"Save"。
+7. 截图 -> 验证：
+   - 返回 Agent 列表。
+   - "CUSTOM"区现在可见。
+   - "Test Agent"条目出现在 CUSTOM 区。
+```
+
+---
+
+#### 流程 2-4：编辑自定义 Agent
+
+**前置条件：** "Test Agent"已存在（流程 2-3 通过）。
+
+```
+目标：验证自定义 Agent 字段可编辑且修改能持久化。
+
+步骤：
+1. 点击 CUSTOM 区的"Test Agent"。
+2. 截图 -> 验证："Edit Agent"表单显示可编辑字段；Save 按钮禁用（未作修改）。
+3. 将名称改为"Test Agent v2"。
+4. 截图 -> 验证：Save 按钮已启用。
+5. 点击"Save"。
+6. 截图 -> 验证：Agent 列表 CUSTOM 区显示"Test Agent v2"。
+```
+
+---
+
+#### 流程 2-5：克隆内置 Agent
+
+**前置条件：** Agent 列表可见。
+
+```
+目标：验证克隆会创建带正确名称前缀的新自定义 Agent。
+
+步骤：
+1. 点击"General Assistant"。
+2. 点击"Clone"。
+3. 截图 -> 验证：
+   - 返回 Agent 列表（或显示克隆 Agent 的编辑表单）。
+   - CUSTOM 区出现名称以"Copy of"开头的新条目（如"Copy of General Assistant"）。
+4. 点击该克隆 Agent。
+5. 截图 -> 验证：所有字段与原始 Agent 一致，但现在可编辑（可见 Save/Delete 按钮）。
+```
+
+---
+
+#### 流程 2-6：删除自定义 Agent — 确认对话框
+
+**前置条件：** 至少存在一个自定义 Agent（流程 2-3 或 2-5 通过）。
+
+```
+目标：验证删除自定义 Agent 时出现确认对话框，确认后从列表移除。
+
+步骤：
+1. 点击自定义 Agent（如"Test Agent v2"）。
+2. 点击"Delete Agent"。
+3. 截图 -> 验证：确认对话框出现，包含警告消息。
+   预期：对话框说明使用该 Agent 的 session 将回退至 General Assistant。
+4. 点击"Cancel"。
+5. 截图 -> 验证：Agent 仍在列表中（删除已取消）。
+6. 重新打开 Agent 详情，再次点击"Delete Agent"。
+7. 在对话框中点击"Confirm"（或"Delete"）。
+8. 截图 -> 验证：CUSTOM 区该 Agent 已移除。
+```
+
+---
+
+#### 流程 2-7：聊天中的 Agent 选择器 — 切换 Agent
+
+**前置条件：** 至少存在一个自定义 Agent。已配置带有效 API key 的提供商。
+
+```
+目标：验证 Agent 选择器底部弹出层出现且切换 Agent 正常工作。
+
+步骤：
+1. 导航至聊天界面。
+2. 记录顶部栏当前 Agent 名称（如"General Assistant"）。
+3. 点击顶部栏的 Agent 名称/下拉箭头。
+4. 截图 -> 验证：
+   - 底部弹出层出现，显示所有 Agent 列表。
+   - 当前 Agent 高亮/已选中。
+5. 点击另一个 Agent（如自定义 Agent）。
+6. 截图 -> 验证：
+   - 底部弹出层关闭。
+   - 顶部栏 Agent 名称更新为新 Agent。
+   - 聊天中出现系统消息"Switched to [Agent 名称]"。
+```
+
 ## 安全考虑
 
 1. **Agent 中无敏感数据**：Agent 数据（名称、prompt、工具列表）不是敏感信息。无需加密。

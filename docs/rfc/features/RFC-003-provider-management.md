@@ -2037,6 +2037,157 @@ This is a **soft warning**, not a blocking validation. The key can still be save
 - Setup screen flow: choose provider -> enter key -> test -> select model -> complete
 - Setup screen skip navigates to chat
 
+### Layer 2 Visual Verification Flows
+
+Each flow is independent. State the preconditions before running.
+Screenshot after each numbered step that says "Screenshot".
+
+---
+
+#### Flow 3-1: First Launch — Welcome Screen Appears
+
+**Precondition:** Fresh install (or app data cleared via `adb shell pm clear com.oneclaw.shadow`).
+
+```
+Goal: Verify the Setup/Welcome screen is shown on first launch, not the Chat screen.
+
+Steps:
+1. adb shell am start -n com.oneclaw.shadow/.MainActivity
+2. Screenshot -> Verify: Setup/Welcome screen visible, NOT the Chat screen.
+   Expected: Provider selection list (OpenAI, Anthropic, Google Gemini) visible.
+   Expected: "Skip" button visible in top-right or bottom area.
+```
+
+---
+
+#### Flow 3-2: Skip Setup — Direct to Chat
+
+**Precondition:** Fresh install or app data cleared.
+
+```
+Goal: Verify "Skip" on the setup screen navigates to Chat with no crash.
+
+Steps:
+1. Launch app (Setup screen shown).
+2. Tap "Skip".
+3. Screenshot -> Verify: Chat screen is shown (empty state, input field visible).
+   Expected: No Setup screen, no crash.
+4. Re-launch the app (force-stop + restart).
+5. Screenshot -> Verify: Chat screen shown directly (Setup NOT shown again after skip).
+```
+
+---
+
+#### Flow 3-3: Enter API Key and Save
+
+**Precondition:** App on Setup screen OR navigate: Settings -> Provider List -> Anthropic.
+
+```
+Goal: Verify entering and saving an API key persists correctly.
+
+Steps:
+1. Navigate to Anthropic provider detail screen.
+2. Screenshot -> Verify: API key field shows masked placeholder or empty; Save button present.
+3. Tap the API key field and enter a valid Anthropic API key.
+4. Tap "Save".
+5. Screenshot -> Verify: API key field shows masked value (not plain text).
+   Expected: Key is saved — navigating away and back still shows the masked value.
+6. Navigate away (back to provider list) and re-open Anthropic detail.
+7. Screenshot -> Verify: Masked API key still shown (key persisted across navigation).
+```
+
+---
+
+#### Flow 3-4: Test Connection — Success
+
+**Precondition:** Valid API key saved for Anthropic provider (run Flow 3-3 first).
+
+```
+Goal: Verify "Test Connection" reports success with a valid key.
+
+Steps:
+1. Open Anthropic provider detail (valid key already saved).
+2. Tap "Test Connection".
+3. Screenshot immediately -> Verify: Loading indicator / "Testing..." state shown.
+4. Wait for result (up to 10 seconds).
+5. Screenshot -> Verify: Success result shown (green/Connected chip or success message).
+   Expected: Provider chip in list shows "Connected" status.
+```
+
+---
+
+#### Flow 3-5: Test Connection — Failure (Invalid Key)
+
+**Precondition:** Navigate to any provider detail screen.
+
+```
+Goal: Verify "Test Connection" shows a clear error with an invalid/wrong key.
+
+Steps:
+1. Open Anthropic provider detail.
+2. Enter an obviously invalid API key (e.g., "invalid-key-123") and save.
+3. Tap "Test Connection".
+4. Wait for result.
+5. Screenshot -> Verify: Error result shown (red/error chip or error message with reason).
+   Expected: Error message indicates authentication failure or invalid key.
+   Expected: Provider chip in list does NOT show "Connected".
+```
+
+---
+
+#### Flow 3-6: Toggle API Key Visibility
+
+**Precondition:** A provider with a saved API key (run Flow 3-3 first).
+
+```
+Goal: Verify the eye icon toggles between masked and visible key text.
+
+Steps:
+1. Open Anthropic provider detail (key already saved and masked).
+2. Screenshot -> Verify: API key field shows masked value (dots or asterisks).
+3. Tap the eye icon next to the API key field.
+4. Screenshot -> Verify: API key field shows the actual key text (plain text visible).
+5. Tap the eye icon again.
+6. Screenshot -> Verify: API key field is masked again.
+```
+
+---
+
+#### Flow 3-7: Fetch and Display Model List
+
+**Precondition:** Valid API key saved and connection tested successfully (Flow 3-4 passed).
+
+```
+Goal: Verify model list loads from the API and displays correctly.
+
+Steps:
+1. Open Anthropic provider detail.
+2. Tap "Refresh Models" (or the refresh icon).
+3. Screenshot -> Verify: Loading indicator shown while fetching.
+4. Wait for fetch to complete (up to 10 seconds).
+5. Screenshot -> Verify: Model list populated.
+   Expected: Models shown with display name and source label (PRESET or API).
+   Expected: At least the preset models (Claude Opus 4.5, Claude Sonnet 4.5, Claude Haiku 4.5) visible.
+```
+
+---
+
+#### Flow 3-8: Set Default Model
+
+**Precondition:** Model list loaded (Flow 3-7 passed).
+
+```
+Goal: Verify tapping the star icon marks a model as default.
+
+Steps:
+1. Open Anthropic provider detail, model list visible.
+2. Identify a non-default model (no star filled).
+3. Tap its star icon.
+4. Screenshot -> Verify: That model now shows a filled star; previous default (if any) star cleared.
+5. Navigate away and re-open the provider detail.
+6. Screenshot -> Verify: The selected model still shows as default (persisted).
+```
+
 ## Security Considerations
 
 1. **API keys never in Room**: Keys are stored exclusively in EncryptedSharedPreferences. The providers table has no api_key column.
