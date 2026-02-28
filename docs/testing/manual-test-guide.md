@@ -294,7 +294,7 @@ Type a message in the input field (e.g., "Hello, what can you do?"). Tap the Sen
 - After streaming completes, model ID label appears below the AI message
 - Copy and Regenerate icons appear below the AI message
 
-### Step 6.3: Stop generation mid-stream
+### Step 6.4: Stop generation mid-stream
 
 While the AI is streaming, tap the Stop button.
 
