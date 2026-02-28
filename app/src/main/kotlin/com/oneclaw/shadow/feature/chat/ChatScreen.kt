@@ -470,28 +470,30 @@ fun AiMessageBubble(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        val aiInteractionSource = remember { MutableInteractionSource() }
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    interactionSource = aiInteractionSource,
-                    indication = null,
-                    onClick = {},
-                    onLongClick = onCopy
-                )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                if (content.isNotEmpty()) {
-                    Markdown(
-                        content = content,
-                        modifier = Modifier.fillMaxWidth()
+        if (content.isNotEmpty() || isStreaming) {
+            val aiInteractionSource = remember { MutableInteractionSource() }
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        interactionSource = aiInteractionSource,
+                        indication = null,
+                        onClick = {},
+                        onLongClick = onCopy
                     )
-                }
-                if (isStreaming) {
-                    StreamingCursor()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    if (content.isNotEmpty()) {
+                        Markdown(
+                            content = content,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (isStreaming) {
+                        StreamingCursor()
+                    }
                 }
             }
         }
