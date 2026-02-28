@@ -27,6 +27,7 @@ coroutinesTest = "1.8.1"
 retrofitKotlinxSerialization = "1.0.0"
 roborazzi = "1.59.0"
 robolectric = "4.15.1"
+quickjs = "1.0.0-alpha13"
 
 [libraries]
 # AndroidX Core
@@ -100,6 +101,7 @@ coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-
 roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+quickjs-android = { group = "io.github.dokar3", name = "quickjs-kt-android", version.ref = "quickjs" }
 
 [plugins]
 roborazzi-plugin = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

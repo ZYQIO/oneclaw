@@ -124,6 +124,9 @@ dependencies {
     // Markdown
     implementation(libs.compose.markdown)
 
+    // QuickJS JavaScript Engine
+    implementation(libs.quickjs.android)
+
     // Testing
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation(libs.roborazzi)
