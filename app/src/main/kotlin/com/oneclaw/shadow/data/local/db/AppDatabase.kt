@@ -35,7 +35,7 @@ import java.util.concurrent.Executors
         SettingsEntity::class,
         MemoryIndexEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -82,7 +82,7 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL("INSERT INTO models (id, display_name, provider_id, is_default, source, context_window_size) VALUES ('gemini-2.5-pro', 'Gemini 2.5 Pro', 'provider-gemini', 0, 'PRESET', 1048576)")
 
                     // Seed built-in General Assistant agent
-                    val toolIds = json.encodeToString(listOf("get_current_time", "read_file", "write_file", "http_request"))
+                    val toolIds = json.encodeToString(listOf("get_current_time", "read_file", "write_file", "http_request", "load_skill"))
                     val systemPrompt = AgentConstants.GENERAL_ASSISTANT_SYSTEM_PROMPT.replace("'", "''")
                     db.execSQL(
                         """INSERT INTO agents (id, name, description, system_prompt, tool_ids, preferred_provider_id, preferred_model_id, is_built_in, created_at, updated_at)

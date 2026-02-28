@@ -25,6 +25,18 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // RFC-014: Add load_skill to General Assistant's tool_ids
+        db.execSQL(
+            """UPDATE agents
+               SET tool_ids = '["get_current_time","read_file","write_file","http_request","load_skill"]'
+               WHERE id = 'agent-general-assistant'
+               AND tool_ids NOT LIKE '%load_skill%'"""
+        )
+    }
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add context_window_size to models
