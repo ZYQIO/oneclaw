@@ -102,7 +102,8 @@ fun AppNavGraph(
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onManageProviders = { navController.navigate(Route.ProviderList.path) },
-                onManageAgents = { navController.navigate(Route.AgentList.path) }
+                onManageAgents = { navController.navigate(Route.AgentList.path) },
+                onUsageStatistics = { /* TODO: RFC-006 -- navigate(Route.UsageStatistics.path) */ }
             )
         }
     }
