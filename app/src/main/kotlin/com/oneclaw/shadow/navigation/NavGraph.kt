@@ -14,6 +14,7 @@ import com.oneclaw.shadow.feature.provider.ProviderDetailScreen
 import com.oneclaw.shadow.feature.provider.ProviderListScreen
 import com.oneclaw.shadow.feature.provider.SetupScreen
 import com.oneclaw.shadow.feature.provider.SettingsScreen
+import com.oneclaw.shadow.feature.usage.UsageStatisticsScreen
 import org.koin.compose.koinInject
 
 @Composable
@@ -109,7 +110,13 @@ fun AppNavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onManageProviders = { navController.navigate(Route.ProviderList.path) },
                 onManageAgents = { navController.navigate(Route.AgentList.path) },
-                onUsageStatistics = { /* TODO: RFC-006 -- navigate(Route.UsageStatistics.path) */ }
+                onUsageStatistics = { navController.navigate(Route.UsageStatistics.path) }
+            )
+        }
+
+        composable(Route.UsageStatistics.path) {
+            UsageStatisticsScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

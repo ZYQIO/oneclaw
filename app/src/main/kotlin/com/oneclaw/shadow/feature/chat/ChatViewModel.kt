@@ -476,5 +476,7 @@ fun Message.toChatMessageItem(): ChatMessageItem = ChatMessageItem(
     id = id, type = type, content = content, thinkingContent = thinkingContent,
     toolCallId = toolCallId, toolName = toolName, toolInput = toolInput, toolOutput = toolOutput,
     toolStatus = toolStatus, toolDurationMs = toolDurationMs, modelId = modelId,
+    tokenCountInput = tokenCountInput,
+    tokenCountOutput = tokenCountOutput,
     isRetryable = type == MessageType.ERROR, timestamp = createdAt
 )

@@ -88,6 +88,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.m3.Markdown
 import com.oneclaw.shadow.core.model.MessageType
 import com.oneclaw.shadow.core.model.ToolCallStatus
+import com.oneclaw.shadow.core.util.formatWithCommas
 import com.oneclaw.shadow.feature.agent.AgentSelectorSheet
 import com.oneclaw.shadow.feature.session.SessionDrawerContent
 import com.oneclaw.shadow.feature.session.SessionListViewModel
@@ -373,6 +374,8 @@ fun MessageList(
                     content = message.content,
                     thinkingContent = message.thinkingContent,
                     modelId = message.modelId,
+                    tokenCountInput = message.tokenCountInput,
+                    tokenCountOutput = message.tokenCountOutput,
                     isLastAiMessage = message == messages.lastOrNull { it.type == MessageType.AI_RESPONSE },
                     onCopy = { onCopy(message.content) },
                     onRegenerate = onRegenerate
@@ -463,6 +466,8 @@ fun AiMessageBubble(
     content: String,
     thinkingContent: String?,
     modelId: String?,
+    tokenCountInput: Int? = null,
+    tokenCountOutput: Int? = null,
     isLastAiMessage: Boolean,
     onCopy: () -> Unit,
     onRegenerate: () -> Unit,
@@ -533,6 +538,16 @@ fun AiMessageBubble(
                         modifier = Modifier
                             .align(Alignment.CenterVertically)
                             .padding(start = 8.dp)
+                    )
+                }
+                if (tokenCountInput != null && tokenCountOutput != null) {
+                    Text(
+                        text = "${formatWithCommas(tokenCountInput)} in / ${formatWithCommas(tokenCountOutput)} out",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .padding(start = if (modelId != null) 4.dp else 8.dp)
                     )
                 }
             }

@@ -44,6 +44,8 @@ data class ChatMessageItem(
     val toolStatus: ToolCallStatus? = null,
     val toolDurationMs: Long? = null,
     val modelId: String? = null,
+    val tokenCountInput: Int? = null,
+    val tokenCountOutput: Int? = null,
     val isRetryable: Boolean = false,
     val timestamp: Long = 0
 )

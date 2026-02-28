@@ -20,6 +20,7 @@ import com.oneclaw.shadow.feature.provider.usecase.SetDefaultModelUseCase
 import com.oneclaw.shadow.feature.provider.usecase.TestConnectionUseCase
 import com.oneclaw.shadow.feature.session.SessionListViewModel
 import com.oneclaw.shadow.feature.session.usecase.BatchDeleteSessionsUseCase
+import com.oneclaw.shadow.feature.usage.UsageStatisticsViewModel
 import com.oneclaw.shadow.feature.session.usecase.CleanupSoftDeletedUseCase
 import com.oneclaw.shadow.feature.session.usecase.CreateSessionUseCase
 import com.oneclaw.shadow.feature.session.usecase.DeleteSessionUseCase
@@ -74,4 +75,7 @@ val featureModule = module {
 
     // RFC-001: Chat feature view model
     viewModelOf(::ChatViewModel)
+
+    // RFC-006: Usage Statistics
+    viewModelOf(::UsageStatisticsViewModel)
 }
