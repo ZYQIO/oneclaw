@@ -85,10 +85,19 @@ until adb -s <SERIAL> shell uiautomator dump /sdcard/p.xml 2>/dev/null && \
 
 ### Step 8 — Record results
 
-After the flow completes, update the test report (EN + ZH):
-- Change the Layer 2 row in the summary table from `SKIP` to `PASS` or `FAIL`
-- Add a subsection under `## Layer 2: adb Visual Verification` with the flow ID, result, device info, screenshots, and step-by-step observations
-- Add an entry to the Change History table
+After the flow completes, update the test report (EN + ZH) at `docs/testing/reports/RFC-00{N}-*-report.md`:
+
+1. Change the Layer 2 row in the summary table from `SKIP` to `PASS` or `FAIL`.
+2. Add a subsection under `## Layer 2: adb Visual Verification` with:
+   - Flow ID, result, device model, Android version, provider/model used
+   - For each screenshot taken, embed it inline using a relative path:
+     ```markdown
+     <img src="screenshots/Flow1-1_step4_streaming_mid.png" width="280">
+     ```
+   - A description of what was verified in that screenshot
+3. Add an entry to the Change History table.
+
+Both the EN and ZH report files must be updated. Screenshots are referenced by the same relative path in both.
 
 ## Screenshot naming convention
 
