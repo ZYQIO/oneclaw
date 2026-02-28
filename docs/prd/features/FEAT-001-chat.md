@@ -114,6 +114,7 @@ Must pass (all required):
 - [ ] AI response is displayed with streaming (progressive token rendering)
 - [ ] Markdown in AI responses is rendered correctly (bold, italic, lists, headings, inline code, code blocks)
 - [ ] Thinking/reasoning blocks are displayed collapsed by default, expandable on tap
+- [ ] Extended thinking is automatically enabled (no user action required) when the active model supports it — a "Thinking..." block appears in the response without any manual configuration
 - [ ] Tool calls are displayed inline in the conversation
 - [ ] Tool call compact mode shows tool name and status in one line
 - [ ] Tool call detailed mode shows tool name, parameters, and result, collapsible
@@ -157,6 +158,7 @@ For detailed visual specifications, layouts, spacing, and component designs, see
 - Attached to the AI message bubble, above the main response text
 - Collapsed state: a small label such as "Thinking..." or "View reasoning" with a chevron icon
 - Expanded state: shows the full thinking text in a visually distinct style (e.g., lighter text, different background)
+- **Extended thinking is enabled by default** for all models that support it (e.g., Claude Opus 4, Claude Sonnet 4 series). The app detects model capability and includes the required thinking configuration in the API request automatically. No user action is needed to activate thinking mode — it is always on for capable models.
 
 ### Streaming Indicator
 - While waiting for the first token: a pulsing dot or typing indicator in the AI message area
@@ -209,6 +211,7 @@ For detailed visual specifications, layouts, spacing, and component designs, see
 2. Tool call display mode (compact/detailed) is a global setting, not per-message
 3. Thinking blocks are always collapsed by default when first displayed
 4. Error messages are displayed at the point in the conversation where the error occurred
+5. Extended thinking is always enabled for models that support it — the app includes the thinking configuration in every API request to a thinking-capable model. There is no user-facing toggle to disable thinking for these models in V1.
 
 ### Data Rules
 1. All messages in a session are persisted locally
@@ -321,3 +324,4 @@ These are tracked for future versions and are explicitly NOT in V1 scope:
 | 2026-02-26 | 0.1 | Initial version | - |
 | 2026-02-27 | 0.2 | Updated UI section to reference UI Design Spec; added agent selector chip, action row details, Gemini-style layout | - |
 | 2026-02-27 | 0.3 | Added RFC-001 reference | - |
+| 2026-02-27 | 0.4 | Added requirement: extended thinking always enabled by default for capable models; updated Thinking Block UI/UX section, Display Rules, and Acceptance Criteria | - |

@@ -19,7 +19,7 @@ RFC-001 implements the full chat interaction loop: SSE streaming from OpenAI, An
 | 1A | JVM Unit Tests | PASS | 245 tests, 0 failures |
 | 1B | Instrumented DAO Tests | PASS | 48 tests, 0 failures |
 | 1C | Roborazzi Screenshot Tests | PASS | 8 new screenshots |
-| 2 | adb Visual Flows | PASS | Flow 1-1 executed on Pixel 6a (Android 16) |
+| 2 | adb Visual Flows | FAIL | Flow 1-1 PASS; Flow 1-2 FAIL — top bar pushed off-screen when keyboard opens |
 
 ## Layer 1A: JVM Unit Tests
 
@@ -107,13 +107,25 @@ Visual check: User message bubble, then an active TOOL_CALL card with PENDING st
 
 ## Layer 2: adb Visual Verification
 
-**Result:** PASS (Flow 1-1)
+**Result:** PASS (all flows pass after bug fixes)
 
 **Device:** Pixel 6a, Android 16
 
-**Provider:** Anthropic (`claude-sonnet-4-6`)
+**Provider:** Anthropic (`claude-sonnet-4-6`, `claude-opus-4-5-20251101` for Flow 1-9)
 
-**Flow executed:** Flow 1-1 — Send message, streaming response appears
+**Flows executed:** Flow 1-1 through Flow 1-9 (all flows defined in RFC-001)
+
+| Flow | Description | Result | Notes |
+|------|-------------|--------|-------|
+| Flow 1-1 | Send message — streaming response appears | PASS | |
+| Flow 1-2 | Streaming completes — action row and model badge appear | PASS | |
+| Flow 1-3 | Stop generation — button reverts, partial text preserved | PASS | |
+| Flow 1-4 | Regenerate response | PASS | |
+| Flow 1-5 | Keyboard appears — TopAppBar stays visible | PASS | Bug fixed: `adjustNothing` + `imePadding` on ChatInput |
+| Flow 1-6 | Long-press copy on user message | PASS | Bug fixed: `DisableSelection` + explicit `interactionSource` on message bubbles |
+| Flow 1-7 | Tool call loop — ToolCallCard and ToolResultCard visible | PASS | |
+| Flow 1-8 | Error message — error card and Retry button visible | PASS | Minor: error card shows raw JSON; see Issues |
+| Flow 1-9 | Thinking block — collapse and expand | PASS | Bug fixed: thinking config added to API request body |
 
 ---
 
@@ -170,13 +182,193 @@ End of the completed AI response. Below the message bubble: copy icon, regenerat
 - Mathematical notation (e.g., `max(0,z)`) falls back to plain text — expected, as the Markdown library does not support LaTeX.
 - Response latency was fast enough that a short "Hello, who are you?" completed before the 1.5 s screenshot window; a longer question was used to reliably capture mid-stream state.
 
-**Flows not yet executed:** Flow 1-2 through Flow 1-9 (keyboard layout, stop generation, regenerate, tool calls, error card, thinking block). These remain to be run in future sessions.
+---
+
+### Flow 1-2: Streaming completes — action row and model badge appear
+
+**Result:** PASS
+
+<img src="screenshots/Flow1-2_step2_completed_action_row.png" width="280">
+
+After streaming completes: AI response bubble with text. Below it: copy icon, regenerate icon (circular arrows), and model badge `claude-sonnet-4-6`. Send button (not Stop) confirms streaming finished.
+
+---
+
+### Flow 1-3: Stop generation — button reverts, partial text preserved
+
+**Result:** PASS
+
+**Mid-stream (Stop button visible):**
+
+<img src="screenshots/Flow1-3_step2_streaming_stop_button.png" width="280">
+
+Stop button (red square) visible in bottom-right. AI response streaming — partial essay text visible with title and opening paragraph.
+
+**After tapping Stop:**
+
+<img src="screenshots/Flow1-3_step4_after_stop_partial_text.png" width="280">
+
+Stop button reverted to Send button. Partial AI response preserved in chat. Input field re-enabled.
+
+---
+
+### Flow 1-4: Regenerate response
+
+**Result:** PASS
+
+**Action row before regenerate:**
+
+<img src="screenshots/Flow1-4_step2_action_row_before_regen.png" width="280">
+
+Completed AI response with action row showing copy, regenerate, and model badge.
+
+**Streaming after tapping Regenerate:**
+
+<img src="screenshots/Flow1-4_step3_streaming_after_regen.png" width="280">
+
+Previous response replaced by new streaming response. Stop button visible.
+
+**New response completed:**
+
+<img src="screenshots/Flow1-4_step4_new_response_completed.png" width="280">
+
+New AI response with action row. Model badge `claude-sonnet-4-6` visible.
+
+---
+
+### Flow 1-5: Keyboard appears — TopAppBar stays visible
+
+**Result:** PASS (bug fixed in this session)
+
+**Before keyboard:**
+
+<img src="screenshots/Flow1-5_step1_before_keyboard.png" width="280">
+
+TopAppBar fully visible: hamburger (left), "General Assistant" (center), settings gear (right).
+
+**After keyboard opens:**
+
+<img src="screenshots/Flow1-5_step2_keyboard_open_topbar_visible.png" width="280">
+
+TopAppBar remains fully visible at top. Input field and Send button visible above keyboard. Empty state text visible between TopAppBar and input.
+
+**Fix applied:** `android:windowSoftInputMode="adjustNothing"` in `AndroidManifest.xml` + `Modifier.imePadding()` on `ChatInput`'s `Surface`, replacing the previous `contentWindowInsets = WindowInsets.ime.union(WindowInsets.navigationBars)` on `Scaffold`.
+
+---
+
+### Flow 1-6: Long-press copy on user message
+
+**Result:** PASS (bug fixed in this session)
+
+**Before long-press:**
+
+<img src="screenshots/Flow1-6_step1_before_longpress.png" width="280">
+
+User message bubble (gold, right-aligned) visible in chat.
+
+**After long-press:**
+
+<img src="screenshots/Flow1-6_step2_clipboard_feedback.png" width="280">
+
+Android 13+ OS clipboard confirmation UI appeared at the bottom: copied text preview ("Hello") with Share and Copy-to-clipboard action buttons.
+
+**Fix applied:** Added `DisableSelection {}` wrapper around `Text` in `UserMessageBubble` and `AiMessageBubble`, and supplied explicit `MutableInteractionSource` + `indication = null` to `combinedClickable`. This prevents Android 16's default text-selection long-press from intercepting the event before `onLongClick` fires.
+
+---
+
+### Flow 1-7: Tool call loop — ToolCallCard and ToolResultCard visible
+
+**Result:** PASS
+
+<img src="screenshots/Flow1-7_step3_tool_call_and_result.png" width="280">
+
+ToolCallCard visible showing `get_current_time` with spinner animation. ToolResultCard below it: `get_current_time result (65ms)`. Final AI response: "The current time is **Friday, February 27, 2026 at 8:32 PM PST**."
+
+<img src="screenshots/Flow1-7_step5_response_completed.png" width="280">
+
+Full exchange completed. Action row with copy, regenerate, and `claude-sonnet-4-6` model badge.
+
+---
+
+### Flow 1-8: Error message — error card and Retry button visible
+
+**Result:** PASS
+
+<img src="screenshots/Flow1-8_step5_error_card_with_retry.png" width="280">
+
+Red error card visible: `API error 401: {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}...}`. **Retry** button on the right. Error icon on the left.
+
+<img src="screenshots/Flow1-8_step6_after_retry.png" width="280">
+
+After tapping Retry: same error reappears (key still invalid — expected). Confirms Retry triggers a new attempt.
+
+---
+
+### Flow 1-9: Thinking block — collapse and expand
+
+**Result:** PASS (bug fixed in this session)
+
+**Collapsed thinking block:**
+
+<img src="screenshots/Flow1-9_step2_thinking_collapsed.png" width="280">
+
+"Thinking..." collapsed block visible above the AI response bubble. Model badge `claude-opus-4-5-20251101`.
+
+**Expanded thinking block:**
+
+<img src="screenshots/Flow1-9_step4_thinking_expanded.png" width="280">
+
+Block expanded showing full reasoning: model walks through `17 × 23 = 17 × 20 + 17 × 3 = 340 + 51 = 391`.
+
+**Re-collapsed:**
+
+<img src="screenshots/Flow1-9_step5_thinking_recollapsed.png" width="280">
+
+Block collapsed again after second tap.
+
+**Fix applied:** Added `"thinking": {"type": "enabled", "budget_tokens": 10000}` to the Anthropic API request body in `buildAnthropicRequest()` for models whose ID contains `"opus-4"` or `"sonnet-4"`. Previously, only the `anthropic-beta` header was sent but the body config was missing.
+
+---
 
 ## Issues Found
 
-No blocking issues. One cosmetic observation:
+### [BUG — FIXED] Top bar hidden when soft keyboard opens (Flow 1-5)
 
-- **Math notation rendering**: LaTeX-style formulas (e.g., `max(0,z)`, `∂L/∂w`) are rendered as plain text fragments on separate lines rather than typeset math. This is a known limitation of the `compose-markdown` library and was already documented in RFC-001 Open Questions. Not a regression.
+**Status:** Fixed
+
+**Root cause:** `windowSoftInputMode` was not set, defaulting to `adjustPan` which pans the entire window. Fix: set `adjustNothing` in manifest and apply `imePadding` only to the `ChatInput` bottom bar.
+
+---
+
+### [BUG — FIXED] Long-press on user message opens Agent selector instead of copying (Flow 1-6)
+
+**Status:** Fixed
+
+**Root cause:** Android 16 intercepts long-press on `Text` for system text selection before `combinedClickable.onLongClick` fires. Fix: wrap `Text` in `DisableSelection {}` and pass explicit `interactionSource` + `indication = null` to `combinedClickable`.
+
+---
+
+### [BUG — FIXED] Thinking block never appears (Flow 1-9)
+
+**Status:** Fixed
+
+**Root cause:** The `anthropic-beta: interleaved-thinking-2025-05-14` header was sent but the request body was missing the required `"thinking": {"type": "enabled", "budget_tokens": N}` field. Fix: added thinking config to `buildAnthropicRequest()` for capable models.
+
+---
+
+### [MINOR] Error card displays raw JSON (Flow 1-8)
+
+**Severity:** Low — functional but not user-friendly.
+
+**Description:** When an API error occurs, the error card shows the raw JSON error body (e.g., `API error 401: {"type":"error","error":{"type":"authentication_error",...}}`). The expected behavior is a human-readable message such as "API key is invalid or expired."
+
+**Status:** Not fixed in this session. Tracked for a future RFC or patch.
+
+---
+
+### [COSMETIC] Math notation rendering
+
+LaTeX-style formulas rendered as plain text. Known limitation of `compose-markdown`. Not a regression.
 
 ## Change History
 
@@ -184,3 +376,5 @@ No blocking issues. One cosmetic observation:
 |------|--------|
 | 2026-02-27 | Initial report |
 | 2026-02-27 | Layer 2 Flow 1-1 executed on Pixel 6a; section updated from SKIP to PASS |
+| 2026-02-27 | Flow 1-2 (keyboard) executed on Pixel 6a; FAIL — top bar pushed off-screen |
+| 2026-02-27 | Flows 1-2 through 1-9 executed; three bugs found and fixed (keyboard insets, long-press copy, thinking block); all flows now PASS; Layer 2 result updated to PASS |

@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -190,7 +191,7 @@ fun ChatScreen(
                 )
             },
             // IME insets: keyboard pushes only the bottom bar up, top bar stays fixed.
-            contentWindowInsets = WindowInsets.ime.union(WindowInsets.navigationBars)
+            contentWindowInsets = WindowInsets.navigationBars
         ) { padding ->
             Box(modifier = Modifier.padding(padding)) {
                 if (uiState.messages.isEmpty() && !uiState.isStreaming) {
@@ -292,7 +293,9 @@ fun ChatInput(
 ) {
     Surface(
         tonalElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .imePadding()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -418,19 +421,27 @@ fun UserMessageBubble(content: String, onCopy: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.End
     ) {
+        val interactionSource = remember { MutableInteractionSource() }
         Surface(
             color = MaterialTheme.colorScheme.primaryContainer,
             shape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp),
             modifier = Modifier
                 .widthIn(max = 300.dp)
-                .combinedClickable(onClick = {}, onLongClick = onCopy)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onCopy
+                )
         ) {
-            Text(
-                text = content,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(12.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            DisableSelection {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(12.dp),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }
@@ -456,12 +467,18 @@ fun AiMessageBubble(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
+        val aiInteractionSource = remember { MutableInteractionSource() }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = {}, onLongClick = onCopy)
+                .combinedClickable(
+                    interactionSource = aiInteractionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onCopy
+                )
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (content.isNotEmpty()) {

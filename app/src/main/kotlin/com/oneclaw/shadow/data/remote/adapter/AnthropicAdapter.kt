@@ -279,8 +279,18 @@ class AnthropicAdapter(
         systemPrompt: String?
     ): JsonObject = buildJsonObject {
         put("model", modelId)
-        put("max_tokens", 8192)
+        put("max_tokens", 16000)
         put("stream", true)
+
+        // Enable extended thinking for models that support it.
+        // Requires max_tokens >= budget_tokens + expected output tokens.
+        val supportsThinking = modelId.contains("opus-4") || modelId.contains("sonnet-4")
+        if (supportsThinking) {
+            put("thinking", buildJsonObject {
+                put("type", "enabled")
+                put("budget_tokens", 10000)
+            })
+        }
 
         if (!systemPrompt.isNullOrBlank()) {
             put("system", systemPrompt)
