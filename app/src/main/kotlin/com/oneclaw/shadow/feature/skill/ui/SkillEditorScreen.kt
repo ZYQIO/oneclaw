@@ -97,9 +97,9 @@ fun SkillEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
-                .imePadding()
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 

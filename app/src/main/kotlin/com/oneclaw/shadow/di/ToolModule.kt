@@ -42,20 +42,28 @@ val toolModule = module {
             register(HttpRequestTool(get()))  // get() = OkHttpClient from NetworkModule
 
             // RFC-014: load_skill tool (always available to all agents)
-            register(get<LoadSkillTool>())  // get() = LoadSkillTool from above
+            // Wrapped in try-catch so a SkillRegistry init failure doesn't break the whole registry
+            try {
+                register(get<LoadSkillTool>())
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register load_skill: ${e.message}")
+            }
 
             // JS tools: loaded from file system
-            val loader: JsToolLoader = get()
-            val loadResult = loader.loadTools()
-            val conflicts = loader.registerTools(this, loadResult.loadedTools)
+            try {
+                val loader: JsToolLoader = get()
+                val loadResult = loader.loadTools()
+                val conflicts = loader.registerTools(this, loadResult.loadedTools)
 
-            // Log results
-            val totalErrors = loadResult.errors + conflicts
-            if (loadResult.loadedTools.isNotEmpty()) {
-                Log.i("ToolModule", "Loaded ${loadResult.loadedTools.size} JS tool(s)")
-            }
-            totalErrors.forEach { error ->
-                Log.w("ToolModule", "JS tool load error [${error.fileName}]: ${error.error}")
+                val totalErrors = loadResult.errors + conflicts
+                if (loadResult.loadedTools.isNotEmpty()) {
+                    Log.i("ToolModule", "Loaded ${loadResult.loadedTools.size} JS tool(s)")
+                }
+                totalErrors.forEach { error ->
+                    Log.w("ToolModule", "JS tool load error [${error.fileName}]: ${error.error}")
+                }
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to load JS tools: ${e.message}")
             }
         }
     }
