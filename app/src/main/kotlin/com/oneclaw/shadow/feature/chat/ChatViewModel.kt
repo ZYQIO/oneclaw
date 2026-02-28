@@ -14,7 +14,6 @@ import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.core.repository.MessageRepository
 import com.oneclaw.shadow.core.repository.ProviderRepository
 import com.oneclaw.shadow.core.repository.SessionRepository
-import com.oneclaw.shadow.core.util.AppResult
 import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
 import com.oneclaw.shadow.feature.session.usecase.CreateSessionUseCase
 import com.oneclaw.shadow.feature.session.usecase.GenerateTitleUseCase
@@ -151,10 +150,11 @@ class ChatViewModel(
 
     /**
      * Select a skill from the slash command popup.
-     * Loads skill content directly and injects it as the user message (RFC-014 Trigger Path 1).
+     * Constructs a message and sends it.
+     * RFC-014
      */
     fun selectSkillFromSlashCommand(skill: SkillDefinition) {
-        val message = loadSkillContent(skill)
+        val message = buildSkillMessage(skill)
         _uiState.update {
             it.copy(
                 inputText = "",
@@ -166,23 +166,22 @@ class ChatViewModel(
 
     /**
      * Select a skill from the skill selection bottom sheet.
-     * Loads skill content directly and injects it as the user message (RFC-014 Trigger Path 2).
+     * RFC-014
      */
     fun selectSkillFromSheet(skill: SkillDefinition) {
-        val message = loadSkillContent(skill)
+        val message = buildSkillMessage(skill)
         _uiState.update { it.copy(showSkillSheet = false) }
         sendTextMessage(message)
     }
 
-    /**
-     * Load the full prompt content for a skill, falling back to a natural language request
-     * if the content cannot be loaded.
-     */
-    private fun loadSkillContent(skill: SkillDefinition): String {
-        val registry = skillRegistry ?: return "Use the ${skill.displayName} skill."
-        return when (val result = registry.loadSkillContent(skill.name)) {
-            is AppResult.Success -> result.data
-            is AppResult.Error -> "Use the ${skill.displayName} skill."
+    private fun buildSkillMessage(skill: SkillDefinition): String {
+        return if (skill.parameters.isEmpty()) {
+            "Use the ${skill.displayName} skill"
+        } else {
+            val paramsList = skill.parameters.joinToString(", ") { p ->
+                if (p.required) p.name else "${p.name} (optional)"
+            }
+            "Use the ${skill.displayName} skill. Parameters: $paramsList"
         }
     }
 
