@@ -19,7 +19,7 @@ data class ChatUiState(
     val activeToolCalls: List<ActiveToolCall> = emptyList(),
 
     val inputText: String = "",
-    val canSend: Boolean = true,
+    val pendingCount: Int = 0,
 
     val shouldAutoScroll: Boolean = true,
 

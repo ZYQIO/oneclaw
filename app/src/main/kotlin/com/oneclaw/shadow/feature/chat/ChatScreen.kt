@@ -188,7 +188,7 @@ fun ChatScreen(
                     onSend = { viewModel.sendMessage() },
                     onStop = { viewModel.stopGeneration() },
                     isStreaming = uiState.isStreaming,
-                    canSend = uiState.canSend && uiState.hasConfiguredProvider
+                    hasConfiguredProvider = uiState.hasConfiguredProvider
                 )
             },
             // Bottom bar handles its own insets (navigationBarsPadding + imePadding).
@@ -290,7 +290,7 @@ fun ChatInput(
     onSend: () -> Unit,
     onStop: () -> Unit,
     isStreaming: Boolean,
-    canSend: Boolean
+    hasConfiguredProvider: Boolean
 ) {
     Surface(
         tonalElevation = 2.dp,
@@ -311,9 +311,11 @@ fun ChatInput(
                 placeholder = { Text("Message") },
                 shape = MaterialTheme.shapes.extraLarge,
                 maxLines = 6,
-                enabled = !isStreaming
+                enabled = true
             )
             Spacer(modifier = Modifier.width(8.dp))
+
+            // Stop button: only visible during streaming
             if (isStreaming) {
                 IconButton(
                     onClick = onStop,
@@ -321,18 +323,24 @@ fun ChatInput(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     )
                 ) {
-                    Icon(Icons.Default.Stop, contentDescription = "Stop")
-                }
-            } else {
-                IconButton(
-                    onClick = onSend,
-                    enabled = canSend && text.isNotBlank(),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.error
                     )
-                ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send")
                 }
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+
+            // Send button: always visible, enabled when text is not blank and provider configured
+            IconButton(
+                onClick = onSend,
+                enabled = text.isNotBlank() && hasConfiguredProvider,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(Icons.Default.Send, contentDescription = "Send")
             }
         }
     }

@@ -17,6 +17,7 @@ import com.oneclaw.shadow.feature.session.usecase.GenerateTitleUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +42,8 @@ class ChatViewModel(
     private var isFirstMessage = true
     private var firstUserMessageText: String? = null
 
+    private val pendingMessages = Channel<String>(Channel.UNLIMITED)
+
     init {
         initialize(null)
         checkProviderStatus()
@@ -63,8 +66,7 @@ class ChatViewModel(
                     streamingText = "",
                     streamingThinkingText = "",
                     activeToolCalls = emptyList(),
-                    inputText = "",
-                    canSend = true
+                    inputText = ""
                 )
             }
         }
@@ -104,11 +106,37 @@ class ChatViewModel(
 
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
-        if (text.isBlank() || _uiState.value.isStreaming) return
+        if (text.isBlank()) return
+        _uiState.update { it.copy(inputText = "") }
 
+        if (_uiState.value.isStreaming) {
+            // Queue path: save to DB immediately, signal the running loop
+            viewModelScope.launch {
+                val sessionId = _uiState.value.sessionId ?: return@launch
+                messageRepository.addMessage(Message(
+                    id = "", sessionId = sessionId, type = MessageType.USER,
+                    content = text, thinkingContent = null,
+                    toolCallId = null, toolName = null, toolInput = null, toolOutput = null,
+                    toolStatus = null, toolDurationMs = null, tokenCountInput = null,
+                    tokenCountOutput = null, modelId = null, providerId = null, createdAt = 0
+                ))
+                val tempId = java.util.UUID.randomUUID().toString()
+                _uiState.update { state ->
+                    state.copy(
+                        messages = state.messages + ChatMessageItem(
+                            id = tempId, type = MessageType.USER,
+                            content = text, timestamp = System.currentTimeMillis()
+                        ),
+                        pendingCount = state.pendingCount + 1
+                    )
+                }
+                pendingMessages.trySend(text)
+            }
+            return
+        }
+
+        // Non-streaming path: start a new loop (existing logic)
         viewModelScope.launch {
-            _uiState.update { it.copy(inputText = "") }
-
             // Lazy session creation
             var sessionId = _uiState.value.sessionId
             if (sessionId == null) {
@@ -137,8 +165,7 @@ class ChatViewModel(
                     isStreaming = true,
                     streamingText = "",
                     streamingThinkingText = "",
-                    activeToolCalls = emptyList(),
-                    canSend = false
+                    activeToolCalls = emptyList()
                 )
             }
 
@@ -151,7 +178,8 @@ class ChatViewModel(
                     sendMessageUseCase.execute(
                         sessionId = finalSessionId,
                         userText = text,
-                        agentId = _uiState.value.currentAgentId
+                        agentId = _uiState.value.currentAgentId,
+                        pendingMessages = pendingMessages
                     ).collect { event ->
                         handleChatEvent(event, finalSessionId, accumulatedText, accumulatedThinking) { newText, newThinking ->
                             accumulatedText = newText
@@ -234,6 +262,9 @@ class ChatViewModel(
                 _uiState.update { it.copy(isCompacting = false) }
                 // No Snackbar needed on success; fallback (didCompact=false) is silent
             }
+            is ChatEvent.UserMessageInjected -> {
+                _uiState.update { it.copy(pendingCount = maxOf(0, it.pendingCount - 1)) }
+            }
             is ChatEvent.Error -> {
                 handleError(sessionId, event)
             }
@@ -266,7 +297,7 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isStreaming = true, streamingText = "", streamingThinkingText = "",
-                activeToolCalls = emptyList(), canSend = false
+                activeToolCalls = emptyList()
             )
         }
         streamingJob = viewModelScope.launch {
@@ -275,7 +306,8 @@ class ChatViewModel(
             try {
                 sendMessageUseCase.execute(
                     sessionId = sessionId, userText = userText,
-                    agentId = _uiState.value.currentAgentId
+                    agentId = _uiState.value.currentAgentId,
+                    pendingMessages = pendingMessages
                 ).collect { event ->
                     handleChatEvent(event, sessionId, accumulatedText, accumulatedThinking) { newText, newThinking ->
                         accumulatedText = newText
@@ -347,10 +379,29 @@ class ChatViewModel(
     }
 
     private suspend fun finishStreaming(sessionId: String) {
+        // Handle queued messages that won't be processed (Stop was pressed)
+        val abandonedTexts = mutableListOf<String>()
+        while (true) {
+            val text = pendingMessages.tryReceive().getOrNull() ?: break
+            abandonedTexts.add(text)
+        }
+        if (abandonedTexts.isNotEmpty()) {
+            messageRepository.addMessage(Message(
+                id = "", sessionId = sessionId, type = MessageType.SYSTEM,
+                content = "The user interrupted the previous response. " +
+                    "The preceding queued message(s) were submitted before the interruption " +
+                    "and can be ignored. Please respond to the user's next message.",
+                thinkingContent = null,
+                toolCallId = null, toolName = null, toolInput = null, toolOutput = null,
+                toolStatus = null, toolDurationMs = null, tokenCountInput = null,
+                tokenCountOutput = null, modelId = null, providerId = null, createdAt = 0
+            ))
+        }
+
         _uiState.update {
             it.copy(
                 isStreaming = false, streamingText = "", streamingThinkingText = "",
-                activeToolCalls = emptyList(), canSend = true
+                activeToolCalls = emptyList(), pendingCount = 0
             )
         }
         // Reload messages from DB
@@ -390,7 +441,7 @@ class ChatViewModel(
         _uiState.update {
             it.copy(
                 isStreaming = false, streamingText = "", streamingThinkingText = "",
-                activeToolCalls = emptyList(), canSend = true
+                activeToolCalls = emptyList(), pendingCount = 0
             )
         }
         val messages = messageRepository.getMessagesSnapshot(sessionId)

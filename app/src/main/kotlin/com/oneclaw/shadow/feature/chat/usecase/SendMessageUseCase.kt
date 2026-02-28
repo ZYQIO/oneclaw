@@ -22,6 +22,7 @@ import com.oneclaw.shadow.tool.engine.ToolCallRequest
 import com.oneclaw.shadow.tool.engine.ToolExecutionEngine
 import com.oneclaw.shadow.tool.engine.ToolRegistry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
@@ -49,7 +50,8 @@ class SendMessageUseCase(
     fun execute(
         sessionId: String,
         userText: String,
-        agentId: String
+        agentId: String,
+        pendingMessages: Channel<String> = Channel(Channel.UNLIMITED)
     ): Flow<ChatEvent> = channelFlow {
 
         // 1. Resolve agent
@@ -164,20 +166,33 @@ class SendMessageUseCase(
                 ))
 
                 if (pendingToolCalls.isEmpty()) {
-                    // Response complete — no tool calls
-                    sessionRepository.updateMessageStats(
-                        id = sessionId,
-                        count = messageRepository.getMessageCount(sessionId),
-                        preview = accumulatedText.take(100)
-                    )
-                    send(ChatEvent.ResponseComplete(aiMessage, usage))
+                    // Drain any pending user messages before deciding to stop
+                    val injected = drainPendingMessages(pendingMessages)
+                    for (text in injected) {
+                        send(ChatEvent.UserMessageInjected(text))
+                    }
+                    if (injected.isEmpty()) {
+                        // No pending messages -- loop is truly done
+                        sessionRepository.updateMessageStats(
+                            id = sessionId,
+                            count = messageRepository.getMessageCount(sessionId),
+                            preview = accumulatedText.take(100)
+                        )
+                        send(ChatEvent.ResponseComplete(aiMessage, usage))
 
-                    // Trigger auto-compact check
-                    send(ChatEvent.CompactStarted)
-                    val compactResult = autoCompactUseCase.compactIfNeeded(sessionId, model, provider)
-                    send(ChatEvent.CompactCompleted(compactResult.didCompact))
+                        // Trigger auto-compact check
+                        send(ChatEvent.CompactStarted)
+                        val compactResult = autoCompactUseCase.compactIfNeeded(sessionId, model, provider)
+                        send(ChatEvent.CompactCompleted(compactResult.didCompact))
 
-                    break
+                        break
+                    }
+                    // Pending messages found -- continue to next iteration
+                    round++
+                    if (round < MAX_TOOL_ROUNDS) {
+                        send(ChatEvent.ToolRoundStarting(round))
+                    }
+                    continue
                 }
 
                 // Execute tools in parallel
@@ -223,6 +238,11 @@ class SendMessageUseCase(
                     send(ChatEvent.ToolCallCompleted(tr.toolCallId, tr.toolName, tr.result))
                 }
 
+                // Drain pending user messages before starting next tool round
+                val injectedBeforeTool = drainPendingMessages(pendingMessages)
+                for (text in injectedBeforeTool) {
+                    send(ChatEvent.UserMessageInjected(text))
+                }
                 round++
                 if (round < MAX_TOOL_ROUNDS) {
                     send(ChatEvent.ToolRoundStarting(round))
@@ -296,6 +316,15 @@ class SendMessageUseCase(
         } catch (e: Exception) {
             emptyMap()
         }
+    }
+
+    private fun drainPendingMessages(channel: Channel<String>): List<String> {
+        val injected = mutableListOf<String>()
+        while (true) {
+            val text = channel.tryReceive().getOrNull() ?: break
+            injected.add(text)
+        }
+        return injected
     }
 
     private data class PendingToolCall(

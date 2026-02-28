@@ -15,4 +15,5 @@ sealed class ChatEvent {
     data class Error(val message: String, val errorCode: ErrorCode, val isRetryable: Boolean) : ChatEvent()
     data object CompactStarted : ChatEvent()
     data class CompactCompleted(val didCompact: Boolean) : ChatEvent()
+    data class UserMessageInjected(val text: String) : ChatEvent()
 }
