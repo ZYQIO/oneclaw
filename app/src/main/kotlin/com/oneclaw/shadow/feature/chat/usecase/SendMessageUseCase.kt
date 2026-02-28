@@ -167,19 +167,6 @@ class SendMessageUseCase(
                     break
                 }
 
-                // Save tool call messages
-                for (tc in pendingToolCalls) {
-                    messageRepository.addMessage(Message(
-                        id = "", sessionId = sessionId, type = MessageType.TOOL_CALL,
-                        content = "", thinkingContent = null,
-                        toolCallId = tc.id, toolName = tc.name,
-                        toolInput = tc.arguments.toString(), toolOutput = null,
-                        toolStatus = ToolCallStatus.PENDING, toolDurationMs = null,
-                        tokenCountInput = null, tokenCountOutput = null,
-                        modelId = null, providerId = null, createdAt = 0
-                    ))
-                }
-
                 // Execute tools in parallel
                 val toolRequests = pendingToolCalls.map { tc ->
                     ToolCallRequest(
@@ -193,16 +180,27 @@ class SendMessageUseCase(
                     availableToolNames = agent.toolIds
                 )
 
-                // Save tool results and emit events
+                // Save tool call + result messages with final status
                 for (tr in toolResponses) {
                     val isSuccess = tr.result.status == com.oneclaw.shadow.core.model.ToolResultStatus.SUCCESS
+                    val finalStatus = if (isSuccess) ToolCallStatus.SUCCESS else ToolCallStatus.ERROR
+                    messageRepository.addMessage(Message(
+                        id = "", sessionId = sessionId, type = MessageType.TOOL_CALL,
+                        content = "", thinkingContent = null,
+                        toolCallId = tr.toolCallId, toolName = tr.toolName,
+                        toolInput = pendingToolCalls.find { it.id == tr.toolCallId }?.arguments?.toString(),
+                        toolOutput = null,
+                        toolStatus = finalStatus, toolDurationMs = null,
+                        tokenCountInput = null, tokenCountOutput = null,
+                        modelId = null, providerId = null, createdAt = 0
+                    ))
                     messageRepository.addMessage(Message(
                         id = "", sessionId = sessionId, type = MessageType.TOOL_RESULT,
                         content = "", thinkingContent = null,
                         toolCallId = tr.toolCallId, toolName = tr.toolName,
                         toolInput = null,
                         toolOutput = tr.result.result ?: tr.result.errorMessage ?: "",
-                        toolStatus = if (isSuccess) ToolCallStatus.SUCCESS else ToolCallStatus.ERROR,
+                        toolStatus = finalStatus,
                         toolDurationMs = tr.durationMs,
                         tokenCountInput = null, tokenCountOutput = null,
                         modelId = null, providerId = null, createdAt = 0

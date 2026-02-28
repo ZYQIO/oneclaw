@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
@@ -190,8 +191,8 @@ fun ChatScreen(
                     canSend = uiState.canSend && uiState.hasConfiguredProvider
                 )
             },
-            // IME insets: keyboard pushes only the bottom bar up, top bar stays fixed.
-            contentWindowInsets = WindowInsets.navigationBars
+            // Bottom bar handles its own insets (navigationBarsPadding + imePadding).
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { padding ->
             Box(modifier = Modifier.padding(padding)) {
                 if (uiState.messages.isEmpty() && !uiState.isStreaming) {
@@ -298,7 +299,9 @@ fun ChatInput(
             .imePadding()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
             OutlinedTextField(

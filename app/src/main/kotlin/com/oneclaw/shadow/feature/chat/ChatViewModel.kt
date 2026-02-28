@@ -220,6 +220,9 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(streamingText = "", streamingThinkingText = "", activeToolCalls = emptyList())
                 }
+                // Reload from DB so tool call/result messages appear before next round starts
+                val messages = messageRepository.getMessagesSnapshot(sessionId)
+                _uiState.update { it.copy(messages = messages.map { m -> m.toChatMessageItem() }) }
             }
             is ChatEvent.ResponseComplete -> {
                 finishStreaming(sessionId)
