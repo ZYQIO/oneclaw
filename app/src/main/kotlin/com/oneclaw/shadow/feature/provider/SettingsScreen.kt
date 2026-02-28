@@ -47,6 +47,7 @@ fun SettingsScreen(
     onManageProviders: () -> Unit,
     onManageAgents: () -> Unit = {},
     onUsageStatistics: () -> Unit = {},
+    onDataBackup: () -> Unit = {},
     themeManager: ThemeManager = koinInject()
 ) {
     val currentTheme by themeManager.themeMode.collectAsState()
@@ -111,22 +112,12 @@ fun SettingsScreen(
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            // -- Data & Backup (placeholder for FEAT-007) --
+            // -- Data & Backup --
             SectionHeader("Data & Backup")
             SettingsItem(
-                title = "Google Drive Sync",
-                subtitle = "Not connected",
-                onClick = { /* TODO: FEAT-007 */ }
-            )
-            SettingsItem(
-                title = "Export Backup",
-                subtitle = "Save all data to a file",
-                onClick = { /* TODO: FEAT-007 */ }
-            )
-            SettingsItem(
-                title = "Import Backup",
-                subtitle = "Restore from a backup file",
-                onClick = { /* TODO: FEAT-007 */ }
+                title = "Data & Backup",
+                subtitle = "Google Drive sync, export/import backup",
+                onClick = onDataBackup
             )
         }
     }

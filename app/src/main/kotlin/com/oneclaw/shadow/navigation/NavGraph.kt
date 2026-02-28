@@ -14,7 +14,9 @@ import com.oneclaw.shadow.feature.provider.ProviderDetailScreen
 import com.oneclaw.shadow.feature.provider.ProviderListScreen
 import com.oneclaw.shadow.feature.provider.SetupScreen
 import com.oneclaw.shadow.feature.provider.SettingsScreen
+import com.oneclaw.shadow.feature.settings.DataBackupScreen
 import com.oneclaw.shadow.feature.usage.UsageStatisticsScreen
+import android.content.Intent
 import org.koin.compose.koinInject
 
 @Composable
@@ -110,13 +112,27 @@ fun AppNavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onManageProviders = { navController.navigate(Route.ProviderList.path) },
                 onManageAgents = { navController.navigate(Route.AgentList.path) },
-                onUsageStatistics = { navController.navigate(Route.UsageStatistics.path) }
+                onUsageStatistics = { navController.navigate(Route.UsageStatistics.path) },
+                onDataBackup = { navController.navigate(Route.DataBackup.path) }
             )
         }
 
         composable(Route.UsageStatistics.path) {
             UsageStatisticsScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Route.DataBackup.path) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            DataBackupScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onRestartApp = {
+                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    Runtime.getRuntime().exit(0)
+                }
             )
         }
     }

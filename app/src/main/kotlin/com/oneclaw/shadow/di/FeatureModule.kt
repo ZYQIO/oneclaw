@@ -26,6 +26,7 @@ import com.oneclaw.shadow.feature.session.usecase.CreateSessionUseCase
 import com.oneclaw.shadow.feature.session.usecase.DeleteSessionUseCase
 import com.oneclaw.shadow.feature.session.usecase.GenerateTitleUseCase
 import com.oneclaw.shadow.feature.session.usecase.RenameSessionUseCase
+import com.oneclaw.shadow.feature.settings.SyncSettingsViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.dsl.module
@@ -78,4 +79,7 @@ val featureModule = module {
 
     // RFC-006: Usage Statistics
     viewModelOf(::UsageStatisticsViewModel)
+
+    // RFC-007: Data & Backup
+    viewModelOf(::SyncSettingsViewModel)
 }

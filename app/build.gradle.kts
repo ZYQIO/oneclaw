@@ -110,6 +110,14 @@ dependencies {
     // Security
     implementation(libs.security.crypto)
 
+    // WorkManager
+    implementation(libs.work.runtime.ktx)
+
+    // Google Sign-In & Drive API
+    implementation(libs.play.services.auth)
+    implementation(libs.google.api.client.android)
+    implementation(libs.google.api.services.drive)
+
     // Image loading
     implementation(libs.coil.compose)
 
