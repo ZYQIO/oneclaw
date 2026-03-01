@@ -1,8 +1,8 @@
-# RFC-024: Scheduled Task Detail Page
+# RFC-028: Scheduled Task Detail Page
 
 ## Document Information
-- **RFC ID**: RFC-024
-- **Related PRD**: [FEAT-024 (Scheduled Task Detail)](../../prd/features/FEAT-024-scheduled-task-detail.md)
+- **RFC ID**: RFC-028
+- **Related PRD**: [FEAT-028 (Scheduled Task Detail)](../../prd/features/FEAT-028-scheduled-task-detail.md)
 - **Extends**: [RFC-019 (Scheduled Tasks)](RFC-019-scheduled-tasks.md)
 - **Depends On**: [RFC-019 (Scheduled Tasks)](RFC-019-scheduled-tasks.md), [RFC-001 (Chat Interaction)](RFC-001-chat-interaction.md)
 - **Created**: 2026-03-01
@@ -534,19 +534,19 @@ The existing `ScheduleEdit` route path `schedules/{taskId}` remains unchanged. T
 
 **DatabaseModule**:
 ```kotlin
-// RFC-024: Execution record DAO
+// RFC-028: Execution record DAO
 single { get<AppDatabase>().taskExecutionRecordDao() }
 ```
 
 **RepositoryModule**:
 ```kotlin
-// RFC-024: Execution record repository
+// RFC-028: Execution record repository
 single<TaskExecutionRecordRepository> { TaskExecutionRecordRepositoryImpl(get()) }
 ```
 
 **FeatureModule**:
 ```kotlin
-// RFC-024: Detail page
+// RFC-028: Detail page
 single { RunScheduledTaskNowUseCase(get(), get(), get(), get(), get()) }
 single { CleanupExecutionHistoryUseCase(get()) }
 viewModel { ScheduledTaskDetailViewModel(get(), get(), get(), get(), get(), get(), get()) }

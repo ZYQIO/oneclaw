@@ -1,13 +1,13 @@
 # Scheduled Task Detail Page
 
 ## Feature Information
-- **Feature ID**: FEAT-024
+- **Feature ID**: FEAT-028
 - **Created**: 2026-03-01
 - **Last Updated**: 2026-03-01
 - **Status**: Draft
 - **Priority**: P2 (Could Have)
 - **Owner**: TBD
-- **Related RFC**: [RFC-024 (Scheduled Task Detail)](../../rfc/features/RFC-024-scheduled-task-detail.md)
+- **Related RFC**: [RFC-028 (Scheduled Task Detail)](../../rfc/features/RFC-028-scheduled-task-detail.md)
 - **Extends**: [FEAT-019 (Scheduled Tasks)](FEAT-019-scheduled-tasks.md)
 
 ## User Story
@@ -74,7 +74,7 @@ Available actions on the detail page:
 List -> tap item -> Edit Screen
 ```
 
-**After (FEAT-024)**:
+**After (FEAT-028)**:
 ```
 List -> tap item -> Detail Page -> Edit button -> Edit Screen
 ```
@@ -83,51 +83,51 @@ The FAB on the list screen still navigates directly to the Create screen.
 
 ## Acceptance Criteria
 
-### TEST-024-01: Navigate to Detail Page
+### TEST-028-01: Navigate to Detail Page
 - **Given** the user is on the scheduled task list screen
 - **When** they tap on a task item
 - **Then** the detail page opens showing the task's full configuration, status, and execution history
 
-### TEST-024-02: Display Task Configuration
+### TEST-028-02: Display Task Configuration
 - **Given** the user is on the detail page for a task
 - **Then** the page shows: task name, agent name (not ID), full prompt text, schedule description, and enabled status
 
-### TEST-024-03: Display Next Trigger Time
+### TEST-028-03: Display Next Trigger Time
 - **Given** the user views a detail page for an enabled daily task scheduled at 08:00
 - **Then** the next trigger time shows the correct upcoming datetime
 - **And** for a disabled task, the next trigger shows "Disabled"
 
-### TEST-024-04: Display Execution History
+### TEST-028-04: Display Execution History
 - **Given** a scheduled task has been executed 3 times (2 success, 1 failed)
 - **When** the user opens the detail page
 - **Then** all 3 executions are listed with correct timestamps, statuses, and session links
 
-### TEST-024-05: Navigate to Execution Session
+### TEST-028-05: Navigate to Execution Session
 - **Given** the user is on the detail page and sees an execution history entry with a session
 - **When** they tap on the entry
 - **Then** the app navigates to the chat session showing the execution's conversation
 
-### TEST-024-06: Edit from Detail Page
+### TEST-028-06: Edit from Detail Page
 - **Given** the user is on the detail page
 - **When** they tap the Edit action
 - **Then** the edit screen opens with the task's current configuration pre-filled
 
-### TEST-024-07: Delete from Detail Page
+### TEST-028-07: Delete from Detail Page
 - **Given** the user is on the detail page
 - **When** they tap Delete and confirm
 - **Then** the task is deleted, the alarm is cancelled, and the user is navigated back to the list
 
-### TEST-024-08: Toggle from Detail Page
+### TEST-028-08: Toggle from Detail Page
 - **Given** the user is on the detail page for an enabled task
 - **When** they toggle the switch to disabled
 - **Then** the alarm is cancelled, the status updates to disabled, and the next trigger time updates accordingly
 
-### TEST-024-09: Run Now
+### TEST-028-09: Run Now
 - **Given** the user is on the detail page for a task
 - **When** they tap "Run Now"
 - **Then** the task executes immediately (creates a session, runs agent loop), the execution history updates with the new entry, and a result notification is sent
 
-### TEST-024-10: Empty Execution History
+### TEST-028-10: Empty Execution History
 - **Given** a newly created task that has never been executed
 - **When** the user opens the detail page
 - **Then** the execution history section shows an empty state message like "No executions yet"
