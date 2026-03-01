@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.oneclaw.shadow.core.model.AgentConstants
 import com.oneclaw.shadow.data.local.dao.AgentDao
+import com.oneclaw.shadow.data.local.dao.AttachmentDao
 import com.oneclaw.shadow.data.local.dao.MemoryIndexDao
 import com.oneclaw.shadow.data.local.dao.MessageDao
 import com.oneclaw.shadow.data.local.dao.ModelDao
@@ -16,6 +17,7 @@ import com.oneclaw.shadow.data.local.dao.ScheduledTaskDao
 import com.oneclaw.shadow.data.local.dao.SessionDao
 import com.oneclaw.shadow.data.local.dao.SettingsDao
 import com.oneclaw.shadow.data.local.entity.AgentEntity
+import com.oneclaw.shadow.data.local.entity.AttachmentEntity
 import com.oneclaw.shadow.data.local.entity.MemoryIndexEntity
 import com.oneclaw.shadow.data.local.entity.MessageEntity
 import com.oneclaw.shadow.data.local.entity.ModelEntity
@@ -34,9 +36,10 @@ import java.util.concurrent.Executors
         MessageEntity::class,
         SettingsEntity::class,
         MemoryIndexEntity::class,
-        ScheduledTaskEntity::class
+        ScheduledTaskEntity::class,
+        AttachmentEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -49,6 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun settingsDao(): SettingsDao
     abstract fun memoryIndexDao(): MemoryIndexDao
     abstract fun scheduledTaskDao(): ScheduledTaskDao
+    abstract fun attachmentDao(): AttachmentDao
 
     companion object {
         fun createSeedCallback(): Callback {

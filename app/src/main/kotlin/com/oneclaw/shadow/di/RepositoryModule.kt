@@ -1,12 +1,14 @@
 package com.oneclaw.shadow.di
 
 import com.oneclaw.shadow.core.repository.AgentRepository
+import com.oneclaw.shadow.core.repository.AttachmentRepository
 import com.oneclaw.shadow.core.repository.MessageRepository
 import com.oneclaw.shadow.core.repository.ProviderRepository
 import com.oneclaw.shadow.core.repository.SessionRepository
 import com.oneclaw.shadow.core.repository.ScheduledTaskRepository
 import com.oneclaw.shadow.core.repository.SettingsRepository
 import com.oneclaw.shadow.data.repository.AgentRepositoryImpl
+import com.oneclaw.shadow.data.repository.AttachmentRepositoryImpl
 import com.oneclaw.shadow.data.repository.MessageRepositoryImpl
 import com.oneclaw.shadow.data.repository.ProviderRepositoryImpl
 import com.oneclaw.shadow.data.repository.ScheduledTaskRepositoryImpl
@@ -21,4 +23,5 @@ val repositoryModule = module {
     single<MessageRepository> { MessageRepositoryImpl(get()) }
     single<SettingsRepository> { SettingsRepositoryImpl(get()) }
     single<ScheduledTaskRepository> { ScheduledTaskRepositoryImpl(get()) }
+    single<AttachmentRepository> { AttachmentRepositoryImpl(get()) }
 }

@@ -1,6 +1,7 @@
 package com.oneclaw.shadow.data.remote.adapter
 
 import com.oneclaw.shadow.core.model.AiModel
+import com.oneclaw.shadow.core.model.AttachmentType
 import com.oneclaw.shadow.core.model.ConnectionErrorType
 import com.oneclaw.shadow.core.model.ConnectionTestResult
 import com.oneclaw.shadow.core.model.ModelSource
@@ -17,12 +18,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -301,10 +304,7 @@ class AnthropicAdapter(
             while (i < messages.size) {
                 when (val msg = messages[i]) {
                     is ApiMessage.User -> {
-                        add(buildJsonObject {
-                            put("role", "user")
-                            put("content", msg.content)
-                        })
+                        add(buildUserMessage(msg))
                         i++
                     }
                     is ApiMessage.Assistant -> {
@@ -371,6 +371,42 @@ class AnthropicAdapter(
                             ToolSchemaSerializer.toJsonSchemaMap(tool.parametersSchema)
                         ))
                     })
+                }
+            })
+        }
+    }
+
+    private fun buildUserMessage(message: ApiMessage.User): JsonObject {
+        if (message.attachments.isEmpty()) {
+            return buildJsonObject {
+                put("role", "user")
+                put("content", message.content)
+            }
+        }
+
+        return buildJsonObject {
+            put("role", "user")
+            put("content", buildJsonArray {
+                message.attachments
+                    .filter {
+                        it.type == AttachmentType.IMAGE ||
+                            (it.type == AttachmentType.FILE && it.mimeType == "application/pdf")
+                    }
+                    .forEach { attachment ->
+                        addJsonObject {
+                            put("type", "image")
+                            putJsonObject("source") {
+                                put("type", "base64")
+                                put("media_type", attachment.mimeType)
+                                put("data", attachment.base64Data)
+                            }
+                        }
+                    }
+                if (message.content.isNotBlank()) {
+                    addJsonObject {
+                        put("type", "text")
+                        put("text", message.content)
+                    }
                 }
             })
         }
