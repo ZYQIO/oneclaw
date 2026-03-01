@@ -9,9 +9,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
 import com.oneclaw.shadow.core.notification.NotificationHelper
 import com.oneclaw.shadow.core.theme.ThemeManager
@@ -51,6 +54,15 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
+            }
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                SideEffect {
+                    val window = this@MainActivity.window
+                    val controller = WindowCompat.getInsetsController(window, view)
+                    controller.isAppearanceLightStatusBars = !darkTheme
+                    controller.isAppearanceLightNavigationBars = !darkTheme
+                }
             }
             OneClawShadowTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
