@@ -18,6 +18,10 @@ data class AgentEntity(
     val preferredProviderId: String?,
     @ColumnInfo(name = "preferred_model_id")
     val preferredModelId: String?,
+    @ColumnInfo(name = "temperature")
+    val temperature: Float?,
+    @ColumnInfo(name = "max_iterations")
+    val maxIterations: Int?,
     @ColumnInfo(name = "is_built_in")
     val isBuiltIn: Boolean,
     @ColumnInfo(name = "created_at")

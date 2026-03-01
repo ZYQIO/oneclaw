@@ -36,7 +36,7 @@ import java.util.concurrent.Executors
         MemoryIndexEntity::class,
         ScheduledTaskEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -85,8 +85,8 @@ abstract class AppDatabase : RoomDatabase() {
                     // Seed built-in General Assistant agent
                     val systemPrompt = AgentConstants.GENERAL_ASSISTANT_SYSTEM_PROMPT.replace("'", "''")
                     db.execSQL(
-                        """INSERT INTO agents (id, name, description, system_prompt, tool_ids, preferred_provider_id, preferred_model_id, is_built_in, created_at, updated_at)
-                           VALUES ('${AgentConstants.GENERAL_ASSISTANT_ID}', '${AgentConstants.GENERAL_ASSISTANT_NAME}', 'A general-purpose AI assistant with access to all tools.', '$systemPrompt', '[]', NULL, NULL, 1, $now, $now)"""
+                        """INSERT INTO agents (id, name, description, system_prompt, tool_ids, preferred_provider_id, preferred_model_id, temperature, max_iterations, is_built_in, created_at, updated_at)
+                           VALUES ('${AgentConstants.GENERAL_ASSISTANT_ID}', '${AgentConstants.GENERAL_ASSISTANT_NAME}', 'A general-purpose AI assistant with access to all tools.', '$systemPrompt', '[]', NULL, NULL, NULL, NULL, 1, $now, $now)"""
                     )
                 }
             }

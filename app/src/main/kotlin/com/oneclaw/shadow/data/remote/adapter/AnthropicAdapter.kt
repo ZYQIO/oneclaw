@@ -104,9 +104,10 @@ class AnthropicAdapter(
         modelId: String,
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
-        systemPrompt: String?
+        systemPrompt: String?,
+        temperature: Float?
     ): Flow<StreamEvent> = flow {
-        val requestBody = buildAnthropicRequest(modelId, messages, tools, systemPrompt)
+        val requestBody = buildAnthropicRequest(modelId, messages, tools, systemPrompt, temperature)
         val request = Request.Builder()
             .url("${apiBaseUrl.trimEnd('/')}/messages")
             .addHeader("x-api-key", apiKey)
@@ -276,7 +277,8 @@ class AnthropicAdapter(
         modelId: String,
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
-        systemPrompt: String?
+        systemPrompt: String?,
+        temperature: Float? = null
     ): JsonObject = buildJsonObject {
         put("model", modelId)
         put("max_tokens", 16000)
@@ -290,6 +292,10 @@ class AnthropicAdapter(
                 put("type", "enabled")
                 put("budget_tokens", 10000)
             })
+            // Anthropic requires temperature = 1.0 when extended thinking is enabled.
+            // When thinking is active, the temperature parameter is ignored and omitted.
+        } else if (temperature != null) {
+            put("temperature", temperature.toDouble())
         }
 
         if (!systemPrompt.isNullOrBlank()) {

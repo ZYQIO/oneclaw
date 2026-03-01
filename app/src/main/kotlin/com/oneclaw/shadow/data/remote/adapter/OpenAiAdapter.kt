@@ -114,9 +114,10 @@ class OpenAiAdapter(
         modelId: String,
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
-        systemPrompt: String?
+        systemPrompt: String?,
+        temperature: Float?
     ): Flow<StreamEvent> = flow {
-        val requestBody = buildOpenAiRequest(modelId, messages, tools, systemPrompt)
+        val requestBody = buildOpenAiRequest(modelId, messages, tools, systemPrompt, temperature)
         val request = Request.Builder()
             .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
             .addHeader("Authorization", "Bearer $apiKey")
@@ -261,11 +262,15 @@ class OpenAiAdapter(
         modelId: String,
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
-        systemPrompt: String?
+        systemPrompt: String?,
+        temperature: Float? = null
     ): JsonObject = buildJsonObject {
         put("model", modelId)
         put("stream", true)
         put("stream_options", buildJsonObject { put("include_usage", true) })
+        if (temperature != null) {
+            put("temperature", temperature.toDouble())
+        }
 
         put("messages", buildJsonArray {
             if (!systemPrompt.isNullOrBlank()) {

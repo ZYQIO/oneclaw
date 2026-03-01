@@ -104,6 +104,9 @@ class SendMessageUseCase(
             .getAllToolDefinitions()
             .takeIf { it.isNotEmpty() }
 
+        // Determine effective max iterations from agent or global default
+        val effectiveMaxRounds = agent.maxIterations ?: MAX_TOOL_ROUNDS
+
         var round = 0
         try {
             // Inject memory context into system prompt (only on first round)
@@ -127,7 +130,7 @@ class SendMessageUseCase(
             // RFC-014: Inject skill registry into system prompt
             val baseSystemPrompt = buildSystemPromptWithSkills(memorySystemPrompt)
 
-            while (round < MAX_TOOL_ROUNDS) {
+            while (round < effectiveMaxRounds) {
                 val allMessages = messageRepository.getMessagesSnapshot(sessionId)
                 val session = sessionRepository.getSessionById(sessionId)!!
                 val (effectiveSystemPrompt, apiMessages) = CompactAwareMessageBuilder.build(
@@ -148,7 +151,8 @@ class SendMessageUseCase(
                     modelId = model.id,
                     messages = apiMessages,
                     tools = agentToolDefs,
-                    systemPrompt = effectiveSystemPrompt
+                    systemPrompt = effectiveSystemPrompt,
+                    temperature = agent.temperature
                 ).collect { event ->
                     when (event) {
                         is StreamEvent.TextDelta -> {
@@ -214,7 +218,7 @@ class SendMessageUseCase(
                     }
                     // Pending messages found -- continue to next iteration
                     round++
-                    if (round < MAX_TOOL_ROUNDS) {
+                    if (round < effectiveMaxRounds) {
                         send(ChatEvent.ToolRoundStarting(round))
                     }
                     continue
@@ -275,14 +279,14 @@ class SendMessageUseCase(
                     send(ChatEvent.UserMessageInjected(text))
                 }
                 round++
-                if (round < MAX_TOOL_ROUNDS) {
+                if (round < effectiveMaxRounds) {
                     send(ChatEvent.ToolRoundStarting(round))
                 }
             }
 
-            if (round >= MAX_TOOL_ROUNDS) {
+            if (round >= effectiveMaxRounds) {
                 send(ChatEvent.Error(
-                    "Reached maximum tool call rounds ($MAX_TOOL_ROUNDS). Stopping.",
+                    "Reached maximum tool call rounds ($effectiveMaxRounds). Stopping.",
                     ErrorCode.TOOL_ERROR, false
                 ))
             }

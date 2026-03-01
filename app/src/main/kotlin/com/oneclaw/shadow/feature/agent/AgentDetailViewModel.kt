@@ -61,11 +61,15 @@ class AgentDetailViewModel(
                     systemPrompt = agent.systemPrompt,
                     preferredProviderId = agent.preferredProviderId,
                     preferredModelId = agent.preferredModelId,
+                    temperature = agent.temperature,
+                    maxIterations = agent.maxIterations,
                     savedName = agent.name,
                     savedDescription = agent.description ?: "",
                     savedSystemPrompt = agent.systemPrompt,
                     savedPreferredProviderId = agent.preferredProviderId,
                     savedPreferredModelId = agent.preferredModelId,
+                    savedTemperature = agent.temperature,
+                    savedMaxIterations = agent.maxIterations,
                     isLoading = false
                 )
             }
@@ -114,8 +118,23 @@ class AgentDetailViewModel(
 
     fun clearPreferredModel() = setPreferredModel(null, null)
 
+    fun updateTemperature(value: Float?) {
+        val error = if (value != null && (value < 0f || value > 2f)) {
+            "Temperature must be between 0.0 and 2.0"
+        } else null
+        _uiState.update { it.copy(temperature = value, temperatureError = error) }
+    }
+
+    fun updateMaxIterations(value: Int?) {
+        val error = if (value != null && (value < 1 || value > 100)) {
+            "Max iterations must be between 1 and 100"
+        } else null
+        _uiState.update { it.copy(maxIterations = value, maxIterationsError = error) }
+    }
+
     fun saveAgent() {
         val state = _uiState.value
+        if (state.temperatureError != null || state.maxIterationsError != null) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             if (isCreateMode) {
@@ -142,6 +161,8 @@ class AgentDetailViewModel(
                     systemPrompt = state.systemPrompt.trim(),
                     preferredProviderId = state.preferredProviderId,
                     preferredModelId = state.preferredModelId,
+                    temperature = state.temperature,
+                    maxIterations = state.maxIterations,
                     isBuiltIn = false,
                     createdAt = originalAgent?.createdAt ?: 0,
                     updatedAt = 0
@@ -157,6 +178,8 @@ class AgentDetailViewModel(
                                 savedSystemPrompt = updated.systemPrompt,
                                 savedPreferredProviderId = updated.preferredProviderId,
                                 savedPreferredModelId = updated.preferredModelId,
+                                savedTemperature = updated.temperature,
+                                savedMaxIterations = updated.maxIterations,
                                 successMessage = "Agent saved."
                             )
                         }

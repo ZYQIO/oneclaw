@@ -86,6 +86,14 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // RFC-038: Add temperature and max_iterations to agents
+        db.execSQL("ALTER TABLE agents ADD COLUMN temperature REAL DEFAULT NULL")
+        db.execSQL("ALTER TABLE agents ADD COLUMN max_iterations INTEGER DEFAULT NULL")
+    }
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add context_window_size to models
