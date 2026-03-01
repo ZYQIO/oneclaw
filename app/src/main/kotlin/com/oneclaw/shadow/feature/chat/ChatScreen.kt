@@ -464,6 +464,39 @@ fun ChatInput(
     }
 }
 
+/**
+ * Reorders a flat message list so each TOOL_CALL is immediately followed by its
+ * matching TOOL_RESULT (matched by toolCallId). Runs of consecutive TOOL_CALLs
+ * followed by consecutive TOOL_RESULTs are interleaved into CALL-RESULT pairs.
+ */
+fun interleaveToolMessages(messages: List<ChatMessageItem>): List<ChatMessageItem> {
+    val result = mutableListOf<ChatMessageItem>()
+    var i = 0
+    while (i < messages.size) {
+        val msg = messages[i]
+        if (msg.type == MessageType.TOOL_CALL) {
+            val calls = mutableListOf<ChatMessageItem>()
+            while (i < messages.size && messages[i].type == MessageType.TOOL_CALL) {
+                calls.add(messages[i++])
+            }
+            val results = mutableListOf<ChatMessageItem>()
+            while (i < messages.size && messages[i].type == MessageType.TOOL_RESULT) {
+                results.add(messages[i++])
+            }
+            for (call in calls) {
+                result.add(call)
+                results.find { it.toolCallId == call.toolCallId }?.let { result.add(it) }
+            }
+            // Any unmatched results (shouldn't happen in normal flow)
+            results.filterTo(result) { r -> calls.none { c -> c.toolCallId == r.toolCallId } }
+        } else {
+            result.add(msg)
+            i++
+        }
+    }
+    return result
+}
+
 @Composable
 fun MessageList(
     messages: List<ChatMessageItem>,
@@ -476,12 +509,13 @@ fun MessageList(
     onRetry: () -> Unit,
     onRegenerate: () -> Unit
 ) {
+    val displayMessages = remember(messages) { interleaveToolMessages(messages) }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
-        items(messages, key = { it.id }) { message ->
+        items(displayMessages, key = { it.id }) { message ->
             when (message.type) {
                 MessageType.USER -> UserMessageBubble(
                     content = message.content,
@@ -493,7 +527,7 @@ fun MessageList(
                     modelId = message.modelId,
                     tokenCountInput = message.tokenCountInput,
                     tokenCountOutput = message.tokenCountOutput,
-                    isLastAiMessage = message == messages.lastOrNull { it.type == MessageType.AI_RESPONSE },
+                    isLastAiMessage = message == displayMessages.lastOrNull { it.type == MessageType.AI_RESPONSE },
                     onCopy = { onCopy(message.content) },
                     onRegenerate = onRegenerate
                 )
