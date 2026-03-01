@@ -79,14 +79,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownTypography
 import com.oneclaw.shadow.core.model.MessageType
 import com.oneclaw.shadow.core.model.ToolCallStatus
 import com.oneclaw.shadow.core.util.formatWithCommas
@@ -112,6 +118,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current
+    val inputFocusRequester = remember { FocusRequester() }
 
     // Auto-scroll
     LaunchedEffect(uiState.messages.size, uiState.streamingText) {
@@ -195,6 +202,7 @@ fun ChatScreen(
                             skills = uiState.slashCommandState.matchingSkills,
                             onSkillSelected = { skill ->
                                 viewModel.selectSkillFromSlashCommand(skill)
+                                inputFocusRequester.requestFocus()
                             }
                         )
                     }
@@ -205,7 +213,8 @@ fun ChatScreen(
                         onStop = { viewModel.stopGeneration() },
                         onSkillClick = { viewModel.toggleSkillSheet() },
                         isStreaming = uiState.isStreaming,
-                        hasConfiguredProvider = uiState.hasConfiguredProvider
+                        hasConfiguredProvider = uiState.hasConfiguredProvider,
+                        focusRequester = inputFocusRequester
                     )
                 }
             },
@@ -262,7 +271,10 @@ fun ChatScreen(
     if (uiState.showSkillSheet) {
         SkillSelectionBottomSheet(
             skills = uiState.allSkills,
-            onSkillSelected = { skill -> viewModel.selectSkillFromSheet(skill) },
+            onSkillSelected = { skill ->
+                viewModel.selectSkillFromSheet(skill)
+                inputFocusRequester.requestFocus()
+            },
             onDismiss = { viewModel.dismissSkillSheet() }
         )
     }
@@ -318,7 +330,8 @@ fun ChatInput(
     onStop: () -> Unit,
     onSkillClick: () -> Unit = {},
     isStreaming: Boolean,
-    hasConfiguredProvider: Boolean
+    hasConfiguredProvider: Boolean,
+    focusRequester: FocusRequester = remember { FocusRequester() }
 ) {
     Surface(
         tonalElevation = 2.dp,
@@ -347,7 +360,9 @@ fun ChatInput(
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
                 placeholder = { Text("Message or /skill") },
                 shape = MaterialTheme.shapes.extraLarge,
                 maxLines = 6,
@@ -540,6 +555,14 @@ fun AiMessageBubble(
                     if (content.isNotEmpty()) {
                         Markdown(
                             content = content,
+                            typography = markdownTypography(
+                                h1 = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                                h2 = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp),
+                                h3 = MaterialTheme.typography.titleSmall.copy(fontSize = 18.sp),
+                                h4 = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+                                h5 = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+                                h6 = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

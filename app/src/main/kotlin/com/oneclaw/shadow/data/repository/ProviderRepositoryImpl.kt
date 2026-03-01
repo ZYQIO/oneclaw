@@ -81,8 +81,16 @@ class ProviderRepositoryImpl(
         return when (val result = adapter.listModels(provider.apiBaseUrl, apiKey)) {
             is AppResult.Success -> {
                 val modelsWithProvider = result.data.map { it.copy(providerId = providerId) }
+                val previousDefault = modelDao.getDefaultModelSnapshot()
                 modelDao.deleteByProviderAndSource(providerId, ModelSource.DYNAMIC.name)
                 modelDao.insertAll(modelsWithProvider.map { it.toEntity() })
+                if (previousDefault != null
+                    && previousDefault.providerId == providerId
+                    && previousDefault.source == ModelSource.DYNAMIC.name
+                    && modelsWithProvider.any { it.id == previousDefault.id }
+                ) {
+                    modelDao.setDefault(previousDefault.id, providerId)
+                }
                 AppResult.Success(modelsWithProvider)
             }
             is AppResult.Error -> result

@@ -148,30 +148,24 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * Select a skill from the slash command popup.
-     * Constructs a message and sends it.
-     * RFC-014
-     */
     fun selectSkillFromSlashCommand(skill: SkillDefinition) {
-        val message = buildSkillMessage(skill)
+        val commandText = "/${skill.name} "
         _uiState.update {
             it.copy(
-                inputText = "",
+                inputText = commandText,
                 slashCommandState = SlashCommandState(isActive = false)
             )
         }
-        sendTextMessage(message)
     }
 
-    /**
-     * Select a skill from the skill selection bottom sheet.
-     * RFC-014
-     */
     fun selectSkillFromSheet(skill: SkillDefinition) {
-        val message = buildSkillMessage(skill)
-        _uiState.update { it.copy(showSkillSheet = false) }
-        sendTextMessage(message)
+        val commandText = "/${skill.name} "
+        _uiState.update {
+            it.copy(
+                inputText = commandText,
+                showSkillSheet = false
+            )
+        }
     }
 
     private fun buildSkillMessage(skill: SkillDefinition): String {

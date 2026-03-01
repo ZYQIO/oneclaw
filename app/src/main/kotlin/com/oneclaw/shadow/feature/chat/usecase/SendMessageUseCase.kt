@@ -99,15 +99,10 @@ class SendMessageUseCase(
         )
         sessionRepository.setActive(sessionId, true)
 
-        // 5. Get agent tools -- always include load_skill if available
-        val agentToolDefs: List<ToolDefinition>? = buildList {
-            // Always include load_skill (RFC-014)
-            toolRegistry.getTool("load_skill")?.let { add(it.definition) }
-            // Add agent's configured tools
-            if (agent.toolIds.isNotEmpty()) {
-                addAll(toolRegistry.getToolDefinitionsByNames(agent.toolIds))
-            }
-        }.distinctBy { it.name }.takeIf { it.isNotEmpty() }
+        // 5. Get agent tools
+        val agentToolDefs: List<ToolDefinition>? = toolRegistry
+            .getToolDefinitionsByNames(agent.toolIds)
+            .takeIf { it.isNotEmpty() }
 
         var round = 0
         try {
