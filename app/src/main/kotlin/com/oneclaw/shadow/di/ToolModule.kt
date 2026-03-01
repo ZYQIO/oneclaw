@@ -9,6 +9,7 @@ import com.oneclaw.shadow.tool.browser.WebViewManager
 import com.oneclaw.shadow.tool.builtin.BrowserTool
 import com.oneclaw.shadow.tool.builtin.CreateAgentTool
 import com.oneclaw.shadow.tool.builtin.CreateScheduledTaskTool
+import com.oneclaw.shadow.tool.builtin.JsEvalTool
 import com.oneclaw.shadow.tool.builtin.LoadSkillTool
 import com.oneclaw.shadow.tool.builtin.WebfetchTool
 import com.oneclaw.shadow.tool.engine.PermissionChecker
@@ -58,6 +59,9 @@ val toolModule = module {
     single { WebViewManager(androidContext(), get(), get()) }
     single { BrowserTool(androidContext(), get()) }
 
+    // RFC-034: js_eval built-in tool
+    single { JsEvalTool(get(), get()) }
+
     // RFC-017: Tool enabled state store
     single { ToolEnabledStateStore(androidContext()) }
 
@@ -92,6 +96,12 @@ val toolModule = module {
                 register(get<BrowserTool>(), ToolSourceInfo.BUILTIN)
             } catch (e: Exception) {
                 Log.e("ToolModule", "Failed to register browser: ${e.message}")
+            }
+
+            try {
+                register(get<JsEvalTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register js_eval: ${e.message}")
             }
 
             // Built-in JS tools from assets (replaces Kotlin tool registration)
