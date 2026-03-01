@@ -7,6 +7,7 @@ import com.oneclaw.shadow.core.model.ScheduledTask
 import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.core.repository.ScheduledTaskRepository
 import com.oneclaw.shadow.core.util.AppResult
+import com.oneclaw.shadow.feature.schedule.alarm.ExactAlarmHelper
 import com.oneclaw.shadow.feature.schedule.usecase.CreateScheduledTaskUseCase
 import com.oneclaw.shadow.feature.schedule.usecase.UpdateScheduledTaskUseCase
 import io.mockk.coEvery
@@ -37,6 +38,7 @@ class ScheduledTaskEditViewModelTest {
     private lateinit var scheduledTaskRepository: ScheduledTaskRepository
     private lateinit var createUseCase: CreateScheduledTaskUseCase
     private lateinit var updateUseCase: UpdateScheduledTaskUseCase
+    private lateinit var exactAlarmHelper: ExactAlarmHelper
     private val testDispatcher = StandardTestDispatcher()
 
     private val testAgent = Agent(
@@ -77,7 +79,9 @@ class ScheduledTaskEditViewModelTest {
         scheduledTaskRepository = mockk(relaxed = true)
         createUseCase = mockk(relaxed = true)
         updateUseCase = mockk(relaxed = true)
+        exactAlarmHelper = mockk(relaxed = true)
         every { agentRepository.getAllAgents() } returns flowOf(listOf(testAgent))
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns true
     }
 
     @AfterEach
@@ -91,7 +95,8 @@ class ScheduledTaskEditViewModelTest {
             agentRepository = agentRepository,
             scheduledTaskRepository = scheduledTaskRepository,
             createUseCase = createUseCase,
-            updateUseCase = updateUseCase
+            updateUseCase = updateUseCase,
+            exactAlarmHelper = exactAlarmHelper
         )
 
     @Test
@@ -155,7 +160,9 @@ class ScheduledTaskEditViewModelTest {
 
     @Test
     fun `save calls createUseCase for new task`() = runTest {
-        coEvery { createUseCase(any()) } returns AppResult.Success(existingTask)
+        coEvery { createUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(existingTask, alarmRegistered = true)
+        )
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -201,7 +208,9 @@ class ScheduledTaskEditViewModelTest {
 
     @Test
     fun `save sets savedSuccessfully on success`() = runTest {
-        coEvery { createUseCase(any()) } returns AppResult.Success(existingTask)
+        coEvery { createUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(existingTask, alarmRegistered = true)
+        )
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -215,5 +224,124 @@ class ScheduledTaskEditViewModelTest {
         assertFalse(state.isSaving)
         assertTrue(state.savedSuccessfully)
         assertNull(state.errorMessage)
+    }
+
+    @Test
+    fun `save shows exact alarm dialog when permission is not granted for new task`() = runTest {
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns false
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.updateName("New Task")
+        viewModel.updatePrompt("Do something")
+        viewModel.save()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.showExactAlarmDialog)
+        assertFalse(state.isSaving)
+        coVerify(exactly = 0) { createUseCase(any()) }
+    }
+
+    @Test
+    fun `save proceeds normally when permission is granted`() = runTest {
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns true
+        coEvery { createUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(existingTask, alarmRegistered = true)
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.updateName("New Task")
+        viewModel.updatePrompt("Do something")
+        viewModel.save()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showExactAlarmDialog)
+        assertTrue(state.savedSuccessfully)
+        coVerify(exactly = 1) { createUseCase(any()) }
+    }
+
+    @Test
+    fun `dismissExactAlarmDialog clears showExactAlarmDialog flag`() = runTest {
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns false
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.showExactAlarmDialog)
+
+        viewModel.dismissExactAlarmDialog()
+
+        assertFalse(viewModel.uiState.value.showExactAlarmDialog)
+    }
+
+    @Test
+    fun `saveWithoutAlarm proceeds with save and clears dialog`() = runTest {
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns false
+        coEvery { createUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(existingTask, alarmRegistered = false)
+        )
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        // Trigger permission check (dialog shown)
+        viewModel.save()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showExactAlarmDialog)
+
+        // User dismisses dialog -- save without alarm
+        viewModel.saveWithoutAlarm()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showExactAlarmDialog)
+        assertTrue(state.savedSuccessfully)
+        coVerify(exactly = 1) { createUseCase(any()) }
+    }
+
+    @Test
+    fun `onExactAlarmDialogSettings clears dialog without saving`() = runTest {
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns false
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.save()
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showExactAlarmDialog)
+
+        viewModel.onExactAlarmDialogSettings()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showExactAlarmDialog)
+        assertFalse(state.savedSuccessfully)
+        coVerify(exactly = 0) { createUseCase(any()) }
+    }
+
+    @Test
+    fun `save does not show dialog when editing existing task`() = runTest {
+        // For edit mode, permission check is skipped
+        every { exactAlarmHelper.canScheduleExactAlarms() } returns false
+        coEvery { scheduledTaskRepository.getTaskById("task-existing") } returns existingTask
+        coEvery { updateUseCase(any()) } returns AppResult.Success(Unit)
+
+        val viewModel = createViewModel(SavedStateHandle(mapOf("taskId" to "task-existing")))
+        advanceUntilIdle()
+
+        viewModel.save()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.showExactAlarmDialog)
+        assertTrue(state.savedSuccessfully)
+        coVerify(exactly = 1) { updateUseCase(any()) }
     }
 }

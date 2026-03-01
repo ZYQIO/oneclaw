@@ -10,6 +10,7 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -111,7 +112,9 @@ class CreateScheduledTaskToolTest {
     @Test
     fun `successful daily task creation returns success message`() = runTest {
         val task = createdTask()
-        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(task)
+        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(task, alarmRegistered = true)
+        )
 
         val result = tool.execute(baseParams())
 
@@ -128,7 +131,9 @@ class CreateScheduledTaskToolTest {
             minute = 0,
             dayOfWeek = 1
         )
-        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(task)
+        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(task, alarmRegistered = true)
+        )
 
         val params = baseParams(mapOf(
             "schedule_type" to "weekly",
@@ -157,7 +162,9 @@ class CreateScheduledTaskToolTest {
             dateMillis = dateMillis,
             nextTriggerAt = dateMillis
         )
-        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(task)
+        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(task, alarmRegistered = true)
+        )
 
         val params = baseParams(mapOf(
             "schedule_type" to "one_time",
@@ -210,5 +217,32 @@ class CreateScheduledTaskToolTest {
         assertEquals(ToolResultStatus.ERROR, result.status)
         assertEquals("creation_failed", result.errorType)
         assertTrue(result.errorMessage!!.contains("past"))
+    }
+
+    @Test
+    fun `result includes warning when alarm is not registered due to missing permission`() = runTest {
+        val task = createdTask()
+        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(task, alarmRegistered = false)
+        )
+
+        val result = tool.execute(baseParams())
+
+        assertEquals(ToolResultStatus.SUCCESS, result.status)
+        assertTrue(result.result!!.contains("Warning"))
+        assertTrue(result.result!!.contains("Alarms & reminders"))
+    }
+
+    @Test
+    fun `result does not include warning when alarm is registered`() = runTest {
+        val task = createdTask()
+        coEvery { createScheduledTaskUseCase(any()) } returns AppResult.Success(
+            CreateScheduledTaskUseCase.CreateResult(task, alarmRegistered = true)
+        )
+
+        val result = tool.execute(baseParams())
+
+        assertEquals(ToolResultStatus.SUCCESS, result.status)
+        assertFalse(result.result!!.contains("Warning"))
     }
 }
