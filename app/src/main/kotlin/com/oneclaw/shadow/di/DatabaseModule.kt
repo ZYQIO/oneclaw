@@ -9,6 +9,7 @@ import com.oneclaw.shadow.data.local.db.MIGRATION_4_5
 import com.oneclaw.shadow.data.local.db.MIGRATION_5_6
 import com.oneclaw.shadow.data.local.db.MIGRATION_6_7
 import com.oneclaw.shadow.data.local.db.MIGRATION_7_8
+import com.oneclaw.shadow.data.local.db.MIGRATION_8_9
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
@@ -19,7 +20,7 @@ val databaseModule = module {
             AppDatabase::class.java,
             "oneclaw.db"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .addCallback(AppDatabase.createSeedCallback())
             .build()
     }

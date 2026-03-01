@@ -39,7 +39,7 @@ import java.util.concurrent.Executors
         ScheduledTaskEntity::class,
         TaskExecutionRecordEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

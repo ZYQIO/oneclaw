@@ -108,6 +108,15 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // RFC-031: Add web_search_enabled to agents
+        db.execSQL("ALTER TABLE agents ADD COLUMN web_search_enabled INTEGER NOT NULL DEFAULT 0")
+        // RFC-031: Add citations to messages
+        db.execSQL("ALTER TABLE messages ADD COLUMN citations TEXT")
+    }
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add context_window_size to models
