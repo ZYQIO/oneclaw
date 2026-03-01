@@ -3,16 +3,23 @@ package com.oneclaw.shadow.feature.provider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -33,8 +40,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.oneclaw.shadow.R
 import com.oneclaw.shadow.core.theme.ThemeManager
 import com.oneclaw.shadow.core.theme.ThemeMode
 import kotlinx.coroutines.launch
@@ -76,9 +86,50 @@ fun SettingsScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
-            // -- Appearance --
-            SectionHeader("Appearance")
             SettingsItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_key),
+                title = "Providers & Models",
+                subtitle = "API keys and model configuration",
+                onClick = onManageProviders
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_smart_toy),
+                title = "Agents",
+                subtitle = "Create and configure agents",
+                onClick = onManageAgents
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = Icons.Filled.Build,
+                title = "Tools",
+                subtitle = "Enable or disable tools",
+                onClick = onManageTools
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = Icons.Filled.AutoAwesome,
+                title = "Skills",
+                subtitle = "Create, edit, import/export skills",
+                onClick = onSkills
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_memory),
+                title = "Memory",
+                subtitle = "Long-term memory and daily logs",
+                onClick = onMemory
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = Icons.Filled.DateRange,
+                title = "Scheduled Tasks",
+                subtitle = "Automated agent tasks",
+                onClick = onScheduledTasks
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_palette),
                 title = "Theme",
                 subtitle = when (currentTheme) {
                     ThemeMode.SYSTEM -> "System default"
@@ -88,81 +139,22 @@ fun SettingsScreen(
                 onClick = { showThemeDialog = true }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Providers & Models --
-            SectionHeader("Providers & Models")
             SettingsItem(
-                title = "Manage Providers",
-                subtitle = "Add API keys, configure models",
-                onClick = onManageProviders
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Agents --
-            SectionHeader("Agents")
-            SettingsItem(
-                title = "Manage Agents",
-                subtitle = "Create and configure agents",
-                onClick = onManageAgents
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Tools --
-            SectionHeader("Tools")
-            SettingsItem(
-                title = "Manage Tools",
-                subtitle = "View and enable/disable tools",
-                onClick = onManageTools
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Usage --
-            SectionHeader("Usage")
-            SettingsItem(
+                icon = Icons.Filled.Info,
                 title = "Usage Statistics",
-                subtitle = "View token usage by model",
+                subtitle = "Token usage by model",
                 onClick = onUsageStatistics
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Memory --
-            SectionHeader("Memory")
             SettingsItem(
-                title = "Agent Memory",
-                subtitle = "View and edit long-term memory, daily logs",
-                onClick = onMemory
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Skills --
-            SectionHeader("Skills")
-            SettingsItem(
-                title = "Manage Skills",
-                subtitle = "Create, edit, and delete skills; import and export SKILL.md files",
-                onClick = onSkills
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Scheduled Tasks --
-            SectionHeader("Automation")
-            SettingsItem(
-                title = "Scheduled Tasks",
-                subtitle = "Create and manage automated agent tasks",
-                onClick = onScheduledTasks
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            // -- Data & Backup --
-            SectionHeader("Data & Backup")
-            SettingsItem(
-                title = "Data & Backup",
-                subtitle = "Google Drive sync, export/import backup",
+                icon = ImageVector.vectorResource(R.drawable.ic_cloud_sync),
+                title = "Backup & Sync",
+                subtitle = "Google Drive sync, export/import",
                 onClick = onDataBackup
             )
         }
     }
 
-    // Theme selection dialog
     if (showThemeDialog) {
         ThemeSelectionDialog(
             currentTheme = currentTheme,
@@ -176,17 +168,8 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
-    )
-}
-
-@Composable
 private fun SettingsItem(
+    icon: ImageVector,
     title: String,
     subtitle: String,
     onClick: () -> Unit
@@ -195,9 +178,16 @@ private fun SettingsItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
             Text(
@@ -206,11 +196,6 @@ private fun SettingsItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -239,7 +224,7 @@ private fun ThemeSelectionDialog(
                     ) {
                         RadioButton(
                             selected = mode == currentTheme,
-                            onClick = null // handled by Row selectable
+                            onClick = null
                         )
                         Text(
                             text = when (mode) {
