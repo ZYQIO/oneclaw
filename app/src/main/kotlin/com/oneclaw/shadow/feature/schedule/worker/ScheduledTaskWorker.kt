@@ -1,6 +1,7 @@
 package com.oneclaw.shadow.feature.schedule.worker
 
 import android.content.Context
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -135,6 +136,10 @@ class ScheduledTaskWorker(
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        return ForegroundInfo(FOREGROUND_NOTIFICATION_ID, notification)
+        return ForegroundInfo(
+            FOREGROUND_NOTIFICATION_ID,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        )
     }
 }
