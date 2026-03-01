@@ -33,6 +33,8 @@ class CreateAgentUseCase(
             systemPrompt = systemPrompt.trim(),
             preferredProviderId = preferredProviderId,
             preferredModelId = preferredModelId,
+            temperature = null,
+            maxIterations = null,
             isBuiltIn = false,
             createdAt = 0,
             updatedAt = 0

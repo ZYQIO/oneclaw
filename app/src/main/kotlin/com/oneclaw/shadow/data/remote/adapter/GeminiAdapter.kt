@@ -103,9 +103,10 @@ class GeminiAdapter(
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?,
-        webSearchEnabled: Boolean
+        webSearchEnabled: Boolean,
+        temperature: Float?
     ): Flow<StreamEvent> = flow {
-        val requestBody = buildGeminiRequest(messages, tools, systemPrompt, webSearchEnabled)
+        val requestBody = buildGeminiRequest(messages, tools, systemPrompt, webSearchEnabled, temperature)
         val url = "${apiBaseUrl.trimEnd('/')}/models/${modelId}:streamGenerateContent?key=$apiKey&alt=sse"
         val request = Request.Builder()
             .url(url)
@@ -265,7 +266,8 @@ class GeminiAdapter(
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?,
-        webSearchEnabled: Boolean = false
+        webSearchEnabled: Boolean = false,
+        temperature: Float? = null
     ): JsonObject = buildJsonObject {
         if (!systemPrompt.isNullOrBlank()) {
             put("system_instruction", buildJsonObject {
@@ -342,6 +344,12 @@ class GeminiAdapter(
                 }
             })
         }
+
+        put("generationConfig", buildJsonObject {
+            if (temperature != null) {
+                put("temperature", temperature.toDouble())
+            }
+        })
     }
 
     private fun buildUserParts(message: ApiMessage.User): JsonArray {

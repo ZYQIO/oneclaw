@@ -121,9 +121,10 @@ class OpenAiAdapter(
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?,
-        webSearchEnabled: Boolean
+        webSearchEnabled: Boolean,
+        temperature: Float?
     ): Flow<StreamEvent> = flow {
-        val requestBody = buildOpenAiRequest(modelId, messages, tools, systemPrompt, webSearchEnabled)
+        val requestBody = buildOpenAiRequest(modelId, messages, tools, systemPrompt, webSearchEnabled, temperature)
         val request = Request.Builder()
             .url("${apiBaseUrl.trimEnd('/')}/chat/completions")
             .addHeader("Authorization", "Bearer $apiKey")
@@ -297,11 +298,15 @@ class OpenAiAdapter(
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?,
-        webSearchEnabled: Boolean = false
+        webSearchEnabled: Boolean = false,
+        temperature: Float? = null
     ): JsonObject = buildJsonObject {
         put("model", modelId)
         put("stream", true)
         put("stream_options", buildJsonObject { put("include_usage", true) })
+        if (temperature != null) {
+            put("temperature", temperature.toDouble())
+        }
 
         if (webSearchEnabled) {
             put("web_search_options", buildJsonObject {

@@ -21,6 +21,8 @@ class CloneAgentUseCase(
             systemPrompt = original.systemPrompt,
             preferredProviderId = original.preferredProviderId,
             preferredModelId = original.preferredModelId,
+            temperature = original.temperature,
+            maxIterations = original.maxIterations,
             isBuiltIn = false,
             createdAt = 0,
             updatedAt = 0

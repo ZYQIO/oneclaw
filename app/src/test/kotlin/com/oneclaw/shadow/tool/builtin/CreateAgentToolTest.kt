@@ -39,6 +39,8 @@ class CreateAgentToolTest {
         systemPrompt = "You are an expert Python developer who helps debug code.",
         preferredProviderId = null,
         preferredModelId = null,
+        temperature = null,
+        maxIterations = null,
         isBuiltIn = false,
         createdAt = 1000L,
         updatedAt = 1000L

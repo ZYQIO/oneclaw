@@ -7,6 +7,8 @@ data class Agent(
     val systemPrompt: String,
     val preferredProviderId: String?,
     val preferredModelId: String?,
+    val temperature: Float? = null,
+    val maxIterations: Int? = null,
     val isBuiltIn: Boolean,
     val createdAt: Long,
     val updatedAt: Long,

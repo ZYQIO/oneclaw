@@ -14,7 +14,8 @@ interface ModelApiAdapter {
         messages: List<ApiMessage>,
         tools: List<ToolDefinition>?,
         systemPrompt: String?,
-        webSearchEnabled: Boolean = false
+        webSearchEnabled: Boolean = false,
+        temperature: Float? = null
     ): Flow<StreamEvent>
 
     suspend fun listModels(

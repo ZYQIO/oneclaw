@@ -25,6 +25,8 @@ data class AgentDetailUiState(
     val preferredProviderId: String? = null,
     val preferredModelId: String? = null,
     val webSearchEnabled: Boolean = false,
+    val temperature: Float? = null,
+    val maxIterations: Int? = null,
 
     // Snapshot of persisted values used to derive hasUnsavedChanges
     val savedName: String = "",
@@ -33,11 +35,17 @@ data class AgentDetailUiState(
     val savedPreferredProviderId: String? = null,
     val savedPreferredModelId: String? = null,
     val savedWebSearchEnabled: Boolean = false,
+    val savedTemperature: Float? = null,
+    val savedMaxIterations: Int? = null,
 
     val availableModels: List<ModelOptionItem> = emptyList(),
 
     val generatePrompt: String = "",
     val isGenerating: Boolean = false,
+
+    // Validation errors
+    val temperatureError: String? = null,
+    val maxIterationsError: String? = null,
 
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
@@ -55,7 +63,9 @@ data class AgentDetailUiState(
             systemPrompt != savedSystemPrompt ||
             preferredProviderId != savedPreferredProviderId ||
             preferredModelId != savedPreferredModelId ||
-            webSearchEnabled != savedWebSearchEnabled
+            webSearchEnabled != savedWebSearchEnabled ||
+            temperature != savedTemperature ||
+            maxIterations != savedMaxIterations
         }
 }
 
