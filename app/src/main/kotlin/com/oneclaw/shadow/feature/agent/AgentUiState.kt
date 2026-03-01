@@ -45,7 +45,6 @@ data class AgentDetailUiState(
 
     // Validation errors
     val temperatureError: String? = null,
-    val maxIterationsError: String? = null,
 
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
@@ -54,6 +53,11 @@ data class AgentDetailUiState(
     val showDeleteDialog: Boolean = false,
     val navigateBack: Boolean = false
 ) {
+    val hasRuntimeChanges: Boolean
+        get() = webSearchEnabled != savedWebSearchEnabled ||
+            temperature != savedTemperature ||
+            maxIterations != savedMaxIterations
+
     val hasUnsavedChanges: Boolean
         get() = if (isNewAgent) {
             name.isNotBlank()
@@ -63,9 +67,7 @@ data class AgentDetailUiState(
             systemPrompt != savedSystemPrompt ||
             preferredProviderId != savedPreferredProviderId ||
             preferredModelId != savedPreferredModelId ||
-            webSearchEnabled != savedWebSearchEnabled ||
-            temperature != savedTemperature ||
-            maxIterations != savedMaxIterations
+            hasRuntimeChanges
         }
 }
 

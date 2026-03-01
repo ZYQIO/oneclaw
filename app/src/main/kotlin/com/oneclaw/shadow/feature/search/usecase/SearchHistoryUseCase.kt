@@ -1,5 +1,6 @@
 package com.oneclaw.shadow.feature.search.usecase
 
+import android.util.Log
 import com.oneclaw.shadow.data.local.dao.MessageDao
 import com.oneclaw.shadow.data.local.dao.SessionDao
 import com.oneclaw.shadow.feature.memory.search.HybridSearchEngine
@@ -22,11 +23,13 @@ class SearchHistoryUseCase(
     private val sessionDao: SessionDao
 ) {
     companion object {
+        private const val TAG = "SearchHistoryUseCase"
         private const val MEMORY_WEIGHT = 1.0f
         private const val MESSAGE_WEIGHT = 0.6f
         private const val SESSION_WEIGHT = 0.5f
         private const val MAX_EXCERPT_LENGTH = 500
         private const val DEDUP_OVERLAP_THRESHOLD = 0.8f
+        private const val RECENT_MESSAGE_BUFFER_MS = 5_000L
     }
 
     /**
@@ -46,32 +49,42 @@ class SearchHistoryUseCase(
         maxResults: Int
     ): List<UnifiedSearchResult> {
         val createdAfter = dateFrom ?: 0L
-        val createdBefore = dateTo ?: Long.MAX_VALUE
+        // Exclude very recent messages (5s buffer) to avoid the current message
+        // appearing in results (it's saved to DB before the tool executes)
+        val createdBefore = if (dateTo != null) dateTo
+            else System.currentTimeMillis() - RECENT_MESSAGE_BUFFER_MS
+
+        Log.d(TAG, "Search: query=\"$query\" scope=$scope dateFrom=$dateFrom dateTo=$dateTo")
 
         val allResults = mutableListOf<UnifiedSearchResult>()
 
         // 1. Search memory index (if scope includes it)
         if (scope in listOf("all", "memory", "daily_log")) {
             val memoryResults = searchMemoryIndex(query, scope, createdAfter, createdBefore)
+            Log.d(TAG, "Memory index results: ${memoryResults.size}")
             allResults.addAll(memoryResults)
         }
 
         // 2. Search message content (if scope includes it)
         if (scope in listOf("all", "sessions")) {
             val messageResults = searchMessages(query, createdAfter, createdBefore)
+            Log.d(TAG, "Message content results: ${messageResults.size}")
             allResults.addAll(messageResults)
         }
 
         // 3. Search session metadata (if scope includes it)
         if (scope in listOf("all", "sessions")) {
             val sessionResults = searchSessions(query, createdAfter, createdBefore)
+            Log.d(TAG, "Session metadata results: ${sessionResults.size}")
             allResults.addAll(sessionResults)
         }
 
         // 4. Deduplicate and rank
-        return deduplicate(allResults)
+        val finalResults = deduplicate(allResults)
             .sortedByDescending { it.finalScore }
             .take(maxResults)
+        Log.d(TAG, "Final results after dedup: ${finalResults.size} (from ${allResults.size} total)")
+        return finalResults
     }
 
     private suspend fun searchMemoryIndex(

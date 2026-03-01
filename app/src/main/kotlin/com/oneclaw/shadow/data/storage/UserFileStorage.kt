@@ -12,7 +12,7 @@ import java.io.File
 open class UserFileStorage(private val context: Context) {
 
     open val rootDir: File
-        get() = File(context.filesDir, "user_files").also { it.mkdirs() }
+        get() = context.filesDir
 
     /**
      * List files and directories in the given relative path.

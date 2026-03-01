@@ -57,6 +57,7 @@ class MessagingBridgeService : Service() {
         when (intent?.action) {
             ACTION_START -> startBridge()
             ACTION_STOP -> stopBridge()
+            ACTION_RESTART -> restartBridge()
         }
         return START_STICKY
     }
@@ -215,6 +216,158 @@ class MessagingBridgeService : Service() {
         }
     }
 
+    private fun restartBridge() {
+        serviceScope.launch {
+            channelMutex.withLock {
+                // Stop existing channels
+                channels.forEach { channel ->
+                    runCatching { channel.stop() }
+                }
+                channels.clear()
+                BridgeBroadcaster.clear()
+            }
+            // Re-read preferences and start channels with updated config
+            channelMutex.withLock {
+                val conversationMapper = ConversationMapper(preferences, conversationManager)
+                var startedCount = 0
+
+                if (preferences.isTelegramEnabled()) {
+                    val token = credentialProvider.getTelegramBotToken()
+                    if (token != null) {
+                        val channel = TelegramChannel(
+                            botToken = token,
+                            context = applicationContext,
+                            okHttpClient = okHttpClient,
+                            preferences = preferences,
+                            conversationMapper = conversationMapper,
+                            agentExecutor = agentExecutor,
+                            messageObserver = messageObserver,
+                            conversationManager = conversationManager,
+                            scope = serviceScope
+                        )
+                        channel.start()
+                        channels.add(channel)
+                        BridgeBroadcaster.register(channel)
+                        startedCount++
+                    }
+                }
+
+                if (preferences.isDiscordEnabled()) {
+                    val token = credentialProvider.getDiscordBotToken()
+                    if (token != null) {
+                        val channel = DiscordChannel(
+                            botToken = token,
+                            context = applicationContext,
+                            okHttpClient = okHttpClient,
+                            preferences = preferences,
+                            conversationMapper = conversationMapper,
+                            agentExecutor = agentExecutor,
+                            messageObserver = messageObserver,
+                            conversationManager = conversationManager,
+                            scope = serviceScope
+                        )
+                        channel.start()
+                        channels.add(channel)
+                        BridgeBroadcaster.register(channel)
+                        startedCount++
+                    }
+                }
+
+                if (preferences.isSlackEnabled()) {
+                    val appToken = credentialProvider.getSlackAppToken()
+                    val botToken = credentialProvider.getSlackBotToken()
+                    if (appToken != null && botToken != null) {
+                        val channel = SlackChannel(
+                            appToken = appToken,
+                            botToken = botToken,
+                            okHttpClient = okHttpClient,
+                            preferences = preferences,
+                            conversationMapper = conversationMapper,
+                            agentExecutor = agentExecutor,
+                            messageObserver = messageObserver,
+                            conversationManager = conversationManager,
+                            scope = serviceScope
+                        )
+                        channel.start()
+                        channels.add(channel)
+                        BridgeBroadcaster.register(channel)
+                        startedCount++
+                    }
+                }
+
+                if (preferences.isMatrixEnabled()) {
+                    val token = credentialProvider.getMatrixAccessToken()
+                    val homeserver = preferences.getMatrixHomeserver()
+                    if (token != null && homeserver.isNotEmpty()) {
+                        val channel = MatrixChannel(
+                            homeserverUrl = homeserver,
+                            accessToken = token,
+                            okHttpClient = okHttpClient,
+                            preferences = preferences,
+                            conversationMapper = conversationMapper,
+                            agentExecutor = agentExecutor,
+                            messageObserver = messageObserver,
+                            conversationManager = conversationManager,
+                            scope = serviceScope
+                        )
+                        channel.start()
+                        channels.add(channel)
+                        BridgeBroadcaster.register(channel)
+                        startedCount++
+                    }
+                }
+
+                if (preferences.isLineEnabled()) {
+                    val accessToken = credentialProvider.getLineChannelAccessToken()
+                    val secret = credentialProvider.getLineChannelSecret()
+                    if (accessToken != null && secret != null) {
+                        val channel = LineChannel(
+                            channelAccessToken = accessToken,
+                            channelSecret = secret,
+                            port = preferences.getLineWebhookPort(),
+                            okHttpClient = okHttpClient,
+                            preferences = preferences,
+                            conversationMapper = conversationMapper,
+                            agentExecutor = agentExecutor,
+                            messageObserver = messageObserver,
+                            conversationManager = conversationManager,
+                            scope = serviceScope
+                        )
+                        channel.start()
+                        channels.add(channel)
+                        BridgeBroadcaster.register(channel)
+                        startedCount++
+                    }
+                }
+
+                if (preferences.isWebChatEnabled()) {
+                    val accessToken = credentialProvider.getWebChatAccessToken()
+                    val channel = WebChatChannel(
+                        port = preferences.getWebChatPort(),
+                        accessToken = accessToken,
+                        preferences = preferences,
+                        conversationMapper = conversationMapper,
+                        agentExecutor = agentExecutor,
+                        messageObserver = messageObserver,
+                        conversationManager = conversationManager,
+                        scope = serviceScope
+                    )
+                    channel.start()
+                    channels.add(channel)
+                    BridgeBroadcaster.register(channel)
+                    startedCount++
+                }
+
+                if (startedCount == 0) {
+                    Log.d(TAG, "No channels after restart -- stopping service")
+                    stopBridge()
+                } else {
+                    Log.d(TAG, "Bridge restarted with $startedCount channel(s)")
+                }
+            }
+        }
+    }
+
     private fun stopBridge() {
         serviceScope.launch {
             channelMutex.withLock {
@@ -263,6 +416,7 @@ class MessagingBridgeService : Service() {
         private const val TAG = "MessagingBridgeService"
         const val ACTION_START = "com.oneclaw.shadow.bridge.START"
         const val ACTION_STOP = "com.oneclaw.shadow.bridge.STOP"
+        const val ACTION_RESTART = "com.oneclaw.shadow.bridge.RESTART"
         private const val NOTIFICATION_ID = 2024
         private const val CHANNEL_ID = "messaging_bridge"
         private const val WAKE_LOCK_TAG = "oneclaw:bridge_wake_lock"
@@ -277,6 +431,13 @@ class MessagingBridgeService : Service() {
         fun stop(context: Context) {
             val intent = Intent(context, MessagingBridgeService::class.java).apply {
                 action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+
+        fun restart(context: Context) {
+            val intent = Intent(context, MessagingBridgeService::class.java).apply {
+                action = ACTION_RESTART
             }
             context.startService(intent)
         }

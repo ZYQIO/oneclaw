@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -47,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
@@ -100,7 +98,7 @@ fun AgentDetailScreen(
                     }
                 },
                 actions = {
-                    if (!uiState.isBuiltIn) {
+                    if (!uiState.isBuiltIn || uiState.hasRuntimeChanges) {
                         TextButton(
                             onClick = { viewModel.saveAgent() },
                             enabled = uiState.hasUnsavedChanges && !uiState.isSaving
@@ -195,7 +193,7 @@ fun AgentDetailScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = !uiState.isBuiltIn) {
+                            .clickable {
                                 viewModel.updateWebSearchEnabled(!uiState.webSearchEnabled)
                             }
                             .padding(16.dp),
@@ -213,9 +211,85 @@ fun AgentDetailScreen(
                         }
                         Switch(
                             checked = uiState.webSearchEnabled,
-                            onCheckedChange = { viewModel.updateWebSearchEnabled(it) },
-                            enabled = !uiState.isBuiltIn
+                            onCheckedChange = { viewModel.updateWebSearchEnabled(it) }
                         )
+                    }
+                }
+
+                // Behavior section: Temperature & Max Iterations
+                item {
+                    HorizontalDivider()
+                    Text(
+                        text = "BEHAVIOR",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        // Temperature slider
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Temperature",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "%.1f".format(uiState.temperature ?: 1.0f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Slider(
+                            value = uiState.temperature ?: 1.0f,
+                            onValueChange = { viewModel.updateTemperature(it) },
+                            valueRange = 0f..2f,
+                            steps = 19,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "Lower values produce more focused output; higher values are more creative.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Max Iterations slider
+                        val sliderValue = (uiState.maxIterations ?: 25).coerceIn(1, 200).toFloat()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Max Iterations",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = if (sliderValue.toInt() >= 200) "Unlimited" else "${sliderValue.toInt()}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Slider(
+                            value = sliderValue,
+                            onValueChange = { v ->
+                                val intVal = v.toInt()
+                                viewModel.updateMaxIterations(if (intVal >= 200) null else intVal)
+                            },
+                            valueRange = 1f..200f,
+                            steps = 198,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "Maximum tool-use rounds per turn. Set to Unlimited for no limit.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
 

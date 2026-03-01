@@ -137,7 +137,7 @@ class SendMessageUseCase(
             .takeIf { it.isNotEmpty() }
 
         // Determine effective max iterations from agent or global default
-        val effectiveMaxRounds = agent.maxIterations ?: MAX_TOOL_ROUNDS
+        val effectiveMaxRounds = agent.maxIterations ?: Int.MAX_VALUE
 
         var round = 0
         try {

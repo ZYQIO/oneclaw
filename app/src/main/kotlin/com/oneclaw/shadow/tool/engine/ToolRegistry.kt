@@ -3,6 +3,9 @@ package com.oneclaw.shadow.tool.engine
 import com.oneclaw.shadow.core.model.ToolDefinition
 import com.oneclaw.shadow.core.model.ToolSourceInfo
 import com.oneclaw.shadow.core.model.ToolSourceType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Registry of all available tools. Singleton, created at app startup.
@@ -14,6 +17,10 @@ class ToolRegistry {
 
     @PublishedApi
     internal val sourceInfoMap = mutableMapOf<String, ToolSourceInfo>()
+
+    @PublishedApi
+    internal val _version = MutableStateFlow(0)
+    val version: StateFlow<Int> = _version.asStateFlow()
 
     /**
      * Register a tool with optional source info.
@@ -29,6 +36,7 @@ class ToolRegistry {
         }
         tools[name] = tool
         sourceInfoMap[name] = sourceInfo
+        _version.value++
     }
 
     /** Get a tool by name. Returns null if not found. */
@@ -82,6 +90,7 @@ class ToolRegistry {
     fun unregister(name: String) {
         tools.remove(name)
         sourceInfoMap.remove(name)
+        _version.value++
     }
 
     /**
@@ -92,9 +101,12 @@ class ToolRegistry {
         val keysToRemove = tools.entries
             .filter { it.value is T }
             .map { it.key }
-        keysToRemove.forEach { key ->
-            tools.remove(key)
-            sourceInfoMap.remove(key)
+        if (keysToRemove.isNotEmpty()) {
+            keysToRemove.forEach { key ->
+                tools.remove(key)
+                sourceInfoMap.remove(key)
+            }
+            _version.value++
         }
     }
 }

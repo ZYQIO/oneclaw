@@ -14,7 +14,10 @@ class CreateAgentUseCase(
         description: String?,
         systemPrompt: String,
         preferredProviderId: String?,
-        preferredModelId: String?
+        preferredModelId: String?,
+        webSearchEnabled: Boolean = false,
+        temperature: Float? = null,
+        maxIterations: Int? = null
     ): AppResult<Agent> {
         AgentValidator.validateName(name)?.let {
             return AppResult.Error(message = it, code = ErrorCode.VALIDATION_ERROR)
@@ -33,11 +36,12 @@ class CreateAgentUseCase(
             systemPrompt = systemPrompt.trim(),
             preferredProviderId = preferredProviderId,
             preferredModelId = preferredModelId,
-            temperature = null,
-            maxIterations = null,
+            temperature = temperature,
+            maxIterations = maxIterations,
             isBuiltIn = false,
             createdAt = 0,
-            updatedAt = 0
+            updatedAt = 0,
+            webSearchEnabled = webSearchEnabled
         )
         val created = agentRepository.createAgent(agent)
         return AppResult.Success(created)

@@ -1,6 +1,7 @@
 package com.oneclaw.shadow.feature.tool
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.oneclaw.shadow.core.model.ToolDefinition
 import com.oneclaw.shadow.core.model.ToolParametersSchema
 import com.oneclaw.shadow.core.model.ToolSourceInfo
@@ -10,14 +11,23 @@ import com.oneclaw.shadow.tool.engine.ToolRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class ToolManagementUiState(
+    val builtInCategories: List<BuiltInCategoryUiItem> = emptyList(),
     val builtInTools: List<ToolUiItem> = emptyList(),
     val toolGroups: List<ToolGroupUiItem> = emptyList(),
     val standaloneTools: List<ToolUiItem> = emptyList(),
     val selectedTool: ToolDetailUiItem? = null,
     val snackbarMessage: String? = null
+)
+
+data class BuiltInCategoryUiItem(
+    val category: String,
+    val tools: List<ToolUiItem>,
+    val isExpanded: Boolean = false
 )
 
 data class ToolUiItem(
@@ -57,6 +67,12 @@ class ToolManagementViewModel(
 
     init {
         loadTools()
+        // Auto-reload when tools are registered/unregistered (e.g., custom tools created via chat)
+        viewModelScope.launch {
+            toolRegistry.version.drop(1).collect {
+                loadTools()
+            }
+        }
     }
 
     fun loadTools() {
@@ -77,6 +93,9 @@ class ToolManagementViewModel(
             }
         }
 
+        // Group built-in tools by category prefix
+        val builtInCategories = categorizeBuiltInTools(builtIn)
+
         val toolGroupItems = groups.map { (groupName, toolNames) ->
             val groupTools = toolNames.mapNotNull { name ->
                 val def = allDefs.find { it.name == name } ?: return@mapNotNull null
@@ -89,7 +108,6 @@ class ToolManagementViewModel(
                 groupName = groupName,
                 tools = groupTools,
                 isGroupEnabled = enabledStateStore.isGroupEnabled(groupName),
-                // Preserve expanded state if already loaded
                 isExpanded = _uiState.value.toolGroups
                     .find { it.groupName == groupName }?.isExpanded ?: false
             )
@@ -97,9 +115,52 @@ class ToolManagementViewModel(
 
         _uiState.update {
             it.copy(
+                builtInCategories = builtInCategories,
                 builtInTools = builtIn.sortedBy { t -> t.name },
                 toolGroups = toolGroupItems,
                 standaloneTools = standalone.sortedBy { t -> t.name }
+            )
+        }
+    }
+
+    private fun categorizeBuiltInTools(tools: List<ToolUiItem>): List<BuiltInCategoryUiItem> {
+        val categorized = tools.groupBy { tool ->
+            val name = tool.name.lowercase()
+            when {
+                name.startsWith("calendar") -> "Google Calendar"
+                name.startsWith("gmail") -> "Gmail"
+                name.startsWith("config") -> "Config"
+                name.startsWith("provider") || name.startsWith("model") -> "Provider / Model"
+                name.startsWith("agent") -> "Agent"
+                name.startsWith("schedule") || name.startsWith("scheduled") -> "Scheduling"
+                name.startsWith("file") || name.startsWith("http") || name.startsWith("web") -> "Files & Web"
+                name.startsWith("pdf") -> "PDF"
+                name.startsWith("js") -> "JS Tools"
+                name.startsWith("drive") -> "Google Drive"
+                name.startsWith("docs") || name.startsWith("document") -> "Google Docs"
+                name.startsWith("sheets") || name.startsWith("spreadsheet") -> "Google Sheets"
+                name.startsWith("slides") || name.startsWith("presentation") -> "Google Slides"
+                name.startsWith("forms") -> "Google Forms"
+                name.startsWith("contacts") || name.startsWith("people") -> "Google Contacts"
+                name.startsWith("tasks") -> "Google Tasks"
+                else -> "Other"
+            }
+        }
+
+        val categoryOrder = listOf(
+            "Gmail", "Google Calendar", "Google Tasks", "Google Contacts",
+            "Google Drive", "Google Docs", "Google Sheets", "Google Slides", "Google Forms",
+            "Config", "Provider / Model", "Agent",
+            "Scheduling", "Files & Web", "PDF", "JS Tools", "Other"
+        )
+
+        return categoryOrder.mapNotNull { category ->
+            val categoryTools = categorized[category] ?: return@mapNotNull null
+            BuiltInCategoryUiItem(
+                category = category,
+                tools = categoryTools.sortedBy { it.name },
+                isExpanded = _uiState.value.builtInCategories
+                    .find { it.category == category }?.isExpanded ?: false
             )
         }
     }
@@ -141,6 +202,18 @@ class ToolManagementViewModel(
         val label = if (newState) "enabled" else "disabled"
         loadTools()
         _uiState.update { it.copy(snackbarMessage = "$groupName group $label") }
+    }
+
+    fun toggleBuiltInCategoryExpanded(category: String) {
+        _uiState.update { state ->
+            state.copy(
+                builtInCategories = state.builtInCategories.map { cat ->
+                    if (cat.category == category) {
+                        cat.copy(isExpanded = !cat.isExpanded)
+                    } else cat
+                }
+            )
+        }
     }
 
     fun toggleGroupExpanded(groupName: String) {

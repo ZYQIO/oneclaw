@@ -327,11 +327,10 @@ class ScheduledTaskEditViewModelTest {
     }
 
     @Test
-    fun `save does not show dialog when editing existing task`() = runTest {
-        // For edit mode, permission check is skipped
+    fun `save shows alarm dialog when editing existing task without permission`() = runTest {
+        // Alarm permission check applies to both new and edited tasks
         every { exactAlarmHelper.canScheduleExactAlarms() } returns false
         coEvery { scheduledTaskRepository.getTaskById("task-existing") } returns existingTask
-        coEvery { updateUseCase(any()) } returns AppResult.Success(Unit)
 
         val viewModel = createViewModel(SavedStateHandle(mapOf("taskId" to "task-existing")))
         advanceUntilIdle()
@@ -340,8 +339,8 @@ class ScheduledTaskEditViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertFalse(state.showExactAlarmDialog)
-        assertTrue(state.savedSuccessfully)
-        coVerify(exactly = 1) { updateUseCase(any()) }
+        assertTrue(state.showExactAlarmDialog)
+        assertFalse(state.savedSuccessfully)
+        coVerify(exactly = 0) { updateUseCase(any()) }
     }
 }

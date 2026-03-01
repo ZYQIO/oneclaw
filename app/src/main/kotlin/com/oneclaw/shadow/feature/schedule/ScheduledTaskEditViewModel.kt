@@ -92,8 +92,8 @@ class ScheduledTaskEditViewModel(
         val state = _uiState.value
         if (state.isSaving) return
 
-        // Check exact alarm permission before saving (only relevant for new tasks, not edits)
-        if (!state.isEditing && !exactAlarmHelper.canScheduleExactAlarms()) {
+        // Check exact alarm permission before saving (for both new and edited tasks)
+        if (!exactAlarmHelper.canScheduleExactAlarms()) {
             _uiState.value = state.copy(showExactAlarmDialog = true)
             return
         }

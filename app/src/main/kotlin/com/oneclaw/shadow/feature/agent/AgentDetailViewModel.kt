@@ -132,15 +132,12 @@ class AgentDetailViewModel(
     }
 
     fun updateMaxIterations(value: Int?) {
-        val error = if (value != null && (value < 1 || value > 100)) {
-            "Max iterations must be between 1 and 100"
-        } else null
-        _uiState.update { it.copy(maxIterations = value, maxIterationsError = error) }
+        _uiState.update { it.copy(maxIterations = value) }
     }
 
     fun saveAgent() {
         val state = _uiState.value
-        if (state.temperatureError != null || state.maxIterationsError != null) return
+        if (state.temperatureError != null) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
             if (isCreateMode) {
@@ -149,7 +146,10 @@ class AgentDetailViewModel(
                     description = state.description.ifBlank { null },
                     systemPrompt = state.systemPrompt,
                     preferredProviderId = state.preferredProviderId,
-                    preferredModelId = state.preferredModelId
+                    preferredModelId = state.preferredModelId,
+                    webSearchEnabled = state.webSearchEnabled,
+                    temperature = state.temperature,
+                    maxIterations = state.maxIterations
                 )
                 when (result) {
                     is AppResult.Success -> _uiState.update {
@@ -160,17 +160,18 @@ class AgentDetailViewModel(
                     }
                 }
             } else {
+                val orig = originalAgent ?: return@launch
                 val updated = Agent(
                     id = state.agentId!!,
-                    name = state.name.trim(),
-                    description = state.description.trim().ifBlank { null },
-                    systemPrompt = state.systemPrompt.trim(),
-                    preferredProviderId = state.preferredProviderId,
-                    preferredModelId = state.preferredModelId,
+                    name = if (state.isBuiltIn) orig.name else state.name.trim(),
+                    description = if (state.isBuiltIn) orig.description else state.description.trim().ifBlank { null },
+                    systemPrompt = if (state.isBuiltIn) orig.systemPrompt else state.systemPrompt.trim(),
+                    preferredProviderId = if (state.isBuiltIn) orig.preferredProviderId else state.preferredProviderId,
+                    preferredModelId = if (state.isBuiltIn) orig.preferredModelId else state.preferredModelId,
                     temperature = state.temperature,
                     maxIterations = state.maxIterations,
-                    isBuiltIn = false,
-                    createdAt = originalAgent?.createdAt ?: 0,
+                    isBuiltIn = orig.isBuiltIn,
+                    createdAt = orig.createdAt,
                     updatedAt = 0,
                     webSearchEnabled = state.webSearchEnabled
                 )

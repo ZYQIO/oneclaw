@@ -78,7 +78,7 @@ class ChatViewModel(
     fun initialize(sessionId: String?) {
         // RFC-023: Trigger session switch before loading new session
         val previousSessionId = _uiState.value.sessionId
-        if (previousSessionId != null && sessionId != null && previousSessionId != sessionId) {
+        if (previousSessionId != null && previousSessionId != sessionId) {
             memoryTriggerManager?.onSessionSwitch(previousSessionId)
         }
 

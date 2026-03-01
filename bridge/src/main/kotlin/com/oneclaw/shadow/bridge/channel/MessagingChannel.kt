@@ -73,14 +73,7 @@ abstract class MessagingChannel(
         // 5. Resolve conversation ID
         val conversationId = conversationMapper.resolveConversationId()
 
-        // 6. Insert user message
-        conversationManager.insertUserMessage(
-            conversationId = conversationId,
-            content = msg.text,
-            imagePaths = msg.imagePaths
-        )
-
-        // 7. Execute agent
+        // 6. Execute agent (SendMessageUseCase inserts the user message internally)
         val beforeTimestamp = System.currentTimeMillis()
         agentExecutor.executeMessage(
             conversationId = conversationId,

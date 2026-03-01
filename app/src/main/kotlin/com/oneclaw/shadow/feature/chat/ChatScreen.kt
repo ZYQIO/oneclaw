@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
@@ -94,6 +95,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import com.oneclaw.shadow.core.model.Citation
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
@@ -111,6 +116,8 @@ import com.oneclaw.shadow.core.model.MessageType
 import com.oneclaw.shadow.core.model.ToolCallStatus
 import com.oneclaw.shadow.core.util.formatWithCommas
 import com.oneclaw.shadow.feature.agent.AgentSelectorSheet
+import com.oneclaw.shadow.feature.chat.components.AttachmentPickerSheet
+import com.oneclaw.shadow.feature.chat.components.AttachmentPreviewRow
 import com.oneclaw.shadow.feature.session.SessionDrawerContent
 import com.oneclaw.shadow.feature.session.SessionListViewModel
 import com.oneclaw.shadow.feature.skill.ui.SkillSelectionBottomSheet
@@ -133,6 +140,29 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current
     val inputFocusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
+
+    // Attachment picker launchers
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.addAttachment(it) } }
+
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> uri?.let { viewModel.addAttachment(it) } }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { viewModel.addAttachment(it) } }
+
+    val cameraPhotoFile = remember { mutableStateOf<java.io.File?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraPhotoFile.value?.let { viewModel.addCameraPhoto(it) }
+        }
+    }
 
     // Auto-scroll state: stable MutableState so nestedScrollConnection closure never goes stale.
     // Reset to true on each new session via LaunchedEffect.
@@ -248,14 +278,24 @@ fun ChatScreen(
                             }
                         )
                     }
+                    // RFC-026: Attachment preview
+                    if (uiState.pendingAttachments.isNotEmpty()) {
+                        AttachmentPreviewRow(
+                            attachments = uiState.pendingAttachments,
+                            onRemove = { viewModel.removeAttachment(it) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                    }
                     ChatInput(
                         text = uiState.inputText,
                         onTextChange = { viewModel.updateInputText(it) },
                         onSend = { viewModel.sendMessage() },
                         onStop = { viewModel.stopGeneration() },
                         onSkillClick = { viewModel.toggleSkillSheet() },
+                        onAttachmentClick = { viewModel.showAttachmentPicker() },
                         isStreaming = uiState.isStreaming,
                         hasConfiguredProvider = uiState.hasConfiguredProvider,
+                        hasPendingAttachments = uiState.pendingAttachments.isNotEmpty(),
                         focusRequester = inputFocusRequester
                     )
                 }
@@ -322,6 +362,38 @@ fun ChatScreen(
             onDismiss = { viewModel.dismissSkillSheet() }
         )
     }
+
+    // RFC-026: Attachment picker bottom sheet
+    if (uiState.showAttachmentPicker) {
+        AttachmentPickerSheet(
+            onDismiss = { viewModel.hideAttachmentPicker() },
+            onPickPhoto = {
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            onPickVideo = {
+                videoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+                )
+            },
+            onTakePhoto = {
+                val photoDir = java.io.File(context.cacheDir, "camera_photos")
+                photoDir.mkdirs()
+                val file = java.io.File(photoDir, "photo_${System.currentTimeMillis()}.jpg")
+                cameraPhotoFile.value = file
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                cameraLauncher.launch(uri)
+            },
+            onPickFile = {
+                filePickerLauncher.launch("*/*")
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -373,8 +445,10 @@ fun ChatInput(
     onSend: () -> Unit,
     onStop: () -> Unit,
     onSkillClick: () -> Unit = {},
+    onAttachmentClick: () -> Unit = {},
     isStreaming: Boolean,
     hasConfiguredProvider: Boolean,
+    hasPendingAttachments: Boolean = false,
     focusRequester: FocusRequester = remember { FocusRequester() }
 ) {
     // Track TextFieldValue internally to control cursor position.
@@ -451,6 +525,25 @@ fun ChatInput(
                     )
                 }
 
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Attachment button
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable(onClick = onAttachmentClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.AttachFile,
+                        contentDescription = "Attach",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.weight(1f))
 
                 // Stop button (right, conditional)
@@ -479,7 +572,7 @@ fun ChatInput(
                 }
 
                 // Send button (right)
-                val sendEnabled = text.isNotBlank() && hasConfiguredProvider
+                val sendEnabled = (text.isNotBlank() || hasPendingAttachments) && hasConfiguredProvider
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -817,32 +910,56 @@ fun ToolCallCard(
     toolInput: String?,
     status: ToolCallStatus
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    val hasInput = !toolInput.isNullOrBlank()
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 2.dp)
+            .then(if (hasInput) Modifier.clickable { expanded = !expanded } else Modifier)
     ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when (status) {
-                ToolCallStatus.PENDING, ToolCallStatus.EXECUTING -> {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                when (status) {
+                    ToolCallStatus.PENDING, ToolCallStatus.EXECUTING -> {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    }
+                    ToolCallStatus.SUCCESS -> {
+                        Icon(Icons.Default.CheckCircle, "Success",
+                            modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                    }
+                    ToolCallStatus.ERROR, ToolCallStatus.TIMEOUT -> {
+                        Icon(Icons.Default.Error, "Error",
+                            modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                    }
                 }
-                ToolCallStatus.SUCCESS -> {
-                    Icon(Icons.Default.CheckCircle, "Success",
-                        modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                }
-                ToolCallStatus.ERROR, ToolCallStatus.TIMEOUT -> {
-                    Icon(Icons.Default.Error, "Error",
-                        modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = toolName,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f)
+                )
+                if (hasInput) {
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = "Toggle parameters",
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = toolName, style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace)
+            if (expanded && hasInput) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = toolInput!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 20,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

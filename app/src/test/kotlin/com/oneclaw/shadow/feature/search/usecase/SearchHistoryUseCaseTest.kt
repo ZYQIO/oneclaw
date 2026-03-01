@@ -105,8 +105,8 @@ class SearchHistoryUseCaseTest {
         useCase.search("test", scope = "all", dateFrom = null, dateTo = null, maxResults = 10)
 
         coVerify { hybridSearchEngine.search("test", topK = 50) }
-        coVerify { messageDao.searchContent("test", 0L, Long.MAX_VALUE, 50) }
-        coVerify { sessionDao.searchByTitleOrPreview("test", 0L, Long.MAX_VALUE, 20) }
+        coVerify { messageDao.searchContent("test", 0L, any(), 50) }
+        coVerify { sessionDao.searchByTitleOrPreview("test", 0L, any(), 20) }
     }
 
     @Test
@@ -132,8 +132,8 @@ class SearchHistoryUseCaseTest {
         useCase.search("test", scope = "sessions", dateFrom = null, dateTo = null, maxResults = 10)
 
         coVerify(exactly = 0) { hybridSearchEngine.search(any(), any()) }
-        coVerify { messageDao.searchContent("test", 0L, Long.MAX_VALUE, 50) }
-        coVerify { sessionDao.searchByTitleOrPreview("test", 0L, Long.MAX_VALUE, 20) }
+        coVerify { messageDao.searchContent("test", 0L, any(), 50) }
+        coVerify { sessionDao.searchByTitleOrPreview("test", 0L, any(), 20) }
     }
 
     // --- Date filter tests ---
@@ -153,7 +153,7 @@ class SearchHistoryUseCaseTest {
     fun `null dateFrom defaults to 0`() = runTest {
         useCase.search("test", scope = "sessions", dateFrom = null, dateTo = null, maxResults = 10)
 
-        coVerify { messageDao.searchContent("test", 0L, Long.MAX_VALUE, 50) }
+        coVerify { messageDao.searchContent("test", 0L, any(), 50) }
     }
 
     // --- Result ordering and scoring tests ---

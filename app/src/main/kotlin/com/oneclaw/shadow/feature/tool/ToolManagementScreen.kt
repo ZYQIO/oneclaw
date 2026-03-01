@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oneclaw.shadow.core.model.ToolParameter
@@ -93,17 +94,33 @@ fun ToolManagementScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            // Built-in section
-            if (uiState.builtInTools.isNotEmpty()) {
+            // Built-in section with category grouping
+            if (uiState.builtInCategories.isNotEmpty()) {
                 item {
                     SectionHeader("BUILT-IN")
                 }
-                items(uiState.builtInTools, key = { it.name }) { tool ->
-                    ToolListItem(
-                        tool = tool,
-                        onToggle = { viewModel.toggleToolEnabled(tool.name) },
-                        onClick = { viewModel.selectTool(tool.name) }
-                    )
+                uiState.builtInCategories.forEach { category ->
+                    item(key = "builtin_cat_${category.category}") {
+                        BuiltInCategoryHeader(
+                            category = category,
+                            onToggleExpand = {
+                                viewModel.toggleBuiltInCategoryExpanded(category.category)
+                            }
+                        )
+                    }
+                    if (category.isExpanded) {
+                        items(
+                            category.tools,
+                            key = { "builtin_tool_${it.name}" }
+                        ) { tool ->
+                            ToolListItem(
+                                tool = tool,
+                                onToggle = { viewModel.toggleToolEnabled(tool.name) },
+                                onClick = { viewModel.selectTool(tool.name) },
+                                isGroupChild = true
+                            )
+                        }
+                    }
                 }
             }
 
@@ -217,21 +234,24 @@ private fun ToolListItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = tool.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = FontFamily.Monospace
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                SourceBadge(tool.sourceType)
-            }
             Text(
-                text = tool.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                text = tool.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SourceBadge(tool.sourceType)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = tool.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         Switch(
             checked = tool.isEnabled,
@@ -258,6 +278,38 @@ private fun SourceBadge(sourceType: ToolSourceType) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+private fun BuiltInCategoryHeader(
+    category: BuiltInCategoryUiItem,
+    onToggleExpand: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggleExpand)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (category.isExpanded) Icons.Default.ExpandLess
+            else Icons.Default.ExpandMore,
+            contentDescription = if (category.isExpanded) "Collapse" else "Expand",
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = category.category,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "${category.tools.size} tools",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

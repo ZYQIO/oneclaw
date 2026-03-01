@@ -10,9 +10,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel for the Google Account settings screen.
- */
 class GoogleAuthViewModel(
     private val googleAuthManager: GoogleAuthManager
 ) : ViewModel() {
@@ -24,7 +21,9 @@ class GoogleAuthViewModel(
         val accountEmail: String? = null,
         val hasCredentials: Boolean = false,
         val isLoading: Boolean = false,
-        val error: String? = null
+        val error: String? = null,
+        val editingCredentials: Boolean = false,
+        val dirty: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -47,11 +46,11 @@ class GoogleAuthViewModel(
     }
 
     fun onClientIdChanged(value: String) {
-        _uiState.update { it.copy(clientId = value) }
+        _uiState.update { it.copy(clientId = value, dirty = true) }
     }
 
     fun onClientSecretChanged(value: String) {
-        _uiState.update { it.copy(clientSecret = value) }
+        _uiState.update { it.copy(clientSecret = value, dirty = true) }
     }
 
     fun saveCredentials() {
@@ -59,7 +58,26 @@ class GoogleAuthViewModel(
             _uiState.value.clientId,
             _uiState.value.clientSecret
         )
-        _uiState.update { it.copy(hasCredentials = true, error = null) }
+        _uiState.update {
+            it.copy(hasCredentials = true, error = null, editingCredentials = false, dirty = false)
+        }
+    }
+
+    fun startEditingCredentials() {
+        _uiState.update {
+            it.copy(
+                clientId = googleAuthManager.getClientId() ?: "",
+                clientSecret = googleAuthManager.getClientSecret() ?: "",
+                editingCredentials = true,
+                dirty = false
+            )
+        }
+    }
+
+    fun cancelEditingCredentials() {
+        _uiState.update {
+            it.copy(editingCredentials = false, dirty = false)
+        }
     }
 
     fun signIn() {
@@ -99,5 +117,16 @@ class GoogleAuthViewModel(
                 )
             }
         }
+    }
+
+    fun deleteCredentials() {
+        googleAuthManager.clearAllCredentials()
+        _uiState.update {
+            UiState()
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
     }
 }

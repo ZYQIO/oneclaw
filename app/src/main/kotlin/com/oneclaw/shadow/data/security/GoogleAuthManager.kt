@@ -9,6 +9,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.oneclaw.shadow.core.util.AppResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -20,8 +22,13 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.BufferedReader
 import java.io.IOException
+import java.io.InputStreamReader
+import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
  * Manages BYOK (Bring Your Own Key) OAuth 2.0 flow for Google Workspace.
@@ -50,6 +57,7 @@ class GoogleAuthManager(
         private const val KEY_EMAIL = "google_oauth_email"
 
         private const val TOKEN_EXPIRY_MARGIN_MS = 60_000L  // refresh 60s before expiry
+        private const val AUTH_TIMEOUT_MS = 120_000
 
         private const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
         private const val TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -85,12 +93,10 @@ class GoogleAuthManager(
     }
 
     private val tokenMutex = Mutex()
+    private val json = Json { ignoreUnknownKeys = true }
 
     // --- Public API ---
 
-    /**
-     * Save OAuth client credentials (Client ID + Client Secret).
-     */
     fun saveOAuthCredentials(clientId: String, clientSecret: String) {
         prefs.edit()
             .putString(KEY_CLIENT_ID, clientId.trim())
@@ -107,10 +113,10 @@ class GoogleAuthManager(
 
     /**
      * Initiate OAuth flow:
-     * 1. Start loopback HTTP server on random port
+     * 1. Start loopback HTTP server on random port bound to 127.0.0.1
      * 2. Build consent URL and open browser
      * 3. Wait for redirect with auth code
-     * 4. Exchange code for tokens
+     * 4. Exchange code for tokens (with retry)
      * 5. Fetch user info
      * 6. Store everything
      */
@@ -120,44 +126,78 @@ class GoogleAuthManager(
         val clientSecret = getClientSecret()
             ?: return AppResult.Error(exception = Exception("Client Secret not configured"), message = "Client Secret not configured")
 
-        return try {
-            // Start loopback server on a random available port
-            val serverSocket = ServerSocket(0)
-            val port = serverSocket.localPort
-            val redirectUri = "http://127.0.0.1:$port"
+        // Bind to 127.0.0.1 explicitly (matches oneclaw-1)
+        val serverSocket = withContext(Dispatchers.IO) {
+            ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
+        }
+        val port = serverSocket.localPort
+        val redirectUri = "http://127.0.0.1:$port"
 
-            // Build consent URL
+        try {
             val consentUrl = buildConsentUrl(clientId, redirectUri)
 
-            // Open browser
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(consentUrl)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-
-            // Wait for redirect (blocking on IO dispatcher)
-            val authCode = withContext(Dispatchers.IO) {
-                waitForAuthCode(serverSocket)
+            // Launch browser on Main dispatcher without FLAG_ACTIVITY_NEW_TASK
+            withContext(Dispatchers.Main) {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(consentUrl))
+                context.startActivity(intent)
             }
 
-            // Exchange code for tokens
-            val tokens = exchangeCodeForTokens(authCode, clientId, clientSecret, redirectUri)
+            // Use NonCancellable so activity recreation doesn't abort the flow
+            return withContext(NonCancellable) {
+                // Wait for redirect (blocking on IO dispatcher)
+                val authCode = withContext(Dispatchers.IO) {
+                    waitForAuthCode(serverSocket)
+                }
 
-            // Fetch user email
-            val email = fetchUserEmail(tokens.accessToken)
+                if (authCode == null) {
+                    return@withContext AppResult.Error(
+                        exception = Exception("No authorization code received"),
+                        message = "No authorization code received (timed out or cancelled)"
+                    )
+                }
 
-            // Store everything
-            prefs.edit()
-                .putString(KEY_REFRESH_TOKEN, tokens.refreshToken)
-                .putString(KEY_ACCESS_TOKEN, tokens.accessToken)
-                .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + tokens.expiresInMs)
-                .putString(KEY_EMAIL, email)
-                .apply()
+                // Retry token exchange -- the first attempt may fail because
+                // the app is still backgrounded and Android restricts network.
+                var lastError: Exception? = null
+                repeat(3) { attempt ->
+                    if (attempt > 0) {
+                        Log.d(TAG, "Token exchange retry $attempt after: ${lastError?.message}")
+                        delay(3000)
+                    }
+                    try {
+                        val tokens = exchangeCodeForTokens(authCode, clientId, clientSecret, redirectUri)
+                        val email = fetchUserEmail(tokens.accessToken)
 
-            AppResult.Success(email)
-        } catch (e: Exception) {
-            Log.e(TAG, "Authorization failed", e)
-            AppResult.Error(exception = e, message = e.message ?: "Authorization failed")
+                        prefs.edit()
+                            .putString(KEY_REFRESH_TOKEN, tokens.refreshToken)
+                            .putString(KEY_ACCESS_TOKEN, tokens.accessToken)
+                            .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + tokens.expiresInMs)
+                            .putString(KEY_EMAIL, email)
+                            .apply()
+
+                        Log.i(TAG, "Authorization successful for $email")
+                        return@withContext AppResult.Success(email)
+                    } catch (e: UnknownHostException) {
+                        lastError = e
+                        Log.e(TAG, "Token exchange failed (DNS): ${e.message}")
+                    } catch (e: SocketTimeoutException) {
+                        lastError = e
+                        Log.e(TAG, "Token exchange failed (timeout): ${e.message}")
+                    } catch (e: Exception) {
+                        lastError = e
+                        Log.e(TAG, "Token exchange failed", e)
+                    }
+                }
+
+                val errorMsg = when (lastError) {
+                    is UnknownHostException -> "Network unavailable. Check your internet connection and try again."
+                    is SocketTimeoutException -> "Connection timed out. Check your internet connection and try again."
+                    else -> lastError?.message ?: "Authorization failed"
+                }
+                AppResult.Error(exception = lastError ?: Exception(errorMsg), message = errorMsg)
+            }
+        } finally {
+            withContext(Dispatchers.IO + NonCancellable) { serverSocket.close() }
         }
     }
 
@@ -176,7 +216,6 @@ class GoogleAuthManager(
                 return@withLock cachedToken
             }
 
-            // Token expired or about to expire -- refresh
             val refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null) ?: return@withLock null
             val clientId = getClientId() ?: return@withLock null
             val clientSecret = getClientSecret() ?: return@withLock null
@@ -190,7 +229,6 @@ class GoogleAuthManager(
                 tokens.accessToken
             } catch (e: Exception) {
                 Log.e(TAG, "Token refresh failed", e)
-                // Clear tokens on refresh failure (refresh token may be revoked)
                 clearTokens()
                 null
             }
@@ -204,7 +242,6 @@ class GoogleAuthManager(
         val token = prefs.getString(KEY_ACCESS_TOKEN, null)
             ?: prefs.getString(KEY_REFRESH_TOKEN, null)
 
-        // Best-effort server-side revocation
         if (token != null) {
             try {
                 withContext(Dispatchers.IO) {
@@ -235,29 +272,46 @@ class GoogleAuthManager(
             "&prompt=consent"
     }
 
-    internal fun waitForAuthCode(serverSocket: ServerSocket): String {
-        serverSocket.soTimeout = 120_000  // 2-minute timeout
-        val socket = serverSocket.accept()
-        val reader = socket.getInputStream().bufferedReader()
-        val requestLine = reader.readLine()
-        // Parse: GET /?code=AUTH_CODE&scope=... HTTP/1.1
-        val code = requestLine
-            ?.substringAfter("code=", "")
-            ?.substringBefore("&")
-            ?.substringBefore(" ")
-            ?: throw IOException("No auth code in redirect")
+    internal fun waitForAuthCode(serverSocket: ServerSocket): String? {
+        serverSocket.soTimeout = AUTH_TIMEOUT_MS
+        return try {
+            val socket = serverSocket.accept()
+            try {
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+                val requestLine = reader.readLine() ?: ""
+                val code = parseAuthCode(requestLine)
 
-        if (code.isBlank()) throw IOException("Empty auth code")
+                val html = if (code != null) {
+                    "<html><body><h2>Authorization complete</h2>" +
+                        "<p>You can close this tab and return to the app.</p></body></html>"
+                } else {
+                    "<html><body><h2>Authorization failed</h2>" +
+                        "<p>Please close this tab and try again.</p></body></html>"
+                }
+                val response = "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: text/html; charset=utf-8\r\n" +
+                    "Connection: close\r\n\r\n$html"
+                socket.getOutputStream().write(response.toByteArray())
+                socket.getOutputStream().flush()
+                code
+            } finally {
+                socket.close()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Loopback server error", e)
+            null
+        }
+    }
 
-        // Send success response to browser
-        val response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" +
-            "<html><body><h2>Authorization successful</h2>" +
-            "<p>You can close this tab and return to the app.</p></body></html>"
-        socket.getOutputStream().write(response.toByteArray())
-        socket.close()
-        serverSocket.close()
-
-        return code
+    private fun parseAuthCode(requestLine: String): String? {
+        val pathAndQuery = requestLine.split(" ").getOrNull(1) ?: return null
+        val queryStart = pathAndQuery.indexOf('?')
+        if (queryStart < 0) return null
+        val query = pathAndQuery.substring(queryStart + 1)
+        return query.split("&")
+            .map { it.split("=", limit = 2) }
+            .find { it[0] == "code" }
+            ?.getOrNull(1)
     }
 
     private suspend fun exchangeCodeForTokens(
@@ -284,11 +338,15 @@ class GoogleAuthManager(
             val responseBody = response.body?.string()
                 ?: throw IOException("Empty token response")
 
-            val json = Json.parseToJsonElement(responseBody).jsonObject
+            if (!response.isSuccessful) {
+                throw IOException("Token exchange failed (${response.code}): $responseBody")
+            }
+
+            val jsonObj = json.parseToJsonElement(responseBody).jsonObject
             TokenResponse(
-                accessToken = json["access_token"]!!.jsonPrimitive.content,
-                refreshToken = json["refresh_token"]?.jsonPrimitive?.content ?: "",
-                expiresInMs = (json["expires_in"]!!.jsonPrimitive.long) * 1000
+                accessToken = jsonObj["access_token"]!!.jsonPrimitive.content,
+                refreshToken = jsonObj["refresh_token"]?.jsonPrimitive?.content ?: "",
+                expiresInMs = (jsonObj["expires_in"]!!.jsonPrimitive.long) * 1000
             )
         }
     }
@@ -315,11 +373,11 @@ class GoogleAuthManager(
             val responseBody = response.body?.string()
                 ?: throw IOException("Empty refresh response")
 
-            val json = Json.parseToJsonElement(responseBody).jsonObject
+            val jsonObj = json.parseToJsonElement(responseBody).jsonObject
             TokenResponse(
-                accessToken = json["access_token"]!!.jsonPrimitive.content,
-                refreshToken = refreshToken,  // refresh token is not rotated
-                expiresInMs = (json["expires_in"]!!.jsonPrimitive.long) * 1000
+                accessToken = jsonObj["access_token"]!!.jsonPrimitive.content,
+                refreshToken = refreshToken,
+                expiresInMs = (jsonObj["expires_in"]!!.jsonPrimitive.long) * 1000
             )
         }
     }
@@ -335,14 +393,25 @@ class GoogleAuthManager(
             val responseBody = response.body?.string()
                 ?: throw IOException("Empty userinfo response")
 
-            val json = Json.parseToJsonElement(responseBody).jsonObject
-            json["email"]?.jsonPrimitive?.content
+            val jsonObj = json.parseToJsonElement(responseBody).jsonObject
+            jsonObj["email"]?.jsonPrimitive?.content
                 ?: throw IOException("No email in userinfo response")
         }
     }
 
     internal fun clearTokens() {
         prefs.edit()
+            .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_TOKEN_EXPIRY)
+            .remove(KEY_EMAIL)
+            .apply()
+    }
+
+    fun clearAllCredentials() {
+        prefs.edit()
+            .remove(KEY_CLIENT_ID)
+            .remove(KEY_CLIENT_SECRET)
             .remove(KEY_REFRESH_TOKEN)
             .remove(KEY_ACCESS_TOKEN)
             .remove(KEY_TOKEN_EXPIRY)
