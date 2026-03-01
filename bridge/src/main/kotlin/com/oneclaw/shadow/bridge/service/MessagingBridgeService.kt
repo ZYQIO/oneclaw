@@ -217,6 +217,8 @@ class MessagingBridgeService : Service() {
     }
 
     private fun restartBridge() {
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, createNotification())
         serviceScope.launch {
             channelMutex.withLock {
                 // Stop existing channels
@@ -439,7 +441,7 @@ class MessagingBridgeService : Service() {
             val intent = Intent(context, MessagingBridgeService::class.java).apply {
                 action = ACTION_RESTART
             }
-            context.startService(intent)
+            context.startForegroundService(intent)
         }
     }
 }
