@@ -1,0 +1,14 @@
+{
+  "name": "webfetch",
+  "description": "Fetch a web page and return its content as Markdown",
+  "parameters": {
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "The URL to fetch"
+      }
+    },
+    "required": ["url"]
+  },
+  "timeoutSeconds": 30
+}

@@ -42,6 +42,13 @@ class ToolRegistry {
     fun getAllToolNames(): List<String> = tools.keys.toList()
 
     /**
+     * Remove a tool by name. Used when a user tool overrides a built-in tool.
+     */
+    fun unregister(name: String) {
+        tools.remove(name)
+    }
+
+    /**
      * Unregister all tools of a specific type.
      * Used by JS tool reload to remove old JS tools before re-scanning.
      */

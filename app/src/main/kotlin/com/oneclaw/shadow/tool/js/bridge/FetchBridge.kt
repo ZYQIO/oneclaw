@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -40,6 +41,7 @@ object FetchBridge {
                 ok: raw.status >= 200 && raw.status < 300,
                 status: raw.status,
                 statusText: raw.statusText,
+                headers: raw.headers || {},
                 _body: raw.body,
                 async text() { return this._body; },
                 async json() { return JSON.parse(this._body); }
@@ -114,6 +116,11 @@ object FetchBridge {
             put("status", response.code)
             put("statusText", response.message)
             put("body", responseBody)
+            put("headers", buildJsonObject {
+                response.headers.names().forEach { name ->
+                    put(name.lowercase(), JsonPrimitive(response.header(name) ?: ""))
+                }
+            })
         }
 
         return result.toString()

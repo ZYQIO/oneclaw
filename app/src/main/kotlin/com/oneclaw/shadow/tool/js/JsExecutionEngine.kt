@@ -6,6 +6,8 @@ import com.oneclaw.shadow.core.model.ToolResult
 import com.oneclaw.shadow.tool.js.bridge.ConsoleBridge
 import com.oneclaw.shadow.tool.js.bridge.FetchBridge
 import com.oneclaw.shadow.tool.js.bridge.FsBridge
+import com.oneclaw.shadow.tool.js.bridge.LibraryBridge
+import com.oneclaw.shadow.tool.js.bridge.TimeBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
@@ -23,7 +25,8 @@ import java.io.File
  * Each execution gets a fresh QuickJS context for isolation.
  */
 class JsExecutionEngine(
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val libraryBridge: LibraryBridge
 ) {
     companion object {
         private const val TAG = "JsExecutionEngine"
@@ -46,7 +49,7 @@ class JsExecutionEngine(
     ): ToolResult {
         return try {
             withTimeout(timeoutSeconds * 1000L) {
-                executeInQuickJs(jsFilePath, toolName, params, env)
+                executeInQuickJs(jsFilePath, null, toolName, params, env)
             }
         } catch (e: TimeoutCancellationException) {
             ToolResult.error("timeout", "JS tool '$toolName' execution timed out after ${timeoutSeconds}s")
@@ -58,8 +61,33 @@ class JsExecutionEngine(
         }
     }
 
+    /**
+     * Execute from pre-loaded source code (built-in JS tools from assets).
+     */
+    suspend fun executeFromSource(
+        jsSource: String,
+        toolName: String,
+        params: Map<String, Any?>,
+        env: Map<String, String>,
+        timeoutSeconds: Int
+    ): ToolResult {
+        return try {
+            withTimeout(timeoutSeconds * 1000L) {
+                executeInQuickJs("", jsSource, toolName, params, env)
+            }
+        } catch (e: TimeoutCancellationException) {
+            ToolResult.error("timeout", "JS tool '$toolName' execution timed out after ${timeoutSeconds}s")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "JS tool '$toolName' execution failed", e)
+            ToolResult.error("execution_error", "JS tool '$toolName' failed: ${e.message}")
+        }
+    }
+
     private suspend fun executeInQuickJs(
         jsFilePath: String,
+        jsSource: String?,
         toolName: String,
         params: Map<String, Any?>,
         env: Map<String, String>
@@ -82,8 +110,14 @@ class JsExecutionEngine(
             // Inject bridge: fetch
             FetchBridge.inject(this, okHttpClient)
 
-            // Load and execute the JS file
-            val jsCode = File(jsFilePath).readText()
+            // Inject bridge: _time
+            TimeBridge.inject(this)
+
+            // Inject bridge: lib()
+            libraryBridge.inject(this)
+
+            // Load JS source -- from file or from pre-loaded string (assets)
+            val jsCode = jsSource ?: File(jsFilePath).readText()
 
             // Build the wrapper that calls execute() and captures the result.
             // We serialize params as JSON, parse it in JS, call execute(),
@@ -92,6 +126,7 @@ class JsExecutionEngine(
 
             val wrapperCode = """
                 ${FetchBridge.FETCH_WRAPPER_JS}
+                ${libraryBridge.LIB_WRAPPER_JS}
 
                 $jsCode
 

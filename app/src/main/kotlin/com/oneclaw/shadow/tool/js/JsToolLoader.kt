@@ -30,6 +30,7 @@ class JsToolLoader(
     companion object {
         private const val TAG = "JsToolLoader"
         private const val EXTERNAL_TOOLS_DIR = "OneClawShadow/tools"
+        private const val ASSETS_TOOLS_DIR = "js/tools"
         private val TOOL_NAME_REGEX = Regex("^[a-z][a-z0-9_]*$")
     }
 
@@ -42,6 +43,62 @@ class JsToolLoader(
         val fileName: String,
         val error: String
     )
+
+    /**
+     * Load built-in JS tools from assets/js/tools/.
+     * Scans for .json + .js pairs in the assets directory.
+     */
+    fun loadBuiltinTools(): LoadResult {
+        val tools = mutableListOf<JsTool>()
+        val errors = mutableListOf<ToolLoadError>()
+
+        val assetFiles = try {
+            context.assets.list(ASSETS_TOOLS_DIR) ?: emptyArray()
+        } catch (e: Exception) {
+            Log.w(TAG, "Cannot list assets/$ASSETS_TOOLS_DIR: ${e.message}")
+            return LoadResult(emptyList(), emptyList())
+        }
+
+        // Find all .json files and look for matching .js files
+        val jsonFiles = assetFiles.filter { it.endsWith(".json") }
+
+        for (jsonFileName in jsonFiles) {
+            val baseName = jsonFileName.removeSuffix(".json")
+            val jsFileName = "$baseName.js"
+
+            if (jsFileName !in assetFiles) {
+                errors.add(ToolLoadError(
+                    jsonFileName,
+                    "Missing corresponding .js file: $jsFileName"
+                ))
+                continue
+            }
+
+            try {
+                val jsonContent = readAsset("$ASSETS_TOOLS_DIR/$jsonFileName")
+                val jsSource = readAsset("$ASSETS_TOOLS_DIR/$jsFileName")
+                val metadata = parseAndValidateMetadata(jsonContent, baseName)
+
+                tools.add(JsTool(
+                    definition = metadata,
+                    jsSource = jsSource,
+                    jsExecutionEngine = jsExecutionEngine,
+                    envVarStore = envVarStore
+                ))
+            } catch (e: Exception) {
+                errors.add(ToolLoadError(
+                    jsonFileName,
+                    "Failed to load built-in tool: ${e.message}"
+                ))
+            }
+        }
+
+        return LoadResult(tools, errors)
+    }
+
+    private fun readAsset(path: String): String {
+        return context.assets.open(path).bufferedReader().use { it.readText() }
+    }
 
     /**
      * Scan tool directories and return all valid JsTool instances.
@@ -193,18 +250,29 @@ class JsToolLoader(
 
     /**
      * Register loaded JS tools into the ToolRegistry.
-     * Skips tools that conflict with already-registered names (built-in tools win).
+     * When allowOverride=true, user tools can override existing tools (e.g., built-ins).
+     * When allowOverride=false, conflicts are skipped and recorded as errors.
      */
-    fun registerTools(registry: ToolRegistry, tools: List<JsTool>): List<ToolLoadError> {
+    fun registerTools(
+        registry: ToolRegistry,
+        tools: List<JsTool>,
+        allowOverride: Boolean = false
+    ): List<ToolLoadError> {
         val conflicts = mutableListOf<ToolLoadError>()
 
         for (tool in tools) {
             if (registry.hasTool(tool.definition.name)) {
-                conflicts.add(ToolLoadError(
-                    "${tool.definition.name}.json",
-                    "Name conflict with existing tool '${tool.definition.name}' (skipped)"
-                ))
-                Log.w(TAG, "JS tool '${tool.definition.name}' skipped: name conflicts with existing tool")
+                if (allowOverride) {
+                    registry.unregister(tool.definition.name)
+                    registry.register(tool)
+                    Log.i(TAG, "User JS tool '${tool.definition.name}' overrides built-in")
+                } else {
+                    conflicts.add(ToolLoadError(
+                        "${tool.definition.name}.json",
+                        "Name conflict with existing tool '${tool.definition.name}' (skipped)"
+                    ))
+                    Log.w(TAG, "JS tool '${tool.definition.name}' skipped: name conflict")
+                }
                 continue
             }
             registry.register(tool)

@@ -1,0 +1,25 @@
+{
+  "name": "write_file",
+  "description": "Write contents to a file on local storage",
+  "parameters": {
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "The absolute file path to write (e.g., '/storage/emulated/0/Documents/output.txt')"
+      },
+      "content": {
+        "type": "string",
+        "description": "The content to write to the file"
+      },
+      "mode": {
+        "type": "string",
+        "description": "Write mode: 'overwrite' (replace file) or 'append' (add to end). Defaults to 'overwrite'.",
+        "enum": ["overwrite", "append"],
+        "default": "overwrite"
+      }
+    },
+    "required": ["path", "content"]
+  },
+  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "timeoutSeconds": 10
+}

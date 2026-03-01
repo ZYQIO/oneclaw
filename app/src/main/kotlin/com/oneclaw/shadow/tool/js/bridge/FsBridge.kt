@@ -44,6 +44,15 @@ object FsBridge {
                     ?: throw IllegalArgumentException("exists: path argument required")
                 fileExists(path)
             }
+
+            // fs.appendFile(path, content) -> void (returns null)
+            function("appendFile") { args: Array<Any?> ->
+                val path = args.getOrNull(0)?.toString()
+                    ?: throw IllegalArgumentException("appendFile: path argument required")
+                val content = args.getOrNull(1)?.toString() ?: ""
+                appendFile(path, content)
+                null
+            }
         }
     }
 
@@ -77,6 +86,13 @@ object FsBridge {
         val file = File(canonical)
         file.parentFile?.mkdirs()
         file.writeText(content, Charsets.UTF_8)
+    }
+
+    private fun appendFile(path: String, content: String) {
+        val canonical = validatePath(path)
+        val file = File(canonical)
+        file.parentFile?.mkdirs()
+        file.appendText(content, Charsets.UTF_8)
     }
 
     private fun fileExists(path: String): Boolean {

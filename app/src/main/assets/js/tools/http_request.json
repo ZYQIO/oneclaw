@@ -1,0 +1,28 @@
+{
+  "name": "http_request",
+  "description": "Make an HTTP request to a URL",
+  "parameters": {
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "The URL to request"
+      },
+      "method": {
+        "type": "string",
+        "description": "HTTP method: GET, POST, PUT, DELETE. Defaults to GET.",
+        "enum": ["GET", "POST", "PUT", "DELETE"],
+        "default": "GET"
+      },
+      "headers": {
+        "type": "object",
+        "description": "Key-value pairs of HTTP headers (optional)"
+      },
+      "body": {
+        "type": "string",
+        "description": "Request body for POST/PUT requests (optional)"
+      }
+    },
+    "required": ["url"]
+  },
+  "timeoutSeconds": 30
+}

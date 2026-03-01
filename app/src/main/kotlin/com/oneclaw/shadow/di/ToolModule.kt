@@ -1,17 +1,14 @@
 package com.oneclaw.shadow.di
 
 import android.util.Log
-import com.oneclaw.shadow.tool.builtin.GetCurrentTimeTool
-import com.oneclaw.shadow.tool.builtin.HttpRequestTool
 import com.oneclaw.shadow.tool.builtin.LoadSkillTool
-import com.oneclaw.shadow.tool.builtin.ReadFileTool
-import com.oneclaw.shadow.tool.builtin.WriteFileTool
 import com.oneclaw.shadow.tool.engine.PermissionChecker
 import com.oneclaw.shadow.tool.engine.ToolExecutionEngine
 import com.oneclaw.shadow.tool.engine.ToolRegistry
 import com.oneclaw.shadow.tool.js.EnvironmentVariableStore
 import com.oneclaw.shadow.tool.js.JsExecutionEngine
 import com.oneclaw.shadow.tool.js.JsToolLoader
+import com.oneclaw.shadow.tool.js.bridge.LibraryBridge
 import com.oneclaw.shadow.tool.skill.SkillFileParser
 import com.oneclaw.shadow.tool.skill.SkillRegistry
 import org.koin.android.ext.koin.androidContext
@@ -19,56 +16,66 @@ import org.koin.dsl.module
 
 val toolModule = module {
 
-    // NEW: JS Execution Engine
-    single { JsExecutionEngine(get()) }  // get() = OkHttpClient
+    // JS Execution Engine (OkHttpClient, LibraryBridge)
+    single { JsExecutionEngine(get(), get()) }
 
-    // NEW: Environment Variable Store
+    // Environment Variable Store
     single { EnvironmentVariableStore(androidContext()) }
 
-    // NEW: JS Tool Loader
-    single { JsToolLoader(androidContext(), get(), get()) }  // JsExecutionEngine, EnvironmentVariableStore
+    // Library Bridge for shared JS libraries
+    single { LibraryBridge(androidContext()) }
+
+    // JS Tool Loader
+    single { JsToolLoader(androidContext(), get(), get()) }
 
     // RFC-014: Skill infrastructure
     single { SkillFileParser() }
     single { SkillRegistry(androidContext(), get()).apply { initialize() } }
-    single { LoadSkillTool(get()) }  // get() = SkillRegistry
+    single { LoadSkillTool(get()) }
 
     single {
         ToolRegistry().apply {
-            // Built-in Kotlin tools
-            register(GetCurrentTimeTool())
-            register(ReadFileTool())
-            register(WriteFileTool())
-            register(HttpRequestTool(get()))  // get() = OkHttpClient from NetworkModule
-
-            // RFC-014: load_skill tool (always available to all agents)
-            // Wrapped in try-catch so a SkillRegistry init failure doesn't break the whole registry
+            // Only Kotlin built-in: LoadSkillTool
             try {
                 register(get<LoadSkillTool>())
             } catch (e: Exception) {
                 Log.e("ToolModule", "Failed to register load_skill: ${e.message}")
             }
 
-            // JS tools: loaded from file system
+            // Built-in JS tools from assets (replaces Kotlin tool registration)
+            val loader: JsToolLoader = get()
             try {
-                val loader: JsToolLoader = get()
-                val loadResult = loader.loadTools()
-                val conflicts = loader.registerTools(this, loadResult.loadedTools)
-
-                val totalErrors = loadResult.errors + conflicts
-                if (loadResult.loadedTools.isNotEmpty()) {
-                    Log.i("ToolModule", "Loaded ${loadResult.loadedTools.size} JS tool(s)")
+                val builtinResult = loader.loadBuiltinTools()
+                loader.registerTools(this, builtinResult.loadedTools, allowOverride = false)
+                if (builtinResult.loadedTools.isNotEmpty()) {
+                    Log.i("ToolModule", "Loaded ${builtinResult.loadedTools.size} built-in JS tool(s)")
                 }
-                totalErrors.forEach { error ->
-                    Log.w("ToolModule", "JS tool load error [${error.fileName}]: ${error.error}")
+                builtinResult.errors.forEach { error ->
+                    Log.e("ToolModule", "Built-in JS tool error [${error.fileName}]: ${error.error}")
                 }
             } catch (e: Exception) {
-                Log.e("ToolModule", "Failed to load JS tools: ${e.message}")
+                Log.e("ToolModule", "Failed to load built-in JS tools: ${e.message}")
+            }
+
+            // User JS tools from file system (can override built-in)
+            try {
+                val userResult = loader.loadTools()
+                val conflicts = loader.registerTools(this, userResult.loadedTools, allowOverride = true)
+
+                val totalErrors = userResult.errors + conflicts
+                if (userResult.loadedTools.isNotEmpty()) {
+                    Log.i("ToolModule", "Loaded ${userResult.loadedTools.size} user JS tool(s)")
+                }
+                totalErrors.forEach { error ->
+                    Log.w("ToolModule", "User JS tool load error [${error.fileName}]: ${error.error}")
+                }
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to load user JS tools: ${e.message}")
             }
         }
     }
 
     single { PermissionChecker(androidContext()) }
 
-    single { ToolExecutionEngine(get(), get()) }  // ToolRegistry, PermissionChecker
+    single { ToolExecutionEngine(get(), get()) }
 }

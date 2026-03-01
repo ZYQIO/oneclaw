@@ -7,21 +7,36 @@ import com.oneclaw.shadow.tool.engine.Tool
 /**
  * A Tool implementation that executes a JavaScript file via QuickJS.
  * From the ToolRegistry's perspective, this is indistinguishable from a built-in Kotlin tool.
+ *
+ * Supports two source modes:
+ * - File-based (jsFilePath set, jsSource null): user tools from file system
+ * - Source-based (jsSource set, jsFilePath empty): built-in tools from assets
  */
 class JsTool(
     override val definition: ToolDefinition,
-    val jsFilePath: String,
+    val jsFilePath: String = "",
+    private val jsSource: String? = null,
     private val jsExecutionEngine: JsExecutionEngine,
     private val envVarStore: EnvironmentVariableStore
 ) : Tool {
 
     override suspend fun execute(parameters: Map<String, Any?>): ToolResult {
-        return jsExecutionEngine.execute(
-            jsFilePath = jsFilePath,
-            toolName = definition.name,
-            params = parameters,
-            env = envVarStore.getAll(),
-            timeoutSeconds = definition.timeoutSeconds
-        )
+        return if (jsSource != null) {
+            jsExecutionEngine.executeFromSource(
+                jsSource = jsSource,
+                toolName = definition.name,
+                params = parameters,
+                env = envVarStore.getAll(),
+                timeoutSeconds = definition.timeoutSeconds
+            )
+        } else {
+            jsExecutionEngine.execute(
+                jsFilePath = jsFilePath,
+                toolName = definition.name,
+                params = parameters,
+                env = envVarStore.getAll(),
+                timeoutSeconds = definition.timeoutSeconds
+            )
+        }
     }
 }

@@ -1,0 +1,19 @@
+{
+  "name": "get_current_time",
+  "description": "Get the current date and time",
+  "parameters": {
+    "properties": {
+      "timezone": {
+        "type": "string",
+        "description": "Timezone identifier (e.g., 'America/New_York', 'Asia/Shanghai'). Defaults to device timezone."
+      },
+      "format": {
+        "type": "string",
+        "description": "Output format: 'iso8601' or 'human_readable'. Defaults to 'iso8601'.",
+        "enum": ["iso8601", "human_readable"]
+      }
+    },
+    "required": []
+  },
+  "timeoutSeconds": 5
+}
