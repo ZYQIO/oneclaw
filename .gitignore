@@ -40,3 +40,4 @@ material-theme.zip
 *.tmp
 *.swp
 *.log
+.claude/worktrees/
