@@ -67,6 +67,7 @@ Repository interfaces live in `core/repository/`. Implementations in `data/repos
 - All docs must be bilingual: English (`filename.md`) and Chinese (`filename-zh.md`), kept in sync
 - Every feature follows: PRD first, then RFC, then code
 - ID system: `FEAT-XXX` (PRD), `RFC-XXX` (design), `ADR-XXX` (decisions), `TEST-XXX` (scenarios)
+- Writing workflow: write English doc first, then spawn a subagent (model: `claude-sonnet-4-6`) to translate it into Chinese
 
 ## Testing Protocol (After Every RFC Implementation)
 
