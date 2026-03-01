@@ -6,6 +6,7 @@ import com.oneclaw.shadow.core.model.ToolSourceType
 import com.oneclaw.shadow.tool.builtin.CreateAgentTool
 import com.oneclaw.shadow.tool.builtin.CreateScheduledTaskTool
 import com.oneclaw.shadow.tool.builtin.LoadSkillTool
+import com.oneclaw.shadow.tool.builtin.WebfetchTool
 import com.oneclaw.shadow.tool.engine.PermissionChecker
 import com.oneclaw.shadow.tool.engine.ToolEnabledStateStore
 import com.oneclaw.shadow.tool.engine.ToolExecutionEngine
@@ -44,6 +45,9 @@ val toolModule = module {
     // RFC-020: create_agent built-in tool
     single { CreateAgentTool(get()) }
 
+    // RFC-021: webfetch built-in tool (replaces JS webfetch)
+    single { WebfetchTool(get()) }
+
     // RFC-017: Tool enabled state store
     single { ToolEnabledStateStore(androidContext()) }
 
@@ -66,6 +70,12 @@ val toolModule = module {
                 register(get<CreateAgentTool>(), ToolSourceInfo.BUILTIN)
             } catch (e: Exception) {
                 Log.e("ToolModule", "Failed to register create_agent: ${e.message}")
+            }
+
+            try {
+                register(get<WebfetchTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register webfetch: ${e.message}")
             }
 
             // Built-in JS tools from assets (replaces Kotlin tool registration)

@@ -139,6 +139,9 @@ dependencies {
     // QuickJS JavaScript Engine
     implementation(libs.quickjs.android)
 
+    // Jsoup HTML parser (RFC-021: Kotlin webfetch tool)
+    implementation("org.jsoup:jsoup:1.18.3")
+
     // Testing
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation(libs.roborazzi)
