@@ -44,7 +44,6 @@ class SessionListViewModelTest {
         name = "General Assistant",
         description = null,
         systemPrompt = "You are a helpful assistant.",
-        toolIds = emptyList(),
         preferredProviderId = null,
         preferredModelId = null,
         isBuiltIn = true,

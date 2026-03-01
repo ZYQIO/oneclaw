@@ -11,8 +11,7 @@ data class AgentListItem(
     val id: String,
     val name: String,
     val description: String?,
-    val isBuiltIn: Boolean,
-    val toolCount: Int
+    val isBuiltIn: Boolean
 )
 
 data class AgentDetailUiState(
@@ -23,7 +22,6 @@ data class AgentDetailUiState(
     val name: String = "",
     val description: String = "",
     val systemPrompt: String = "",
-    val selectedToolIds: List<String> = emptyList(),
     val preferredProviderId: String? = null,
     val preferredModelId: String? = null,
 
@@ -31,11 +29,9 @@ data class AgentDetailUiState(
     val savedName: String = "",
     val savedDescription: String = "",
     val savedSystemPrompt: String = "",
-    val savedToolIds: List<String> = emptyList(),
     val savedPreferredProviderId: String? = null,
     val savedPreferredModelId: String? = null,
 
-    val availableTools: List<ToolOptionItem> = emptyList(),
     val availableModels: List<ModelOptionItem> = emptyList(),
 
     val isLoading: Boolean = true,
@@ -52,18 +48,10 @@ data class AgentDetailUiState(
             name != savedName ||
             description != savedDescription ||
             systemPrompt != savedSystemPrompt ||
-            selectedToolIds.toSet() != savedToolIds.toSet() ||
             preferredProviderId != savedPreferredProviderId ||
             preferredModelId != savedPreferredModelId
         }
 }
-
-data class ToolOptionItem(
-    val name: String,
-    val description: String,
-    val isSelected: Boolean,
-    val isGloballyDisabled: Boolean = false
-)
 
 data class ModelOptionItem(
     val modelId: String,

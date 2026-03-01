@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -31,8 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
@@ -139,53 +136,6 @@ fun AgentDetailScreen(
                             maxLines = 15,
                             modifier = Modifier.fillMaxWidth()
                         )
-                    }
-                }
-
-                item {
-                    HorizontalDivider()
-                    Text(
-                        text = "TOOLS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-
-                items(uiState.availableTools, key = { it.name }) { tool ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .alpha(if (tool.isGloballyDisabled) 0.38f else 1f)
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = tool.name in uiState.selectedToolIds,
-                            onCheckedChange = {
-                                if (!tool.isGloballyDisabled) viewModel.toggleTool(tool.name)
-                            },
-                            enabled = !uiState.isBuiltIn && !tool.isGloballyDisabled
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = tool.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = tool.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (tool.isGloballyDisabled) {
-                                Text(
-                                    text = "Globally disabled",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
                     }
                 }
 

@@ -81,7 +81,7 @@ val featureModule = module {
     factory { CreateAgentUseCase(get()) }
     factory { CloneAgentUseCase(get()) }
     factory { DeleteAgentUseCase(get(), get()) }
-    factory { GetAgentToolsUseCase(get(), get()) }
+    factory { GetAgentToolsUseCase(get()) }
     factory { ResolveModelUseCase(get(), get()) }
 
     // RFC-002: Agent feature view models

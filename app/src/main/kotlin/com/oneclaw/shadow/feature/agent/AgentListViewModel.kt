@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.feature.agent.usecase.CloneAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.DeleteAgentUseCase
-import com.oneclaw.shadow.tool.engine.ToolRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +13,6 @@ import kotlinx.coroutines.launch
 
 class AgentListViewModel(
     private val agentRepository: AgentRepository,
-    private val toolRegistry: ToolRegistry,
     private val cloneAgentUseCase: CloneAgentUseCase,
     private val deleteAgentUseCase: DeleteAgentUseCase
 ) : ViewModel() {
@@ -34,8 +32,7 @@ class AgentListViewModel(
                         id = agent.id,
                         name = agent.name,
                         description = agent.description,
-                        isBuiltIn = agent.isBuiltIn,
-                        toolCount = agent.toolIds.size
+                        isBuiltIn = agent.isBuiltIn
                     )
                 }
                 _uiState.update { it.copy(agents = items, isLoading = false) }

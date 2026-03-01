@@ -64,22 +64,19 @@ class AgentScreenshotTest {
                 id = "general",
                 name = "General Assistant",
                 description = "A versatile assistant for general tasks",
-                isBuiltIn = true,
-                toolCount = 4
+                isBuiltIn = true
             ),
             AgentListItem(
                 id = "coder",
                 name = "Code Helper",
                 description = "Specialized for coding tasks",
-                isBuiltIn = true,
-                toolCount = 2
+                isBuiltIn = true
             ),
             AgentListItem(
                 id = "custom-1",
                 name = "My Custom Agent",
                 description = "Custom agent with specific instructions",
-                isBuiltIn = false,
-                toolCount = 1
+                isBuiltIn = false
             )
         )
         themed {
@@ -101,8 +98,7 @@ class AgentScreenshotTest {
                 id = "general",
                 name = "General Assistant",
                 description = "A versatile assistant for general tasks",
-                isBuiltIn = true,
-                toolCount = 4
+                isBuiltIn = true
             )
         )
         themed {
@@ -128,15 +124,13 @@ class AgentScreenshotTest {
                                 id = "general",
                                 name = "General Assistant",
                                 description = "A versatile assistant",
-                                isBuiltIn = true,
-                                toolCount = 4
+                                isBuiltIn = true
                             ),
                             AgentListItem(
                                 id = "custom-1",
                                 name = "My Agent",
                                 description = null,
-                                isBuiltIn = false,
-                                toolCount = 0
+                                isBuiltIn = false
                             )
                         ),
                         isLoading = false

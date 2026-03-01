@@ -10,8 +10,6 @@ import com.oneclaw.shadow.core.util.AppResult
 import com.oneclaw.shadow.feature.agent.usecase.CloneAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.CreateAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.DeleteAgentUseCase
-import com.oneclaw.shadow.tool.engine.ToolEnabledStateStore
-import com.oneclaw.shadow.tool.engine.ToolRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,8 +19,6 @@ import kotlinx.coroutines.launch
 class AgentDetailViewModel(
     private val agentRepository: AgentRepository,
     private val providerRepository: ProviderRepository,
-    private val toolRegistry: ToolRegistry,
-    private val enabledStateStore: ToolEnabledStateStore,
     private val createAgentUseCase: CreateAgentUseCase,
     private val cloneAgentUseCase: CloneAgentUseCase,
     private val deleteAgentUseCase: DeleteAgentUseCase,
@@ -38,7 +34,6 @@ class AgentDetailViewModel(
     private var originalAgent: Agent? = null
 
     init {
-        loadAvailableTools()
         loadAvailableModels()
         if (!isCreateMode) {
             loadAgent(agentId!!)
@@ -62,48 +57,17 @@ class AgentDetailViewModel(
                     name = agent.name,
                     description = agent.description ?: "",
                     systemPrompt = agent.systemPrompt,
-                    selectedToolIds = agent.toolIds,
                     preferredProviderId = agent.preferredProviderId,
                     preferredModelId = agent.preferredModelId,
                     savedName = agent.name,
                     savedDescription = agent.description ?: "",
                     savedSystemPrompt = agent.systemPrompt,
-                    savedToolIds = agent.toolIds,
                     savedPreferredProviderId = agent.preferredProviderId,
                     savedPreferredModelId = agent.preferredModelId,
-                    availableTools = toolRegistry.getAllToolDefinitions().map { toolDef ->
-                        val sourceInfo = toolRegistry.getToolSourceInfo(toolDef.name)
-                        val isGloballyDisabled = !enabledStateStore.isToolEffectivelyEnabled(
-                            toolDef.name, sourceInfo.groupName
-                        )
-                        ToolOptionItem(
-                            name = toolDef.name,
-                            description = toolDef.description,
-                            isSelected = toolDef.name in agent.toolIds,
-                            isGloballyDisabled = isGloballyDisabled
-                        )
-                    },
                     isLoading = false
                 )
             }
         }
-    }
-
-    private fun loadAvailableTools() {
-        val selectedIds = _uiState.value.selectedToolIds
-        val tools = toolRegistry.getAllToolDefinitions().map { toolDef ->
-            val sourceInfo = toolRegistry.getToolSourceInfo(toolDef.name)
-            val isGloballyDisabled = !enabledStateStore.isToolEffectivelyEnabled(
-                toolDef.name, sourceInfo.groupName
-            )
-            ToolOptionItem(
-                name = toolDef.name,
-                description = toolDef.description,
-                isSelected = toolDef.name in selectedIds,
-                isGloballyDisabled = isGloballyDisabled
-            )
-        }
-        _uiState.update { it.copy(availableTools = tools) }
     }
 
     private fun loadAvailableModels() {
@@ -140,20 +104,6 @@ class AgentDetailViewModel(
         _uiState.update { it.copy(systemPrompt = prompt) }
     }
 
-    fun toggleTool(toolName: String) {
-        _uiState.update { state ->
-            val newToolIds = if (toolName in state.selectedToolIds) {
-                state.selectedToolIds - toolName
-            } else {
-                state.selectedToolIds + toolName
-            }
-            val updatedTools = state.availableTools.map { tool ->
-                tool.copy(isSelected = tool.name in newToolIds)
-            }
-            state.copy(selectedToolIds = newToolIds, availableTools = updatedTools)
-        }
-    }
-
     fun setPreferredModel(providerId: String?, modelId: String?) {
         _uiState.update {
             it.copy(preferredProviderId = providerId, preferredModelId = modelId)
@@ -171,7 +121,6 @@ class AgentDetailViewModel(
                     name = state.name,
                     description = state.description.ifBlank { null },
                     systemPrompt = state.systemPrompt,
-                    toolIds = state.selectedToolIds,
                     preferredProviderId = state.preferredProviderId,
                     preferredModelId = state.preferredModelId
                 )
@@ -189,7 +138,6 @@ class AgentDetailViewModel(
                     name = state.name.trim(),
                     description = state.description.trim().ifBlank { null },
                     systemPrompt = state.systemPrompt.trim(),
-                    toolIds = state.selectedToolIds,
                     preferredProviderId = state.preferredProviderId,
                     preferredModelId = state.preferredModelId,
                     isBuiltIn = false,
@@ -205,7 +153,6 @@ class AgentDetailViewModel(
                                 savedName = updated.name,
                                 savedDescription = updated.description ?: "",
                                 savedSystemPrompt = updated.systemPrompt,
-                                savedToolIds = updated.toolIds,
                                 savedPreferredProviderId = updated.preferredProviderId,
                                 savedPreferredModelId = updated.preferredModelId,
                                 successMessage = "Agent saved."

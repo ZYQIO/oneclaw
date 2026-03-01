@@ -14,7 +14,7 @@ class AgentMapperTest {
             name = "Test Agent",
             description = "A test agent",
             systemPrompt = "You are helpful.",
-            toolIds = """["read_file","write_file"]""",
+            toolIds = "[]",
             preferredProviderId = "provider-1",
             preferredModelId = "model-1",
             isBuiltIn = false,
@@ -28,7 +28,6 @@ class AgentMapperTest {
         assertEquals("Test Agent", domain.name)
         assertEquals("A test agent", domain.description)
         assertEquals("You are helpful.", domain.systemPrompt)
-        assertEquals(listOf("read_file", "write_file"), domain.toolIds)
         assertEquals("provider-1", domain.preferredProviderId)
         assertEquals("model-1", domain.preferredModelId)
         assertEquals(false, domain.isBuiltIn)
@@ -54,39 +53,18 @@ class AgentMapperTest {
         val domain = entity.toDomain()
 
         assertEquals(null, domain.description)
-        assertEquals(emptyList<String>(), domain.toolIds)
         assertEquals(null, domain.preferredProviderId)
         assertEquals(null, domain.preferredModelId)
         assertEquals(true, domain.isBuiltIn)
     }
 
     @Test
-    fun `entity toDomain handles invalid JSON toolIds gracefully`() {
-        val entity = AgentEntity(
-            id = "agent-3",
-            name = "Bad JSON",
-            description = null,
-            systemPrompt = "prompt",
-            toolIds = "not-valid-json",
-            preferredProviderId = null,
-            preferredModelId = null,
-            isBuiltIn = false,
-            createdAt = 100L,
-            updatedAt = 100L
-        )
-
-        val domain = entity.toDomain()
-        assertEquals(emptyList<String>(), domain.toolIds)
-    }
-
-    @Test
-    fun `domain toEntity maps all fields correctly`() {
+    fun `domain toEntity always writes empty tool_ids`() {
         val domain = Agent(
             id = "agent-1",
             name = "Test Agent",
             description = "desc",
             systemPrompt = "prompt",
-            toolIds = listOf("tool_a", "tool_b"),
             preferredProviderId = "p-1",
             preferredModelId = "m-1",
             isBuiltIn = false,
@@ -100,7 +78,7 @@ class AgentMapperTest {
         assertEquals("Test Agent", entity.name)
         assertEquals("desc", entity.description)
         assertEquals("prompt", entity.systemPrompt)
-        assertEquals("""["tool_a","tool_b"]""", entity.toolIds)
+        assertEquals("[]", entity.toolIds)
         assertEquals("p-1", entity.preferredProviderId)
         assertEquals("m-1", entity.preferredModelId)
         assertEquals(false, entity.isBuiltIn)
@@ -115,7 +93,6 @@ class AgentMapperTest {
             name = "Roundtrip Agent",
             description = "testing roundtrip",
             systemPrompt = "Be helpful.",
-            toolIds = listOf("get_current_time", "read_file", "http_request"),
             preferredProviderId = null,
             preferredModelId = null,
             isBuiltIn = true,

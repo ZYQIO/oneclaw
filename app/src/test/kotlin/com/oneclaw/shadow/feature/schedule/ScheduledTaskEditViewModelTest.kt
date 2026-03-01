@@ -44,7 +44,6 @@ class ScheduledTaskEditViewModelTest {
         name = "Test Agent",
         description = null,
         systemPrompt = "You are helpful.",
-        toolIds = emptyList(),
         preferredProviderId = null,
         preferredModelId = null,
         isBuiltIn = false,

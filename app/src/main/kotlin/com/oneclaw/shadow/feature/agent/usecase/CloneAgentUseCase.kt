@@ -19,7 +19,6 @@ class CloneAgentUseCase(
             name = "Copy of ${original.name}",
             description = original.description,
             systemPrompt = original.systemPrompt,
-            toolIds = original.toolIds,
             preferredProviderId = original.preferredProviderId,
             preferredModelId = original.preferredModelId,
             isBuiltIn = false,

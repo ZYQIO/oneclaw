@@ -13,7 +13,6 @@ class CreateAgentUseCase(
         name: String,
         description: String?,
         systemPrompt: String,
-        toolIds: List<String>,
         preferredProviderId: String?,
         preferredModelId: String?
     ): AppResult<Agent> {
@@ -32,7 +31,6 @@ class CreateAgentUseCase(
             name = name.trim(),
             description = description?.trim()?.ifBlank { null },
             systemPrompt = systemPrompt.trim(),
-            toolIds = toolIds,
             preferredProviderId = preferredProviderId,
             preferredModelId = preferredModelId,
             isBuiltIn = false,

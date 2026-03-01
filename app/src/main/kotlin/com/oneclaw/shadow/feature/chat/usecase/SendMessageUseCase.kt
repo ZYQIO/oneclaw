@@ -101,7 +101,7 @@ class SendMessageUseCase(
 
         // 5. Get agent tools
         val agentToolDefs: List<ToolDefinition>? = toolRegistry
-            .getToolDefinitionsByNames(agent.toolIds)
+            .getAllToolDefinitions()
             .takeIf { it.isNotEmpty() }
 
         var round = 0
@@ -230,7 +230,7 @@ class SendMessageUseCase(
                 }
                 val toolResponses = toolExecutionEngine.executeToolsParallel(
                     toolCalls = toolRequests,
-                    availableToolNames = agent.toolIds
+                    availableToolNames = toolRegistry.getAllToolNames()
                 )
 
                 // Save all TOOL_CALL messages first, then all TOOL_RESULT messages.
