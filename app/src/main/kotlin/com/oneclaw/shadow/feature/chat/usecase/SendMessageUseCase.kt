@@ -233,7 +233,9 @@ class SendMessageUseCase(
                     availableToolNames = agent.toolIds
                 )
 
-                // Save tool call + result messages with final status
+                // Save all TOOL_CALL messages first, then all TOOL_RESULT messages.
+                // This ensures MessageToApiMapper can collect consecutive TOOL_CALL rows
+                // after an AI_RESPONSE before encountering any TOOL_RESULT rows.
                 for (tr in toolResponses) {
                     val isSuccess = tr.result.status == com.oneclaw.shadow.core.model.ToolResultStatus.SUCCESS
                     val finalStatus = if (isSuccess) ToolCallStatus.SUCCESS else ToolCallStatus.ERROR
@@ -247,6 +249,10 @@ class SendMessageUseCase(
                         tokenCountInput = null, tokenCountOutput = null,
                         modelId = null, providerId = null, createdAt = 0
                     ))
+                }
+                for (tr in toolResponses) {
+                    val isSuccess = tr.result.status == com.oneclaw.shadow.core.model.ToolResultStatus.SUCCESS
+                    val finalStatus = if (isSuccess) ToolCallStatus.SUCCESS else ToolCallStatus.ERROR
                     val rawOutput = tr.result.result ?: tr.result.errorMessage ?: ""
                     val truncatedOutput = ToolResultTruncator.truncate(rawOutput)
                     messageRepository.addMessage(Message(
