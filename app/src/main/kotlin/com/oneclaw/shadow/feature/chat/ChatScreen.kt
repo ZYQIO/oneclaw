@@ -73,12 +73,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -124,21 +124,48 @@ fun ChatScreen(
     val clipboardManager = LocalClipboardManager.current
     val inputFocusRequester = remember { FocusRequester() }
 
-    // Auto-scroll
+    // Auto-scroll: local state avoids ViewModel round-trip delay
+    var shouldAutoScroll by remember(uiState.sessionId) { mutableStateOf(true) }
+
+    LaunchedEffect(shouldAutoScroll) {
+        viewModel.setAutoScroll(shouldAutoScroll)
+    }
+
     LaunchedEffect(uiState.messages.size, uiState.streamingText) {
-        if (uiState.shouldAutoScroll) {
+        if (shouldAutoScroll) {
             val count = listState.layoutInfo.totalItemsCount
-            if (count > 0) listState.animateScrollToItem(count - 1)
+            if (count > 0) listState.scrollToItem(count - 1)
         }
     }
 
-    val isAtBottom by remember {
-        derivedStateOf {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisible?.index == listState.layoutInfo.totalItemsCount - 1
+    // Detect user scroll direction to control auto-scroll
+    LaunchedEffect(Unit) {
+        var prevIndex = listState.firstVisibleItemIndex
+        var prevOffset = listState.firstVisibleItemScrollOffset
+        snapshotFlow {
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                listState.isScrollInProgress
+            )
+        }.collect { (index, offset, scrolling) ->
+            if (scrolling) {
+                val scrolledUp = index < prevIndex ||
+                    (index == prevIndex && offset < prevOffset)
+                if (scrolledUp) {
+                    shouldAutoScroll = false
+                }
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                val atBottom = lastVisible != null &&
+                    lastVisible.index >= listState.layoutInfo.totalItemsCount - 1
+                if (atBottom && !shouldAutoScroll) {
+                    shouldAutoScroll = true
+                }
+            }
+            prevIndex = index
+            prevOffset = offset
         }
     }
-    LaunchedEffect(isAtBottom) { viewModel.setAutoScroll(isAtBottom) }
 
     // Session undo snackbar
     sessionListState.undoState?.let { undoState ->
@@ -242,10 +269,10 @@ fun ChatScreen(
                     )
                 }
 
-                if (!uiState.shouldAutoScroll && uiState.messages.isNotEmpty()) {
+                if (!shouldAutoScroll && uiState.messages.isNotEmpty()) {
                     FloatingActionButton(
                         onClick = {
-                            viewModel.setAutoScroll(true)
+                            shouldAutoScroll = true
                             scope.launch {
                                 val count = listState.layoutInfo.totalItemsCount
                                 if (count > 0) listState.animateScrollToItem(count - 1)
