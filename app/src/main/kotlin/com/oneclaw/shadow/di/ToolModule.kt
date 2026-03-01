@@ -27,6 +27,23 @@ import com.oneclaw.shadow.tool.builtin.SearchHistoryTool
 import com.oneclaw.shadow.tool.builtin.UpdateJsToolTool
 import com.oneclaw.shadow.tool.builtin.UpdateScheduledTaskTool
 import com.oneclaw.shadow.tool.builtin.WebfetchTool
+import com.oneclaw.shadow.tool.builtin.config.AddModelTool
+import com.oneclaw.shadow.tool.builtin.config.CreateProviderTool
+import com.oneclaw.shadow.tool.builtin.config.DeleteAgentTool
+import com.oneclaw.shadow.tool.builtin.config.DeleteModelTool
+import com.oneclaw.shadow.tool.builtin.config.DeleteProviderTool
+import com.oneclaw.shadow.tool.builtin.config.FetchModelsTool
+import com.oneclaw.shadow.tool.builtin.config.GetConfigTool
+import com.oneclaw.shadow.tool.builtin.config.ListAgentsTool
+import com.oneclaw.shadow.tool.builtin.config.ListModelsTool
+import com.oneclaw.shadow.tool.builtin.config.ListProvidersTool
+import com.oneclaw.shadow.tool.builtin.config.ListToolStatesTool
+import com.oneclaw.shadow.tool.builtin.config.ManageEnvVarTool
+import com.oneclaw.shadow.tool.builtin.config.SetConfigTool
+import com.oneclaw.shadow.tool.builtin.config.SetDefaultModelTool
+import com.oneclaw.shadow.tool.builtin.config.SetToolEnabledTool
+import com.oneclaw.shadow.tool.builtin.config.UpdateAgentTool
+import com.oneclaw.shadow.tool.builtin.config.UpdateProviderTool
 import com.oneclaw.shadow.tool.util.PdfToolUtils
 import com.oneclaw.shadow.tool.engine.PermissionChecker
 import com.oneclaw.shadow.tool.engine.ToolEnabledStateStore
@@ -121,6 +138,32 @@ val toolModule = module {
     single { ListUserToolsTool(get()) }
     single { UpdateJsToolTool(get()) }
     single { DeleteJsToolTool(get()) }
+
+    // RFC-036: Configuration management tools
+    // Provider tools
+    single { ListProvidersTool(get(), get()) }
+    single { CreateProviderTool(get()) }
+    single { UpdateProviderTool(get()) }
+    single { DeleteProviderTool(get()) }
+
+    // Model tools
+    single { ListModelsTool(get()) }
+    single { FetchModelsTool(get(), get()) }
+    single { SetDefaultModelTool(get()) }
+    single { AddModelTool(get()) }
+    single { DeleteModelTool(get()) }
+
+    // Agent tools
+    single { ListAgentsTool(get()) }
+    single { UpdateAgentTool(get()) }
+    single { DeleteAgentTool(get()) }
+
+    // Settings tools
+    single { GetConfigTool(get()) }
+    single { SetConfigTool(get(), get()) }
+
+    // Env var tool
+    single { ManageEnvVarTool(get()) }
 
     single {
         ToolRegistry().apply {
@@ -240,6 +283,44 @@ val toolModule = module {
                 register(get<DeleteJsToolTool>(), ToolSourceInfo.BUILTIN)
             } catch (e: Exception) {
                 Log.e("ToolModule", "Failed to register delete_js_tool: ${e.message}")
+            }
+
+            // RFC-036: Configuration management tools
+            val configTools = listOf(
+                get<ListProvidersTool>(),
+                get<CreateProviderTool>(),
+                get<UpdateProviderTool>(),
+                get<DeleteProviderTool>(),
+                get<ListModelsTool>(),
+                get<FetchModelsTool>(),
+                get<SetDefaultModelTool>(),
+                get<AddModelTool>(),
+                get<DeleteModelTool>(),
+                get<ListAgentsTool>(),
+                get<UpdateAgentTool>(),
+                get<DeleteAgentTool>(),
+                get<GetConfigTool>(),
+                get<SetConfigTool>(),
+                get<ManageEnvVarTool>()
+            )
+            configTools.forEach { tool ->
+                try {
+                    register(tool, ToolSourceInfo.BUILTIN)
+                } catch (e: Exception) {
+                    Log.e("ToolModule", "Failed to register ${tool.definition.name}: ${e.message}")
+                }
+            }
+
+            // Tool state tools: pass `this` (ToolRegistry) to avoid circular Koin dependency
+            try {
+                register(ListToolStatesTool(this, get()), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register list_tool_states: ${e.message}")
+            }
+            try {
+                register(SetToolEnabledTool(this, get()), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register set_tool_enabled: ${e.message}")
             }
 
             // Built-in JS tools from assets (replaces Kotlin tool registration)
