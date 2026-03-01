@@ -11,6 +11,8 @@ import com.oneclaw.shadow.core.lifecycle.AppLifecycleObserver
 import com.oneclaw.shadow.core.notification.NotificationHelper
 import com.oneclaw.shadow.core.theme.ThemeManager
 import com.oneclaw.shadow.data.sync.SyncWorker
+import com.oneclaw.shadow.core.repository.ScheduledTaskRepository
+import com.oneclaw.shadow.feature.schedule.alarm.AlarmScheduler
 import com.oneclaw.shadow.di.appModule
 import com.oneclaw.shadow.di.databaseModule
 import com.oneclaw.shadow.di.featureModule
@@ -72,6 +74,14 @@ class OneclawApplication : Application() {
                 }
             }
         )
+
+        // RFC-019: Re-register all enabled scheduled task alarms on app start
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            val scheduledTaskRepository = get<ScheduledTaskRepository>(ScheduledTaskRepository::class.java)
+            val alarmScheduler = get<AlarmScheduler>(AlarmScheduler::class.java)
+            val enabledTasks = scheduledTaskRepository.getEnabledTasks()
+            alarmScheduler.rescheduleAllEnabled(enabledTasks)
+        }
 
         // RFC-007: Schedule periodic Google Drive sync every 1 hour
         val syncRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)

@@ -51,6 +51,7 @@ fun SettingsScreen(
     onDataBackup: () -> Unit = {},
     onMemory: () -> Unit = {},
     onSkills: () -> Unit = {},
+    onScheduledTasks: () -> Unit = {},
     themeManager: ThemeManager = koinInject()
 ) {
     val currentTheme by themeManager.themeMode.collectAsState()
@@ -139,6 +140,15 @@ fun SettingsScreen(
                 title = "Manage Skills",
                 subtitle = "Create, edit, and delete skills; import and export SKILL.md files",
                 onClick = onSkills
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // -- Scheduled Tasks --
+            SectionHeader("Automation")
+            SettingsItem(
+                title = "Scheduled Tasks",
+                subtitle = "Create and manage automated agent tasks",
+                onClick = onScheduledTasks
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 

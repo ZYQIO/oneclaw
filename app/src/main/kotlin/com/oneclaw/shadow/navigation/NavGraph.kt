@@ -18,6 +18,8 @@ import com.oneclaw.shadow.feature.memory.ui.MemoryScreen
 import com.oneclaw.shadow.feature.settings.DataBackupScreen
 import com.oneclaw.shadow.feature.skill.ui.SkillEditorScreen
 import com.oneclaw.shadow.feature.skill.ui.SkillManagementScreen
+import com.oneclaw.shadow.feature.schedule.ScheduledTaskEditScreen
+import com.oneclaw.shadow.feature.schedule.ScheduledTaskListScreen
 import com.oneclaw.shadow.feature.tool.ToolManagementScreen
 import com.oneclaw.shadow.feature.usage.UsageStatisticsScreen
 import android.content.Intent
@@ -121,7 +123,8 @@ fun AppNavGraph(
                 onUsageStatistics = { navController.navigate(Route.UsageStatistics.path) },
                 onDataBackup = { navController.navigate(Route.DataBackup.path) },
                 onMemory = { navController.navigate(Route.Memory.path) },
-                onSkills = { navController.navigate(Route.SkillManagement.path) }
+                onSkills = { navController.navigate(Route.SkillManagement.path) },
+                onScheduledTasks = { navController.navigate(Route.ScheduleList.path) }
             )
         }
 
@@ -177,6 +180,28 @@ fun AppNavGraph(
             val skillName = backStackEntry.arguments?.getString("skillName")
             SkillEditorScreen(
                 skillName = skillName,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Route.ScheduleList.path) {
+            ScheduledTaskListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onCreateTask = { navController.navigate(Route.ScheduleCreate.path) },
+                onEditTask = { taskId ->
+                    navController.navigate(Route.ScheduleEdit.create(taskId))
+                }
+            )
+        }
+
+        composable(Route.ScheduleCreate.path) {
+            ScheduledTaskEditScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Route.ScheduleEdit.PATH) {
+            ScheduledTaskEditScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

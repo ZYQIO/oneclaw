@@ -37,4 +37,12 @@ sealed class Route(val path: String) {
         }
     }
     data object ManageTools : Route("tools")
+    data object ScheduleList : Route("schedules")
+    data object ScheduleCreate : Route("schedules/create")
+    data class ScheduleEdit(val taskId: String) : Route("schedules/{taskId}") {
+        companion object {
+            const val PATH = "schedules/{taskId}"
+            fun create(taskId: String) = "schedules/$taskId"
+        }
+    }
 }

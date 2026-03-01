@@ -38,6 +38,13 @@ import com.oneclaw.shadow.feature.skill.usecase.GetAllSkillsUseCase
 import com.oneclaw.shadow.feature.skill.usecase.ImportSkillUseCase
 import com.oneclaw.shadow.feature.skill.usecase.LoadSkillContentUseCase
 import com.oneclaw.shadow.feature.skill.usecase.UpdateSkillUseCase
+import com.oneclaw.shadow.feature.schedule.ScheduledTaskEditViewModel
+import com.oneclaw.shadow.feature.schedule.ScheduledTaskListViewModel
+import com.oneclaw.shadow.feature.schedule.alarm.AlarmScheduler
+import com.oneclaw.shadow.feature.schedule.usecase.CreateScheduledTaskUseCase
+import com.oneclaw.shadow.feature.schedule.usecase.DeleteScheduledTaskUseCase
+import com.oneclaw.shadow.feature.schedule.usecase.ToggleScheduledTaskUseCase
+import com.oneclaw.shadow.feature.schedule.usecase.UpdateScheduledTaskUseCase
 import com.oneclaw.shadow.feature.tool.ToolManagementViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -144,4 +151,13 @@ val featureModule = module {
 
     // RFC-017: Tool Management view model
     viewModelOf(::ToolManagementViewModel)
+
+    // RFC-019: Scheduled Tasks
+    single { AlarmScheduler(androidContext()) }
+    factory { CreateScheduledTaskUseCase(get(), get()) }
+    factory { UpdateScheduledTaskUseCase(get(), get()) }
+    factory { DeleteScheduledTaskUseCase(get(), get()) }
+    factory { ToggleScheduledTaskUseCase(get(), get()) }
+    viewModelOf(::ScheduledTaskListViewModel)
+    viewModelOf(::ScheduledTaskEditViewModel)
 }

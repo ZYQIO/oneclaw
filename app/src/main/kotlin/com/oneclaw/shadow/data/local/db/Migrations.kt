@@ -37,6 +37,36 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // RFC-019: Add scheduled_tasks table
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS scheduled_tasks (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                schedule_type TEXT NOT NULL,
+                hour INTEGER NOT NULL,
+                minute INTEGER NOT NULL,
+                day_of_week INTEGER,
+                date_millis INTEGER,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                last_execution_at INTEGER,
+                last_execution_status TEXT,
+                last_execution_session_id TEXT,
+                next_trigger_at INTEGER,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_scheduled_tasks_is_enabled ON scheduled_tasks(is_enabled)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_scheduled_tasks_next_trigger_at ON scheduled_tasks(next_trigger_at)")
+    }
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add context_window_size to models
