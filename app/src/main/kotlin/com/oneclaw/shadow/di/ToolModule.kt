@@ -9,11 +9,14 @@ import com.oneclaw.shadow.tool.browser.WebViewManager
 import com.oneclaw.shadow.feature.search.usecase.SearchHistoryUseCase
 import com.oneclaw.shadow.tool.builtin.BrowserTool
 import com.oneclaw.shadow.tool.builtin.CreateAgentTool
+import com.oneclaw.shadow.tool.builtin.CreateJsToolTool
 import com.oneclaw.shadow.tool.builtin.CreateScheduledTaskTool
+import com.oneclaw.shadow.tool.builtin.DeleteJsToolTool
 import com.oneclaw.shadow.tool.builtin.DeleteScheduledTaskTool
 import com.oneclaw.shadow.tool.builtin.ExecTool
 import com.oneclaw.shadow.tool.builtin.JsEvalTool
 import com.oneclaw.shadow.tool.builtin.ListScheduledTasksTool
+import com.oneclaw.shadow.tool.builtin.ListUserToolsTool
 import com.oneclaw.shadow.tool.builtin.LoadSkillTool
 import com.oneclaw.shadow.tool.builtin.PdfExtractTextTool
 import com.oneclaw.shadow.tool.builtin.PdfInfoTool
@@ -21,6 +24,7 @@ import com.oneclaw.shadow.tool.builtin.PdfRenderPageTool
 import com.oneclaw.shadow.tool.builtin.RunScheduledTaskTool
 import com.oneclaw.shadow.tool.builtin.SaveMemoryTool
 import com.oneclaw.shadow.tool.builtin.SearchHistoryTool
+import com.oneclaw.shadow.tool.builtin.UpdateJsToolTool
 import com.oneclaw.shadow.tool.builtin.UpdateScheduledTaskTool
 import com.oneclaw.shadow.tool.builtin.WebfetchTool
 import com.oneclaw.shadow.tool.util.PdfToolUtils
@@ -31,6 +35,7 @@ import com.oneclaw.shadow.tool.engine.ToolRegistry
 import com.oneclaw.shadow.tool.js.EnvironmentVariableStore
 import com.oneclaw.shadow.tool.js.JsExecutionEngine
 import com.oneclaw.shadow.tool.js.JsToolLoader
+import com.oneclaw.shadow.tool.js.UserToolManager
 import com.oneclaw.shadow.tool.js.bridge.LibraryBridge
 import com.oneclaw.shadow.tool.skill.SkillFileParser
 import com.oneclaw.shadow.tool.skill.SkillRegistry
@@ -100,6 +105,22 @@ val toolModule = module {
 
     // RFC-017: Tool enabled state store
     single { ToolEnabledStateStore(androidContext()) }
+
+    // RFC-035: User tool manager (uses lazy provider to avoid circular dep with ToolRegistry)
+    single {
+        UserToolManager(
+            context = androidContext(),
+            toolRegistryProvider = { get() },
+            jsExecutionEngine = get(),
+            envVarStore = get()
+        )
+    }
+
+    // RFC-035: JS tool CRUD tools
+    single { CreateJsToolTool(get()) }
+    single { ListUserToolsTool(get()) }
+    single { UpdateJsToolTool(get()) }
+    single { DeleteJsToolTool(get()) }
 
     single {
         ToolRegistry().apply {
@@ -197,6 +218,28 @@ val toolModule = module {
                 register(get<PdfRenderPageTool>(), ToolSourceInfo.BUILTIN)
             } catch (e: Exception) {
                 Log.e("ToolModule", "Failed to register pdf_render_page: ${e.message}")
+            }
+
+            // RFC-035: JS tool CRUD tools
+            try {
+                register(get<CreateJsToolTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register create_js_tool: ${e.message}")
+            }
+            try {
+                register(get<ListUserToolsTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register list_user_tools: ${e.message}")
+            }
+            try {
+                register(get<UpdateJsToolTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register update_js_tool: ${e.message}")
+            }
+            try {
+                register(get<DeleteJsToolTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register delete_js_tool: ${e.message}")
             }
 
             // Built-in JS tools from assets (replaces Kotlin tool registration)
