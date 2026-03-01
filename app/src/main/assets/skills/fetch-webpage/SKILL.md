@@ -4,7 +4,7 @@ display_name: "Fetch Webpage"
 description: "Fetch and summarize a webpage's content"
 version: "1.0"
 tools_required:
-  - http_request
+  - webfetch
 parameters:
   - name: url
     type: string
@@ -16,8 +16,8 @@ parameters:
 
 ## Instructions
 
-1. Use `http_request` with method GET to fetch the URL: {{url}}
-2. Parse the response content (HTML or plain text).
+1. Use `webfetch` to fetch the URL: {{url}}
+2. The tool returns the page content as Markdown.
 3. Extract the main textual content, ignoring navigation menus, ads, and boilerplate.
 4. Provide:
    - **Title**: The page title.

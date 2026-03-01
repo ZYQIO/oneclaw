@@ -297,14 +297,16 @@ class AnthropicAdapter(
         }
 
         put("messages", buildJsonArray {
-            // Group consecutive tool calls after an assistant message
-            val grouped = groupMessagesForAnthropic(messages)
-            grouped.forEach { msg ->
-                when (msg) {
-                    is ApiMessage.User -> add(buildJsonObject {
-                        put("role", "user")
-                        put("content", msg.content)
-                    })
+            var i = 0
+            while (i < messages.size) {
+                when (val msg = messages[i]) {
+                    is ApiMessage.User -> {
+                        add(buildJsonObject {
+                            put("role", "user")
+                            put("content", msg.content)
+                        })
+                        i++
+                    }
                     is ApiMessage.Assistant -> {
                         add(buildJsonObject {
                             put("role", "assistant")
@@ -331,17 +333,30 @@ class AnthropicAdapter(
                                 put("content", msg.content ?: "")
                             }
                         })
+                        i++
                     }
-                    is ApiMessage.ToolResult -> add(buildJsonObject {
-                        put("role", "user")
-                        put("content", buildJsonArray {
-                            add(buildJsonObject {
-                                put("type", "tool_result")
-                                put("tool_use_id", msg.toolCallId)
-                                put("content", msg.content)
+                    is ApiMessage.ToolResult -> {
+                        // Collect all consecutive ToolResult messages and merge into a single
+                        // user message. Anthropic requires all tool_result blocks for a parallel
+                        // tool_use to be in the same message, not separate messages.
+                        val toolResults = mutableListOf<ApiMessage.ToolResult>()
+                        while (i < messages.size && messages[i] is ApiMessage.ToolResult) {
+                            toolResults.add(messages[i] as ApiMessage.ToolResult)
+                            i++
+                        }
+                        add(buildJsonObject {
+                            put("role", "user")
+                            put("content", buildJsonArray {
+                                toolResults.forEach { tr ->
+                                    add(buildJsonObject {
+                                        put("type", "tool_result")
+                                        put("tool_use_id", tr.toolCallId)
+                                        put("content", tr.content)
+                                    })
+                                }
                             })
                         })
-                    })
+                    }
                 }
             }
         })
@@ -376,13 +391,4 @@ class AnthropicAdapter(
         else -> kotlinx.serialization.json.JsonPrimitive(value.toString())
     }
 
-    /**
-     * Anthropic requires tool_result messages to follow assistant messages with tool_use blocks.
-     * This function merges consecutive ToolResult messages into the preceding user message format.
-     */
-    private fun groupMessagesForAnthropic(messages: List<ApiMessage>): List<ApiMessage> {
-        // For Anthropic, ToolResult messages are already separate and in correct order.
-        // The interleaving format is handled in buildAnthropicRequest above.
-        return messages
-    }
 }
