@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,10 +34,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
@@ -55,7 +58,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -79,6 +81,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -334,6 +337,13 @@ fun ChatInput(
     hasConfiguredProvider: Boolean,
     focusRequester: FocusRequester = remember { FocusRequester() }
 ) {
+    // Track TextFieldValue internally to control cursor position.
+    // When text changes externally (e.g., skill selection), place cursor at end.
+    var textFieldValue by remember { mutableStateOf(TextFieldValue(text)) }
+    if (textFieldValue.text != text) {
+        textFieldValue = TextFieldValue(text = text, selection = TextRange(text.length))
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(28.dp),
@@ -348,8 +358,11 @@ fun ChatInput(
         ) {
             // Layer 1: Text Field
             BasicTextField(
-                value = text,
-                onValueChange = onTextChange,
+                value = textFieldValue,
+                onValueChange = { newValue ->
+                    textFieldValue = newValue
+                    onTextChange(newValue.text)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester)
@@ -378,19 +391,23 @@ fun ChatInput(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
                     .padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Skill button (left)
-                IconButton(
-                    onClick = onSkillClick,
-                    modifier = Modifier.size(40.dp)
+                // Skill button (left) with background
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable(onClick = onSkillClick),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Default.AutoAwesome,
+                        Icons.Outlined.Build,
                         contentDescription = "Skills",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -398,32 +415,49 @@ fun ChatInput(
 
                 // Stop button (right, conditional)
                 if (isStreaming) {
-                    IconButton(
-                        onClick = onStop,
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        modifier = Modifier.size(40.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .clickable(onClick = onStop),
+                        contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.error
+                        )
+                        Icon(
+                            Icons.Default.Stop,
+                            contentDescription = "Stop",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
 
                 // Send button (right)
-                IconButton(
-                    onClick = onSend,
-                    enabled = text.isNotBlank() && hasConfiguredProvider,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.size(40.dp)
+                val sendEnabled = text.isNotBlank() && hasConfiguredProvider
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (sendEnabled) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
+                        .clickable(enabled = sendEnabled, onClick = onSend),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send")
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (sendEnabled) MaterialTheme.colorScheme.onPrimary
+                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
