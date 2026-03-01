@@ -58,7 +58,10 @@ class ScheduledTaskWorker(
 
         try {
             // Create session
-            val session = createSessionUseCase(agentId = task.agentId)
+            val session = createSessionUseCase(
+                agentId = task.agentId,
+                title = "[Scheduled] ${task.name}"
+            )
             sessionId = session.id
 
             // Execute agent loop

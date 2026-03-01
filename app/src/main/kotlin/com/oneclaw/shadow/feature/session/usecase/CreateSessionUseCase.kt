@@ -12,11 +12,12 @@ class CreateSessionUseCase(
     private val sessionRepository: SessionRepository
 ) {
     suspend operator fun invoke(
-        agentId: String = AgentConstants.GENERAL_ASSISTANT_ID
+        agentId: String = AgentConstants.GENERAL_ASSISTANT_ID,
+        title: String = "New Conversation"
     ): Session {
         val session = Session(
             id = "",
-            title = "New Conversation",
+            title = title,
             currentAgentId = agentId,
             messageCount = 0,
             lastMessagePreview = null,
