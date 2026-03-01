@@ -11,7 +11,15 @@ class CreateScheduledTaskUseCase(
     private val repository: ScheduledTaskRepository,
     private val alarmScheduler: AlarmScheduler
 ) {
-    suspend operator fun invoke(task: ScheduledTask): AppResult<ScheduledTask> {
+    /**
+     * Result of task creation, including whether the alarm was registered.
+     */
+    data class CreateResult(
+        val task: ScheduledTask,
+        val alarmRegistered: Boolean
+    )
+
+    suspend operator fun invoke(task: ScheduledTask): AppResult<CreateResult> {
         if (task.name.isBlank()) {
             return AppResult.Error(
                 message = "Task name is required.",
@@ -37,8 +45,8 @@ class CreateScheduledTaskUseCase(
         )
 
         val created = repository.createTask(taskWithTrigger)
-        alarmScheduler.scheduleTask(created)
+        val alarmRegistered = alarmScheduler.scheduleTask(created)
 
-        return AppResult.Success(created)
+        return AppResult.Success(CreateResult(created, alarmRegistered))
     }
 }

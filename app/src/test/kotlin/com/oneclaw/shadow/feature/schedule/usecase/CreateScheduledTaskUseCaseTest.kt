@@ -10,6 +10,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -73,12 +75,49 @@ class CreateScheduledTaskUseCaseTest {
         coEvery { repository.createTask(any()) } answers {
             firstArg<ScheduledTask>().copy(id = "created-id")
         }
+        every { alarmScheduler.scheduleTask(any()) } returns true
 
         val result = useCase(task)
 
         assertTrue(result is AppResult.Success)
+        val createResult = (result as AppResult.Success).data
+        assertTrue(createResult.alarmRegistered)
+        assertEquals("created-id", createResult.task.id)
         coVerify { repository.createTask(any()) }
         verify { alarmScheduler.scheduleTask(any()) }
+    }
+
+    @Test
+    fun `CreateResult alarmRegistered is false when alarm permission is denied`() = runTest {
+        val task = createTask()
+        coEvery { repository.createTask(any()) } answers {
+            firstArg<ScheduledTask>().copy(id = "created-id")
+        }
+        every { alarmScheduler.scheduleTask(any()) } returns false
+
+        val result = useCase(task)
+
+        assertTrue(result is AppResult.Success)
+        val createResult = (result as AppResult.Success).data
+        assertFalse(createResult.alarmRegistered)
+        assertEquals("created-id", createResult.task.id)
+        // Task is still saved even when alarm registration fails
+        coVerify { repository.createTask(any()) }
+    }
+
+    @Test
+    fun `task is still saved in database when alarm registration fails`() = runTest {
+        val task = createTask()
+        coEvery { repository.createTask(any()) } answers {
+            firstArg<ScheduledTask>().copy(id = "saved-despite-no-alarm")
+        }
+        every { alarmScheduler.scheduleTask(any()) } returns false
+
+        val result = useCase(task)
+
+        assertTrue(result is AppResult.Success)
+        assertEquals("saved-despite-no-alarm", (result as AppResult.Success).data.task.id)
+        coVerify(exactly = 1) { repository.createTask(any()) }
     }
 
     @Test

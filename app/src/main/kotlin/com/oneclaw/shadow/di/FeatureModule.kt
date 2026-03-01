@@ -43,6 +43,7 @@ import com.oneclaw.shadow.feature.skill.usecase.UpdateSkillUseCase
 import com.oneclaw.shadow.feature.schedule.ScheduledTaskEditViewModel
 import com.oneclaw.shadow.feature.schedule.ScheduledTaskListViewModel
 import com.oneclaw.shadow.feature.schedule.alarm.AlarmScheduler
+import com.oneclaw.shadow.feature.schedule.alarm.ExactAlarmHelper
 import com.oneclaw.shadow.feature.schedule.usecase.CreateScheduledTaskUseCase
 import com.oneclaw.shadow.feature.schedule.usecase.DeleteScheduledTaskUseCase
 import com.oneclaw.shadow.feature.schedule.usecase.ToggleScheduledTaskUseCase
@@ -159,7 +160,9 @@ val featureModule = module {
     viewModelOf(::ToolManagementViewModel)
 
     // RFC-019: Scheduled Tasks
-    single { AlarmScheduler(androidContext()) }
+    // RFC-037: ExactAlarmHelper and updated AlarmScheduler
+    single { ExactAlarmHelper(androidContext()) }
+    single { AlarmScheduler(androidContext(), get()) }
     factory { CreateScheduledTaskUseCase(get(), get()) }
     factory { UpdateScheduledTaskUseCase(get(), get()) }
     factory { DeleteScheduledTaskUseCase(get(), get()) }

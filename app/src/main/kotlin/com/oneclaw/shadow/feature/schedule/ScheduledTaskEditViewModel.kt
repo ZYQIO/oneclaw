@@ -9,6 +9,7 @@ import com.oneclaw.shadow.core.model.ScheduledTask
 import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.core.repository.ScheduledTaskRepository
 import com.oneclaw.shadow.core.util.AppResult
+import com.oneclaw.shadow.feature.schedule.alarm.ExactAlarmHelper
 import com.oneclaw.shadow.feature.schedule.usecase.CreateScheduledTaskUseCase
 import com.oneclaw.shadow.feature.schedule.usecase.UpdateScheduledTaskUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,8 @@ class ScheduledTaskEditViewModel(
     private val agentRepository: AgentRepository,
     private val scheduledTaskRepository: ScheduledTaskRepository,
     private val createUseCase: CreateScheduledTaskUseCase,
-    private val updateUseCase: UpdateScheduledTaskUseCase
+    private val updateUseCase: UpdateScheduledTaskUseCase,
+    private val exactAlarmHelper: ExactAlarmHelper
 ) : ViewModel() {
 
     private val taskId: String? = savedStateHandle.get<String>("taskId")
@@ -90,6 +92,32 @@ class ScheduledTaskEditViewModel(
         val state = _uiState.value
         if (state.isSaving) return
 
+        // Check exact alarm permission before saving (only relevant for new tasks, not edits)
+        if (!state.isEditing && !exactAlarmHelper.canScheduleExactAlarms()) {
+            _uiState.value = state.copy(showExactAlarmDialog = true)
+            return
+        }
+
+        performSave()
+    }
+
+    fun dismissExactAlarmDialog() {
+        _uiState.value = _uiState.value.copy(showExactAlarmDialog = false)
+    }
+
+    fun onExactAlarmDialogSettings() {
+        _uiState.value = _uiState.value.copy(showExactAlarmDialog = false)
+        // The screen will launch the settings intent after calling this
+    }
+
+    fun saveWithoutAlarm() {
+        // Called when user dismisses the dialog -- save the task but alarm won't be registered
+        _uiState.value = _uiState.value.copy(showExactAlarmDialog = false)
+        performSave()
+    }
+
+    private fun performSave() {
+        val state = _uiState.value
         _uiState.value = state.copy(isSaving = true, errorMessage = null)
 
         viewModelScope.launch {

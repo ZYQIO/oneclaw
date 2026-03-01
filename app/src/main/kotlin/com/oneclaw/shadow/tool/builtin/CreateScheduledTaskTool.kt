@@ -166,11 +166,20 @@ class CreateScheduledTaskTool(
 
         return when (val result = createScheduledTaskUseCase(task)) {
             is AppResult.Success -> {
-                val created = result.data
+                val createResult = result.data
+                val created = createResult.task
                 val description = buildScheduleDescription(created)
                 val nextTrigger = created.nextTriggerAt?.toString() ?: "unknown"
+                val warning = if (!createResult.alarmRegistered) {
+                    "\n\nWarning: Exact alarm permission is not granted. " +
+                        "The task has been saved but will not trigger at the scheduled time. " +
+                        "Please ask the user to go to Settings > Apps > OneClawShadow > " +
+                        "Alarms & reminders to enable the permission."
+                } else {
+                    ""
+                }
                 ToolResult.success(
-                    "Scheduled task '${name}' created successfully. Schedule: ${description}. Next trigger: ${nextTrigger}"
+                    "Scheduled task '${name}' created successfully. Schedule: ${description}. Next trigger: ${nextTrigger}${warning}"
                 )
             }
             is AppResult.Error -> {

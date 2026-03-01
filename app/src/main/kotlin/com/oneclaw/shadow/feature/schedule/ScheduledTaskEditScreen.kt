@@ -44,9 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.oneclaw.shadow.core.model.ScheduleType
+import com.oneclaw.shadow.feature.schedule.alarm.ExactAlarmHelper
+import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 import java.time.DayOfWeek
 import java.time.Instant
@@ -61,11 +64,25 @@ fun ScheduledTaskEditScreen(
     viewModel: ScheduledTaskEditViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val exactAlarmHelper: ExactAlarmHelper = koinInject()
 
     LaunchedEffect(uiState.savedSuccessfully) {
         if (uiState.savedSuccessfully) {
             onNavigateBack()
         }
+    }
+
+    if (uiState.showExactAlarmDialog) {
+        ExactAlarmPermissionDialog(
+            onGoToSettings = {
+                viewModel.onExactAlarmDialogSettings()
+                context.startActivity(exactAlarmHelper.buildSettingsIntent())
+            },
+            onDismiss = {
+                viewModel.saveWithoutAlarm()
+            }
+        )
     }
 
     Scaffold(
