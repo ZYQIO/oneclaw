@@ -2,7 +2,7 @@
 
 ## Document Information
 - Created: 2026-02-26
-- Last Updated: 2026-02-26
+- Last Updated: 2026-03-01
 - Document Status: Draft
 - Owner: TBD
 
@@ -71,6 +71,7 @@ OneClawShadow is NOT a coding tool or IDE. It is a general-purpose AI agent that
 | FEAT-008 | Notifications | P1 | Planning | [notifications.md](features/FEAT-008-notifications.md) |
 | FEAT-009 | Settings | P2 | Planning | [settings.md](features/FEAT-009-settings.md) |
 | FEAT-013 | Agent Memory System | P1 | Planning | [memory.md](features/FEAT-013-memory.md) |
+| FEAT-024 | Messaging Bridge | P1 | Planning | [messaging-bridge.md](features/FEAT-024-messaging-bridge.md) |
 
 ### Module Descriptions
 
@@ -136,6 +137,9 @@ General app configuration:
 - Default model/provider selection
 - Notification preferences
 - Data management (clear cache, manage storage)
+
+#### FEAT-024: Messaging Bridge
+Connect external messaging platforms to the AI agent runtime. Users can interact with their agents from Telegram, Discord, Slack, Matrix, LINE, or a local WebChat interface without opening the app. The bridge runs as a foreground service, receiving messages from external platforms, routing them to the agent, and sending responses back. Supports image messages, per-channel access control, and a dedicated settings screen for configuration and status monitoring. Implemented as an independent `:bridge` Gradle module.
 
 ## Future Exploration
 
