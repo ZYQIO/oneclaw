@@ -10,6 +10,7 @@ import com.oneclaw.shadow.core.util.AppResult
 import com.oneclaw.shadow.feature.agent.usecase.CloneAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.CreateAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.DeleteAgentUseCase
+import com.oneclaw.shadow.feature.agent.usecase.GenerateAgentFromPromptUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,7 @@ class AgentDetailViewModel(
     private val createAgentUseCase: CreateAgentUseCase,
     private val cloneAgentUseCase: CloneAgentUseCase,
     private val deleteAgentUseCase: DeleteAgentUseCase,
+    private val generateAgentFromPromptUseCase: GenerateAgentFromPromptUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -191,6 +193,41 @@ class AgentDetailViewModel(
                 }
                 is AppResult.Error -> _uiState.update {
                     it.copy(showDeleteDialog = false, errorMessage = result.message)
+                }
+            }
+        }
+    }
+
+    fun updateGeneratePrompt(text: String) {
+        _uiState.update { it.copy(generatePrompt = text) }
+    }
+
+    fun generateFromPrompt() {
+        val prompt = _uiState.value.generatePrompt.trim()
+        if (prompt.isEmpty()) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGenerating = true) }
+            when (val result = generateAgentFromPromptUseCase(prompt)) {
+                is AppResult.Success -> {
+                    val generated = result.data
+                    _uiState.update {
+                        it.copy(
+                            name = generated.name,
+                            description = generated.description,
+                            systemPrompt = generated.systemPrompt,
+                            isGenerating = false,
+                            successMessage = "Agent generated! Review and save."
+                        )
+                    }
+                }
+                is AppResult.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isGenerating = false,
+                            errorMessage = result.message
+                        )
+                    }
                 }
             }
         }

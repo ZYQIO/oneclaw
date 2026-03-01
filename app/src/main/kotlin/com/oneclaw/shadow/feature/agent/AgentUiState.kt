@@ -34,6 +34,9 @@ data class AgentDetailUiState(
 
     val availableModels: List<ModelOptionItem> = emptyList(),
 
+    val generatePrompt: String = "",
+    val isGenerating: Boolean = false,
+
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val errorMessage: String? = null,

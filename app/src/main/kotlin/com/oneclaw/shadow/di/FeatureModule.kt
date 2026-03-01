@@ -7,6 +7,7 @@ import com.oneclaw.shadow.feature.agent.AgentListViewModel
 import com.oneclaw.shadow.feature.agent.usecase.CloneAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.CreateAgentUseCase
 import com.oneclaw.shadow.feature.agent.usecase.DeleteAgentUseCase
+import com.oneclaw.shadow.feature.agent.usecase.GenerateAgentFromPromptUseCase
 import com.oneclaw.shadow.feature.agent.usecase.GetAgentToolsUseCase
 import com.oneclaw.shadow.feature.agent.usecase.ResolveModelUseCase
 import com.oneclaw.shadow.feature.chat.ChatViewModel
@@ -83,6 +84,9 @@ val featureModule = module {
     factory { DeleteAgentUseCase(get(), get()) }
     factory { GetAgentToolsUseCase(get()) }
     factory { ResolveModelUseCase(get(), get()) }
+
+    // RFC-020: Generate agent from prompt
+    factory { GenerateAgentFromPromptUseCase(get(), get(), get()) }
 
     // RFC-002: Agent feature view models
     viewModelOf(::AgentListViewModel)
