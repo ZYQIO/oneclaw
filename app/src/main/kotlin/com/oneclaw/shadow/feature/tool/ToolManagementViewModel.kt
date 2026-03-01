@@ -122,7 +122,15 @@ class ToolManagementViewModel(
         }
 
         loadTools()
-        _uiState.update { it.copy(snackbarMessage = "$toolName $label") }
+        _uiState.update { state ->
+            val updatedSelected = if (state.selectedTool?.name == toolName) {
+                val source = toolRegistry.getToolSourceInfo(toolName)
+                state.selectedTool.copy(
+                    isEnabled = enabledStateStore.isToolEffectivelyEnabled(toolName, source.groupName)
+                )
+            } else state.selectedTool
+            state.copy(selectedTool = updatedSelected, snackbarMessage = "$toolName $label")
+        }
     }
 
     fun toggleGroupEnabled(groupName: String) {
