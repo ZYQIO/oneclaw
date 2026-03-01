@@ -6,10 +6,12 @@ import com.oneclaw.shadow.core.model.ToolSourceType
 import com.oneclaw.shadow.tool.browser.BrowserContentExtractor
 import com.oneclaw.shadow.tool.browser.BrowserScreenshotCapture
 import com.oneclaw.shadow.tool.browser.WebViewManager
+import com.oneclaw.shadow.feature.search.usecase.SearchHistoryUseCase
 import com.oneclaw.shadow.tool.builtin.BrowserTool
 import com.oneclaw.shadow.tool.builtin.CreateAgentTool
 import com.oneclaw.shadow.tool.builtin.CreateScheduledTaskTool
 import com.oneclaw.shadow.tool.builtin.LoadSkillTool
+import com.oneclaw.shadow.tool.builtin.SearchHistoryTool
 import com.oneclaw.shadow.tool.builtin.WebfetchTool
 import com.oneclaw.shadow.tool.engine.PermissionChecker
 import com.oneclaw.shadow.tool.engine.ToolEnabledStateStore
@@ -58,6 +60,10 @@ val toolModule = module {
     single { WebViewManager(androidContext(), get(), get()) }
     single { BrowserTool(androidContext(), get()) }
 
+    // RFC-032: search_history built-in tool
+    single { SearchHistoryUseCase(get(), get(), get()) }
+    single { SearchHistoryTool(get()) }
+
     // RFC-017: Tool enabled state store
     single { ToolEnabledStateStore(androidContext()) }
 
@@ -92,6 +98,12 @@ val toolModule = module {
                 register(get<BrowserTool>(), ToolSourceInfo.BUILTIN)
             } catch (e: Exception) {
                 Log.e("ToolModule", "Failed to register browser: ${e.message}")
+            }
+
+            try {
+                register(get<SearchHistoryTool>(), ToolSourceInfo.BUILTIN)
+            } catch (e: Exception) {
+                Log.e("ToolModule", "Failed to register search_history: ${e.message}")
             }
 
             // Built-in JS tools from assets (replaces Kotlin tool registration)
