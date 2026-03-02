@@ -1,9 +1,13 @@
 package com.oneclaw.shadow.feature.bridge
 
 import com.oneclaw.shadow.bridge.BridgeAgentExecutor
+import com.oneclaw.shadow.core.model.AttachmentType
 import com.oneclaw.shadow.core.repository.AgentRepository
+import com.oneclaw.shadow.data.local.AttachmentFileManager
 import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
 import kotlinx.coroutines.flow.collect
+import java.io.File
+import java.util.UUID
 
 class BridgeAgentExecutorImpl(
     private val sendMessageUseCase: SendMessageUseCase,
@@ -16,11 +20,37 @@ class BridgeAgentExecutorImpl(
         imagePaths: List<String>
     ) {
         val agentId = resolveAgentId()
+        val pendingAttachments = imagePaths.mapNotNull { path ->
+            val file = File(path)
+            if (!file.exists()) return@mapNotNull null
+            AttachmentFileManager.PendingAttachment(
+                id = UUID.randomUUID().toString(),
+                type = AttachmentType.IMAGE,
+                fileName = file.name,
+                mimeType = mimeTypeFromExtension(file.extension),
+                fileSize = file.length(),
+                filePath = path,
+                thumbnailPath = null,
+                width = null,
+                height = null,
+                durationMs = null
+            )
+        }
         sendMessageUseCase.execute(
             sessionId = conversationId,
             userText = userMessage,
-            agentId = agentId
+            agentId = agentId,
+            pendingAttachments = pendingAttachments
         ).collect()
+    }
+
+    private fun mimeTypeFromExtension(ext: String): String = when (ext.lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png"         -> "image/png"
+        "gif"         -> "image/gif"
+        "webp"        -> "image/webp"
+        "bmp"         -> "image/bmp"
+        else          -> "image/jpeg"
     }
 
     private suspend fun resolveAgentId(): String {

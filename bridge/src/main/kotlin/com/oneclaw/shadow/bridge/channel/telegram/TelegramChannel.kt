@@ -19,6 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -71,7 +72,7 @@ class TelegramChannel(
                         val chatId = message["chat"]?.jsonObject?.get("id")?.jsonPrimitive?.content ?: continue
                         val fromId = message["from"]?.jsonObject?.get("id")?.jsonPrimitive?.content
                         val fromFirstName = message["from"]?.jsonObject?.get("first_name")?.jsonPrimitive?.content
-                        val text = message["text"]?.jsonPrimitive?.content ?: ""
+                        val text = extractText(message)
                         val photos = message["photo"]?.jsonArray
                         val imagePaths = mutableListOf<String>()
 
@@ -157,5 +158,10 @@ class TelegramChannel(
         private const val TAG = "TelegramChannel"
         private const val INITIAL_BACKOFF_MS = 3_000L
         private const val MAX_BACKOFF_MS = 60_000L
+
+        internal fun extractText(message: JsonObject): String =
+            message["text"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                ?: message["caption"]?.jsonPrimitive?.content
+                ?: ""
     }
 }
