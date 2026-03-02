@@ -21,6 +21,7 @@ This RFC describes a minimal fix: a `SharedFlow`-based in-process event bus in `
 1. Emit a session-switch event from the bridge layer when `/clear` creates a new session.
 2. Subscribe in `ChatScreen` and call `viewModel.initialize(sessionId)` upon receiving the event.
 3. Keep the change minimal: no new modules, no new data classes, no DB schema changes.
+4. Soft-delete the previous session before creating the new one if it contains no messages, preventing empty sessions from accumulating in the session list.
 
 ### Non-Goals
 
@@ -39,6 +40,8 @@ bridge/src/main/kotlin/com/oneclaw/shadow/bridge/
     channel/
     └── MessagingChannel.kt                          # MODIFIED (/clear branch emits event)
 app/src/main/kotlin/com/oneclaw/shadow/
+├── feature/bridge/
+│   └── BridgeConversationManagerImpl.kt             # MODIFIED (clean up empty previous session)
 └── feature/chat/
     └── ChatScreen.kt                                # MODIFIED (LaunchedEffect subscriber)
 ```
@@ -115,6 +118,50 @@ Design decisions:
 - `viewModel.initialize(sessionId)`: this is the same method called when the user manually selects a session from the drawer. Reusing it ensures identical behavior: the ViewModel loads messages for the new session and updates `uiState.sessionId`.
 - No navigation change is needed because `ChatScreen` is already the current screen.
 
+### Change 4: BridgeConversationManagerImpl -- Clean Up Empty Previous Session
+
+**Problem**: Every `/clear` command eagerly creates a session record in the database even though it contains no messages. If the user sends `/clear` repeatedly without having a conversation in between, empty sessions accumulate in the session list.
+
+**Context**: Unlike the in-app "New Conversation" flow (which is lazy -- no DB record is created until the first message is sent), the bridge must create the session eagerly so that `viewModel.initialize(sessionId)` in `ChatScreen` can immediately look it up via `sessionRepository.getSessionById()`.
+
+**Solution**: In `createNewConversation()`, check whether the current most-recent session is empty before creating the new one. If it is, soft-delete it first. This ensures that at most one empty bridge session exists at any time.
+
+```kotlin
+// BridgeConversationManagerImpl.kt -- updated createNewConversation()
+
+override suspend fun createNewConversation(): String {
+    // If the previous session has no messages, soft-delete it to avoid accumulation
+    val prevId = sessionRepository.getMostRecentSessionId()
+    if (prevId != null) {
+        val prevSession = sessionRepository.getSessionById(prevId)
+        if (prevSession != null && prevSession.messageCount == 0) {
+            sessionRepository.deleteSession(prevId)
+        }
+    }
+
+    val agentId = resolveAgentId()
+    val now = System.currentTimeMillis()
+    val session = Session(
+        id = UUID.randomUUID().toString(),
+        title = "Bridge Conversation",
+        currentAgentId = agentId,
+        messageCount = 0,
+        lastMessagePreview = null,
+        isActive = false,
+        deletedAt = null,
+        createdAt = now,
+        updatedAt = now
+    )
+    val created = sessionRepository.createSession(session)
+    return created.id
+}
+```
+
+Design decisions:
+- Uses `session.messageCount` (a denormalized field on the `Session` model) rather than adding a new `MessageRepository` query. This field is set to `0` when the bridge creates the session and is only incremented when messages are added; a bridge session created by `/clear` that has never received a message will always have `messageCount == 0`.
+- Uses `sessionRepository.deleteSession()` (soft delete via `deleted_at` timestamp), consistent with the rest of the app's session deletion pattern. The soft-deleted session disappears from both the session list and the `getMostRecentSessionId()` query (which already filters `WHERE deleted_at IS NULL`).
+- No change to the `SessionRepository` or `MessageRepository` interfaces is required -- `getSessionById`, `getMostRecentSessionId`, and `deleteSession` all already exist.
+
 ## Testing
 
 ### Unit Tests
@@ -123,6 +170,7 @@ No new unit tests are strictly required for this change. The three modified file
 
 - `BridgeStateTracker`: no existing unit tests (it is a simple state holder); the new `SharedFlow` fields follow the same pattern as existing `StateFlow` fields.
 - `MessagingChannel` (`MessagingChannelTest`): existing tests cover the `/clear` branch. Update the test to verify that `BridgeStateTracker.newSessionFromBridge` emits the new session ID after a `/clear` message.
+- `BridgeConversationManagerImpl`: add a test case for `createNewConversation()` when the previous session has `messageCount == 0` -- verify `deleteSession()` is called before the new session is created. Add a second case where `messageCount > 0` -- verify `deleteSession()` is NOT called.
 - `ChatScreen`: covered by UI/Roborazzi tests; no change to visual layout, so no new screenshot baseline is needed.
 
 ### Manual Verification
@@ -132,9 +180,11 @@ No new unit tests are strictly required for this change. The three modified file
 3. Within 3 seconds, verify that `ChatScreen` switches to a new, empty session.
 4. Send a normal message via Telegram. Verify it appears in the same new session in the app.
 5. Manually switch to an older session in the app drawer. Send a message via Telegram. Verify it appears in the older session (unchanged FEAT-041 behavior).
+6. Send `/clear` via Telegram twice in a row without sending any message in between. Verify that only one empty session appears in the session list (the first empty session is soft-deleted when the second `/clear` is processed).
 
 ## Migration Notes
 
 - No database schema changes.
 - No API changes to `BridgeConversationManager`, `SessionRepository`, or any repository interface.
 - The `BridgeStateTracker` object gains two new public members (`newSessionFromBridge`, `emitNewSessionFromBridge`). Callers outside the bridge module (currently only `ChatScreen`) access these through the existing shared dependency on `BridgeStateTracker`.
+- `BridgeConversationManagerImpl.createNewConversation()` gains pre-creation cleanup logic. The behavior change is observable only when the previous session has `messageCount == 0`; all other cases are unaffected.

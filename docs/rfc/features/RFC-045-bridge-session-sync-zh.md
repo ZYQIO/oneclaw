@@ -21,6 +21,7 @@
 1. 当 `/clear` 创建新会话时，从 bridge 层发出会话切换事件。
 2. 在 `ChatScreen` 中订阅该事件，并在收到事件时调用 `viewModel.initialize(sessionId)`。
 3. 保持变更最小化：不新增模块、不新增数据类、不更改数据库 schema。
+4. 在创建新会话前，若上一个会话不含任何消息，则对其进行软删除，防止空会话在会话列表中不断积累。
 
 ### 非目标
 
@@ -39,6 +40,8 @@ bridge/src/main/kotlin/com/oneclaw/shadow/bridge/
     channel/
     └── MessagingChannel.kt                          # 修改（/clear 分支发出事件）
 app/src/main/kotlin/com/oneclaw/shadow/
+├── feature/bridge/
+│   └── BridgeConversationManagerImpl.kt             # 修改（清理空的上一个会话）
 └── feature/chat/
     └── ChatScreen.kt                                # 修改（添加 LaunchedEffect 订阅者）
 ```
@@ -115,6 +118,50 @@ LaunchedEffect(Unit) {
 - `viewModel.initialize(sessionId)`：这与用户从抽屉手动选择会话时调用的方法相同。复用该方法可确保行为一致：ViewModel 加载新会话的消息并更新 `uiState.sessionId`。
 - 无需更改导航，因为 `ChatScreen` 已是当前屏幕。
 
+### 变更 4：BridgeConversationManagerImpl -- 清理空的上一个会话
+
+**问题**：每次 `/clear` 命令都会急切地在数据库中创建一条会话记录，即使该会话不包含任何消息。如果用户连续发送 `/clear` 而中间没有任何对话，空会话将在会话列表中不断积累。
+
+**背景**：与应用内"新建对话"流程（惰性创建——直到发送第一条消息才在数据库中创建记录）不同，bridge 必须急切地创建会话，以便 `ChatScreen` 中的 `viewModel.initialize(sessionId)` 能立即通过 `sessionRepository.getSessionById()` 查找到该会话。
+
+**解决方案**：在 `createNewConversation()` 中，在创建新会话前先检查当前最新会话是否为空。若为空，则先对其进行软删除。这样可确保任意时刻最多只存在一个空的 bridge 会话。
+
+```kotlin
+// BridgeConversationManagerImpl.kt -- 更新后的 createNewConversation()
+
+override suspend fun createNewConversation(): String {
+    // 若上一个会话没有消息，则对其软删除，避免积累
+    val prevId = sessionRepository.getMostRecentSessionId()
+    if (prevId != null) {
+        val prevSession = sessionRepository.getSessionById(prevId)
+        if (prevSession != null && prevSession.messageCount == 0) {
+            sessionRepository.deleteSession(prevId)
+        }
+    }
+
+    val agentId = resolveAgentId()
+    val now = System.currentTimeMillis()
+    val session = Session(
+        id = UUID.randomUUID().toString(),
+        title = "Bridge Conversation",
+        currentAgentId = agentId,
+        messageCount = 0,
+        lastMessagePreview = null,
+        isActive = false,
+        deletedAt = null,
+        createdAt = now,
+        updatedAt = now
+    )
+    val created = sessionRepository.createSession(session)
+    return created.id
+}
+```
+
+设计决策：
+- 使用 `session.messageCount`（`Session` 模型上的反规范化字段），而非新增 `MessageRepository` 查询。该字段在 bridge 创建会话时设置为 `0`，仅在添加消息时递增；由 `/clear` 创建的、从未收到过消息的 bridge 会话，其 `messageCount` 始终为 `0`。
+- 使用 `sessionRepository.deleteSession()`（通过 `deleted_at` 时间戳进行软删除），与应用其他部分的会话删除模式保持一致。软删除后的会话将从会话列表和 `getMostRecentSessionId()` 查询中消失（该查询已过滤 `WHERE deleted_at IS NULL`）。
+- 无需更改 `SessionRepository` 或 `MessageRepository` 接口——`getSessionById`、`getMostRecentSessionId` 和 `deleteSession` 均已存在。
+
 ## 测试
 
 ### 单元测试
@@ -123,6 +170,7 @@ LaunchedEffect(Unit) {
 
 - `BridgeStateTracker`：无现有单元测试（它是一个简单的状态持有者）；新增的 `SharedFlow` 字段遵循与现有 `StateFlow` 字段相同的模式。
 - `MessagingChannel`（`MessagingChannelTest`）：现有测试覆盖了 `/clear` 分支。更新测试以验证在收到 `/clear` 消息后，`BridgeStateTracker.newSessionFromBridge` 会发出新会话 ID。
+- `BridgeConversationManagerImpl`：针对 `createNewConversation()` 新增一个测试用例，场景为上一个会话的 `messageCount == 0`——验证在创建新会话前 `deleteSession()` 被调用。再新增第二个用例，场景为 `messageCount > 0`——验证 `deleteSession()` 不被调用。
 - `ChatScreen`：由 UI/Roborazzi 测试覆盖；视觉布局无变更，因此无需新的截图基线。
 
 ### 手动验证
@@ -132,9 +180,11 @@ LaunchedEffect(Unit) {
 3. 在 3 秒内，验证 `ChatScreen` 切换到一个新的空会话。
 4. 通过 Telegram 发送一条普通消息，验证其出现在应用的同一新会话中。
 5. 在应用抽屉中手动切换到旧会话，通过 Telegram 发送一条消息，验证其出现在旧会话中（FEAT-041 原有行为不变）。
+6. 通过 Telegram 连续发送两次 `/clear`，中间不发送任何消息。验证会话列表中只出现一个空会话（第一个空会话在处理第二次 `/clear` 时被软删除）。
 
 ## 迁移说明
 
 - 无数据库 schema 变更。
 - `BridgeConversationManager`、`SessionRepository` 或任何仓库接口均无 API 变更。
 - `BridgeStateTracker` 对象新增两个公开成员（`newSessionFromBridge`、`emitNewSessionFromBridge`）。bridge 模块外部的调用方（目前仅 `ChatScreen`）通过现有的对 `BridgeStateTracker` 的共享依赖访问这些成员。
+- `BridgeConversationManagerImpl.createNewConversation()` 新增创建前的清理逻辑。行为变更仅在上一个会话的 `messageCount == 0` 时可见；其他所有情况不受影响。
