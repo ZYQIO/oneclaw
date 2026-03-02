@@ -149,6 +149,7 @@ fun ChatScreen(
     val clipboardManager = LocalClipboardManager.current
     val inputFocusRequester = remember { FocusRequester() }
     val context = LocalContext.current
+    val exactAlarmHelper: ExactAlarmHelper = koinInject()
 
     // Attachment picker launchers
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -427,7 +428,6 @@ fun ChatScreen(
     }
 
     if (showExactAlarmDialog) {
-        val exactAlarmHelper: ExactAlarmHelper = koinInject()
         ExactAlarmPermissionDialog(
             onGoToSettings = {
                 showExactAlarmDialog = false
