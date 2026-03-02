@@ -76,6 +76,19 @@ class ChatViewModel(
         _uiState.update { it.copy(allSkills = allSkills) }
     }
 
+    fun newConversation() {
+        viewModelScope.launch {
+            val currentSessionId = _uiState.value.sessionId
+            if (currentSessionId != null && _uiState.value.messages.isEmpty()) {
+                sessionRepository.softDeleteSession(currentSessionId)
+            }
+            val session = createSessionUseCase(agentId = _uiState.value.currentAgentId)
+            isFirstMessage = true
+            firstUserMessageText = null
+            initialize(session.id)
+        }
+    }
+
     fun initialize(sessionId: String?) {
         // RFC-023: Trigger session switch before loading new session
         val previousSessionId = _uiState.value.sessionId
@@ -356,21 +369,22 @@ class ChatViewModel(
 
         // Non-streaming path: start a new loop (existing logic)
         viewModelScope.launch {
-            // Lazy session creation
+            // Lazy session creation: fallback for initial app state (init calls initialize(null))
             var sessionId = _uiState.value.sessionId
             if (sessionId == null) {
                 val session = createSessionUseCase(agentId = _uiState.value.currentAgentId)
                 sessionId = session.id
                 _uiState.update { it.copy(sessionId = sessionId) }
+                isFirstMessage = true
+            }
 
-                // Phase 1 title: truncated user text
+            // Phase 1 title: set from first message text (covers both lazy and eager creation)
+            if (isFirstMessage && firstUserMessageText == null) {
                 val titleSource = text.ifBlank { pendingAttachments.firstOrNull()?.fileName ?: "attachment" }
                 val truncatedTitle = generateTitleUseCase.generateTruncatedTitle(titleSource)
-                sessionRepository.updateTitle(sessionId, truncatedTitle)
+                sessionRepository.updateTitle(sessionId!!, truncatedTitle)
                 _uiState.update { it.copy(sessionTitle = truncatedTitle) }
-
                 firstUserMessageText = text.ifBlank { titleSource }
-                isFirstMessage = true
             }
 
             // Add user message to UI immediately

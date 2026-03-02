@@ -254,7 +254,7 @@ fun ChatScreen(
                 SessionDrawerContent(
                     viewModel = sessionListViewModel,
                     onNewConversation = {
-                        viewModel.initialize(null)
+                        viewModel.newConversation()
                         scope.launch { drawerState.close() }
                     },
                     onSessionClick = { sessionId ->

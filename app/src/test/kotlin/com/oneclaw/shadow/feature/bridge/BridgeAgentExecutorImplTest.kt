@@ -1,9 +1,12 @@
 package com.oneclaw.shadow.feature.bridge
 
 import com.oneclaw.shadow.core.model.Agent
+import com.oneclaw.shadow.core.model.Session
 import com.oneclaw.shadow.core.repository.AgentRepository
+import com.oneclaw.shadow.core.repository.SessionRepository
 import com.oneclaw.shadow.data.local.AttachmentFileManager
 import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
+import com.oneclaw.shadow.feature.session.usecase.GenerateTitleUseCase
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -23,6 +26,8 @@ class BridgeAgentExecutorImplTest {
 
     private lateinit var sendMessageUseCase: SendMessageUseCase
     private lateinit var agentRepository: AgentRepository
+    private lateinit var sessionRepository: SessionRepository
+    private lateinit var generateTitleUseCase: GenerateTitleUseCase
     private lateinit var executor: BridgeAgentExecutorImpl
 
     private val tempFiles = mutableListOf<File>()
@@ -31,12 +36,20 @@ class BridgeAgentExecutorImplTest {
     fun setUp() {
         sendMessageUseCase = mockk()
         agentRepository = mockk()
+        sessionRepository = mockk()
+        generateTitleUseCase = mockk(relaxed = true)
 
         val agent = mockk<Agent>(relaxed = true)
         coEvery { agentRepository.getBuiltInAgents() } returns listOf(agent)
         every { agent.id } returns "agent-1"
 
-        executor = BridgeAgentExecutorImpl(sendMessageUseCase, agentRepository)
+        val session = mockk<Session>(relaxed = true)
+        every { session.messageCount } returns 1
+        coEvery { sessionRepository.getSessionById(any()) } returns session
+
+        executor = BridgeAgentExecutorImpl(
+            sendMessageUseCase, agentRepository, sessionRepository, generateTitleUseCase
+        )
     }
 
     @AfterEach

@@ -22,7 +22,9 @@ val bridgeModule = module {
     single<BridgeAgentExecutor> {
         BridgeAgentExecutorImpl(
             sendMessageUseCase = get(),
-            agentRepository = get()
+            agentRepository = get(),
+            sessionRepository = get(),
+            generateTitleUseCase = get()
         )
     }
     single<BridgeMessageObserver> {

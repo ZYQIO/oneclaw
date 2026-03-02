@@ -4,7 +4,7 @@
 - **Feature ID**: FEAT-045
 - **Created**: 2026-03-01
 - **Last Updated**: 2026-03-01
-- **Status**: Draft
+- **Status**: Completed
 - **Priority**: P1 (Should Have)
 - **Owner**: TBD
 - **Related RFC**: [RFC-045 (Bridge Session Sync)](../../rfc/features/RFC-045-bridge-session-sync.md)
@@ -20,7 +20,9 @@
 
 1. User sends `/clear` via Telegram. The bridge creates a new empty session. Within 3 seconds, the app's ChatScreen switches to that new session without any manual action by the user.
 2. Normal bridge message arrives. The ChatScreen is already displaying the bridge's current session (established by FEAT-041). Messages appear in real time in both Telegram and the app.
-3. User manually switches to a different session inside the app. Subsequent bridge messages route to that session (existing behavior from FEAT-041); ChatScreen remains on that session.
+3. User manually switches to a different session inside the app. Subsequent bridge messages route to that session (not the most-recently-updated session in the database); ChatScreen remains on that session.
+4. User taps "New Conversation" in the app. A new empty session is immediately created in the database and displayed. Subsequent bridge messages route to that new session.
+5. Bridge receives the first message in a new session (after `/clear`). The session title updates from "Bridge Conversation" to a meaningful truncated title immediately, and later to an AI-generated title.
 
 ## Feature Description
 
@@ -42,12 +44,14 @@ No new database tables, no new network calls, and no changes to navigation are r
 2. The session list in the drawer updates automatically (it already does so via existing Room Flow; no additional work required).
 3. If the ChatScreen is not currently visible (app is backgrounded), the switch takes effect the next time the screen is foregrounded.
 4. Normal bridge messages (non-`/clear`) do not trigger any session switch in the ChatScreen.
-5. Manual session switching by the user in the app is unaffected.
-6. All existing Layer 1A unit tests continue to pass.
+5. After the user manually switches to a session in the app, subsequent bridge messages route to that session (not the DB-most-recent session).
+6. Tapping "New Conversation" in the app immediately creates a DB session and registers it as the active session for bridge routing.
+7. If the current session has no messages when "New Conversation" is tapped (or `/clear` is sent), the empty session is soft-deleted before the new one is created.
+8. Bridge sessions receive a meaningful title: a truncated user-message title on the first message, and an AI-generated title after the first AI response.
+9. All existing Layer 1A unit tests continue to pass.
 
 ### Out of Scope
 
-- Reverse synchronization: notifying the bridge when the user switches sessions in the app (already handled by `getMostRecentSessionId()` in FEAT-041).
 - Multi-session mapping per channel (each external chat maps to a different app session).
 - Push notification when `/clear` is invoked while the app is not running.
 - Support for channels other than Telegram (the mechanism is channel-agnostic, but the only `/clear` command currently implemented is in Telegram).

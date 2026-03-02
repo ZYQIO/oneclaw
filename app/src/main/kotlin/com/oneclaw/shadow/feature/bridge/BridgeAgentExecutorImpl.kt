@@ -4,16 +4,20 @@ import com.oneclaw.shadow.bridge.BridgeAgentExecutor
 import com.oneclaw.shadow.bridge.BridgeMessage
 import com.oneclaw.shadow.core.model.AttachmentType
 import com.oneclaw.shadow.core.repository.AgentRepository
+import com.oneclaw.shadow.core.repository.SessionRepository
 import com.oneclaw.shadow.data.local.AttachmentFileManager
 import com.oneclaw.shadow.feature.chat.ChatEvent
 import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
+import com.oneclaw.shadow.feature.session.usecase.GenerateTitleUseCase
 import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.UUID
 
 class BridgeAgentExecutorImpl(
     private val sendMessageUseCase: SendMessageUseCase,
-    private val agentRepository: AgentRepository
+    private val agentRepository: AgentRepository,
+    private val sessionRepository: SessionRepository,
+    private val generateTitleUseCase: GenerateTitleUseCase
 ) : BridgeAgentExecutor {
 
     override suspend fun executeMessage(
@@ -21,6 +25,15 @@ class BridgeAgentExecutorImpl(
         userMessage: String,
         imagePaths: List<String>
     ): BridgeMessage? {
+        // Check before executing: is this the first message in the session?
+        val isFirstMessage = (sessionRepository.getSessionById(conversationId)?.messageCount ?: 0) == 0
+
+        // Phase 1 title: immediate truncated title from the user message
+        if (isFirstMessage) {
+            val truncatedTitle = generateTitleUseCase.generateTruncatedTitle(userMessage)
+            sessionRepository.updateTitle(conversationId, truncatedTitle)
+        }
+
         val agentId = resolveAgentId()
         val pendingAttachments = imagePaths.mapNotNull { path ->
             val file = File(path)
@@ -40,6 +53,8 @@ class BridgeAgentExecutorImpl(
         }
         var lastResponseContent: String? = null
         var lastResponseTimestamp: Long = 0L
+        var lastModelId: String? = null
+        var lastProviderId: String? = null
 
         try {
             sendMessageUseCase.execute(
@@ -52,6 +67,8 @@ class BridgeAgentExecutorImpl(
                     is ChatEvent.ResponseComplete -> {
                         lastResponseContent = event.message.content
                         lastResponseTimestamp = event.message.createdAt
+                        lastModelId = event.message.modelId
+                        lastProviderId = event.message.providerId
                     }
                     else -> { /* other events not needed by bridge */ }
                 }
@@ -64,6 +81,18 @@ class BridgeAgentExecutorImpl(
         }
 
         val content = lastResponseContent
+
+        // Phase 2 title: AI-generated title after first response
+        if (isFirstMessage && content != null && lastModelId != null && lastProviderId != null) {
+            generateTitleUseCase.generateAiTitle(
+                sessionId = conversationId,
+                firstUserMessage = userMessage,
+                firstAiResponse = content,
+                currentModelId = lastModelId!!,
+                currentProviderId = lastProviderId!!
+            )
+        }
+
         return if (content != null && content.isNotBlank()) {
             BridgeMessage(content = content, timestamp = lastResponseTimestamp)
         } else {
