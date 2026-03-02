@@ -22,12 +22,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.ViewCompat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +46,11 @@ fun AttachmentPickerSheet(
         onDismissRequest = onDismiss,
         scrimColor = Color.Black.copy(alpha = 0.32f)
     ) {
+        val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+        val view = LocalView.current
+        SideEffect {
+            ViewCompat.getWindowInsetsController(view)?.isAppearanceLightStatusBars = !isDark
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()

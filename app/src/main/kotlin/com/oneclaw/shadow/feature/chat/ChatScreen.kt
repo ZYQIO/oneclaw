@@ -116,8 +116,11 @@ import com.oneclaw.shadow.core.model.MessageType
 import com.oneclaw.shadow.core.model.ToolCallStatus
 import com.oneclaw.shadow.core.util.formatWithCommas
 import com.oneclaw.shadow.feature.agent.AgentSelectorSheet
+import com.oneclaw.shadow.core.model.Attachment
+import com.oneclaw.shadow.feature.chat.components.AttachmentDisplay
 import com.oneclaw.shadow.feature.chat.components.AttachmentPickerSheet
 import com.oneclaw.shadow.feature.chat.components.AttachmentPreviewRow
+import com.oneclaw.shadow.feature.chat.components.ImageViewerDialog
 import com.oneclaw.shadow.feature.session.SessionDrawerContent
 import com.oneclaw.shadow.feature.session.SessionListViewModel
 import com.oneclaw.shadow.feature.skill.ui.SkillSelectionBottomSheet
@@ -318,7 +321,8 @@ fun ChatScreen(
                         listState = listState,
                         onCopy = { content -> clipboardManager.setText(AnnotatedString(content)) },
                         onRetry = { viewModel.retryLastMessage() },
-                        onRegenerate = { viewModel.regenerate() }
+                        onRegenerate = { viewModel.regenerate() },
+                        onImageClick = { path -> viewModel.openImageViewer(path) }
                     )
                 }
 
@@ -392,6 +396,13 @@ fun ChatScreen(
             onPickFile = {
                 filePickerLauncher.launch("*/*")
             }
+        )
+    }
+
+    uiState.viewingImagePath?.let { imagePath ->
+        ImageViewerDialog(
+            imagePath = imagePath,
+            onDismiss = { viewModel.closeImageViewer() }
         )
     }
 }
@@ -642,7 +653,8 @@ fun MessageList(
     listState: LazyListState,
     onCopy: (String) -> Unit,
     onRetry: () -> Unit,
-    onRegenerate: () -> Unit
+    onRegenerate: () -> Unit,
+    onImageClick: (String) -> Unit = {}
 ) {
     val displayMessages = remember(messages) { interleaveToolMessages(messages) }
     LazyColumn(
@@ -654,7 +666,9 @@ fun MessageList(
             when (message.type) {
                 MessageType.USER -> UserMessageBubble(
                     content = message.content,
-                    onCopy = { onCopy(message.content) }
+                    attachments = message.attachments,
+                    onCopy = { onCopy(message.content) },
+                    onImageClick = onImageClick
                 )
                 MessageType.AI_RESPONSE -> AiMessageBubble(
                     content = message.content,
@@ -721,7 +735,12 @@ fun MessageList(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun UserMessageBubble(content: String, onCopy: () -> Unit) {
+fun UserMessageBubble(
+    content: String,
+    attachments: List<Attachment> = emptyList(),
+    onCopy: () -> Unit,
+    onImageClick: (String) -> Unit = {}
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -741,13 +760,25 @@ fun UserMessageBubble(content: String, onCopy: () -> Unit) {
                     onLongClick = onCopy
                 )
         ) {
-            DisableSelection {
-                Text(
-                    text = content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+            Column(modifier = Modifier.padding(12.dp)) {
+                if (attachments.isNotEmpty()) {
+                    AttachmentDisplay(
+                        attachments = attachments,
+                        onImageClick = { attachment -> onImageClick(attachment.filePath) },
+                        onVideoClick = {},
+                        onFileClick = {},
+                        modifier = if (content.isNotBlank()) Modifier.padding(bottom = 8.dp) else Modifier
+                    )
+                }
+                if (content.isNotBlank()) {
+                    DisableSelection {
+                        Text(
+                            text = content,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             }
         }
     }
