@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material3.Button
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -112,6 +113,32 @@ fun BridgeSettingsScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
+                var broadcastText by remember { mutableStateOf("") }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = broadcastText,
+                        onValueChange = { broadcastText = it },
+                        label = { Text("Message to broadcast") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (broadcastText.isNotBlank()) {
+                                MessagingBridgeService.broadcast(context, broadcastText)
+                                broadcastText = ""
+                            }
+                        }
+                    ) {
+                        Text("Send")
+                    }
+                }
             }
 
             BridgeSwitchRow(

@@ -58,6 +58,10 @@ class MessagingBridgeService : Service() {
             ACTION_START -> startBridge()
             ACTION_STOP -> stopBridge()
             ACTION_RESTART -> restartBridge()
+            ACTION_BROADCAST -> {
+                val text = intent.getStringExtra(EXTRA_BROADCAST_TEXT) ?: return START_STICKY
+                serviceScope.launch { BridgeBroadcaster.broadcast(text) }
+            }
         }
         return START_STICKY
     }
@@ -419,6 +423,8 @@ class MessagingBridgeService : Service() {
         const val ACTION_START = "com.oneclaw.shadow.bridge.START"
         const val ACTION_STOP = "com.oneclaw.shadow.bridge.STOP"
         const val ACTION_RESTART = "com.oneclaw.shadow.bridge.RESTART"
+        const val ACTION_BROADCAST = "com.oneclaw.shadow.bridge.BROADCAST"
+        const val EXTRA_BROADCAST_TEXT = "text"
         private const val NOTIFICATION_ID = 2024
         private const val CHANNEL_ID = "messaging_bridge"
         private const val WAKE_LOCK_TAG = "oneclaw:bridge_wake_lock"
@@ -442,6 +448,14 @@ class MessagingBridgeService : Service() {
                 action = ACTION_RESTART
             }
             context.startForegroundService(intent)
+        }
+
+        fun broadcast(context: Context, text: String) {
+            val intent = Intent(context, MessagingBridgeService::class.java).apply {
+                action = ACTION_BROADCAST
+                putExtra(EXTRA_BROADCAST_TEXT, text)
+            }
+            context.startService(intent)
         }
     }
 }

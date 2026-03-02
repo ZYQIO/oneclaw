@@ -83,7 +83,7 @@ abstract class MessagingChannel(
 
         // 7. Execute agent concurrently (SendMessageUseCase inserts the user message internally)
         val beforeTimestamp = System.currentTimeMillis()
-        scope.launch {
+        val agentJob = scope.launch {
             agentExecutor.executeMessage(
                 conversationId = conversationId,
                 userMessage = msg.text,
@@ -91,12 +91,14 @@ abstract class MessagingChannel(
             )
         }
 
-        // 8. Await assistant response (300s timeout)
+        // 8. Wait for agent to finish, then fetch the final response
         val response = try {
             withTimeout(AGENT_RESPONSE_TIMEOUT_MS) {
+                agentJob.join()
                 messageObserver.awaitNextAssistantMessage(
                     conversationId = conversationId,
-                    afterTimestamp = beforeTimestamp
+                    afterTimestamp = beforeTimestamp,
+                    timeoutMs = 10_000
                 )
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
