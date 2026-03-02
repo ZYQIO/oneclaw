@@ -125,7 +125,7 @@ fun DataBackupScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Data & Backup") },
+                title = { Text("Backup & Sync") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

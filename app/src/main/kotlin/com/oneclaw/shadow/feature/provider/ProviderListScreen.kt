@@ -60,7 +60,7 @@ fun ProviderListScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Providers") },
+                title = { Text("Providers & Models") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

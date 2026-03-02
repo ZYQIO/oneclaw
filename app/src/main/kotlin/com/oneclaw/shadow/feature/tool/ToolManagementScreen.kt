@@ -78,7 +78,7 @@ fun ToolManagementScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Manage Tools") },
+                title = { Text("Tools") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -94,41 +94,8 @@ fun ToolManagementScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            // Built-in section with category grouping
-            if (uiState.builtInCategories.isNotEmpty()) {
-                item {
-                    SectionHeader("BUILT-IN")
-                }
-                uiState.builtInCategories.forEach { category ->
-                    item(key = "builtin_cat_${category.category}") {
-                        BuiltInCategoryHeader(
-                            category = category,
-                            onToggleExpand = {
-                                viewModel.toggleBuiltInCategoryExpanded(category.category)
-                            }
-                        )
-                    }
-                    if (category.isExpanded) {
-                        items(
-                            category.tools,
-                            key = { "builtin_tool_${it.name}" }
-                        ) { tool ->
-                            ToolListItem(
-                                tool = tool,
-                                onToggle = { viewModel.toggleToolEnabled(tool.name) },
-                                onClick = { viewModel.selectTool(tool.name) },
-                                isGroupChild = true
-                            )
-                        }
-                    }
-                }
-            }
-
             // Tool Groups section
             if (uiState.toolGroups.isNotEmpty()) {
-                item {
-                    SectionHeader("TOOL GROUPS")
-                }
                 uiState.toolGroups.forEach { group ->
                     item(key = "group_${group.groupName}") {
                         ToolGroupHeader(
@@ -178,8 +145,7 @@ fun ToolManagementScreen(
             }
 
             // Empty state
-            if (uiState.builtInTools.isEmpty() &&
-                uiState.toolGroups.isEmpty() &&
+            if (uiState.toolGroups.isEmpty() &&
                 uiState.standaloneTools.isEmpty()
             ) {
                 item {
@@ -283,38 +249,6 @@ private fun SourceBadge(sourceType: ToolSourceType) {
 }
 
 @Composable
-private fun BuiltInCategoryHeader(
-    category: BuiltInCategoryUiItem,
-    onToggleExpand: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggleExpand)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = if (category.isExpanded) Icons.Default.ExpandLess
-            else Icons.Default.ExpandMore,
-            contentDescription = if (category.isExpanded) "Collapse" else "Expand",
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = category.category,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = "${category.tools.size} tools",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
 private fun ToolGroupHeader(
     group: ToolGroupUiItem,
     onToggleGroup: () -> Unit,
@@ -335,7 +269,7 @@ private fun ToolGroupHeader(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = group.groupName,
+            text = group.displayName,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f)
         )

@@ -40,6 +40,7 @@ data class ToolUiItem(
 
 data class ToolGroupUiItem(
     val groupName: String,
+    val displayName: String,
     val tools: List<ToolUiItem>,
     val isGroupEnabled: Boolean,
     val isExpanded: Boolean = false
@@ -104,14 +105,16 @@ class ToolManagementViewModel(
                 def.toUiItem(source)
             }.sortedBy { it.name }
 
+            val groupDef = toolRegistry.getGroupDefinition(groupName)
             ToolGroupUiItem(
                 groupName = groupName,
+                displayName = groupDef?.displayName ?: groupName,
                 tools = groupTools,
                 isGroupEnabled = enabledStateStore.isGroupEnabled(groupName),
                 isExpanded = _uiState.value.toolGroups
                     .find { it.groupName == groupName }?.isExpanded ?: false
             )
-        }.sortedBy { it.groupName }
+        }.sortedBy { it.displayName }
 
         _uiState.update {
             it.copy(
