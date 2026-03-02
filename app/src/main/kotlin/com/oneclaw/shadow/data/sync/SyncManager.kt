@@ -69,7 +69,7 @@ class SyncManager(
             GsonFactory.getDefaultInstance(),
             credential
         )
-            .setApplicationName("OneClawShadow")
+            .setApplicationName("OneClaw")
             .build()
     }
 

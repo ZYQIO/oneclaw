@@ -21,7 +21,7 @@ import com.oneclaw.shadow.core.theme.ThemeManager
 import com.oneclaw.shadow.core.theme.ThemeMode
 import com.oneclaw.shadow.navigation.AppNavGraph
 import com.oneclaw.shadow.tool.engine.PermissionChecker
-import com.oneclaw.shadow.ui.theme.OneClawShadowTheme
+import com.oneclaw.shadow.ui.theme.OneClawTheme
 import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                     controller.isAppearanceLightNavigationBars = !darkTheme
                 }
             }
-            OneClawShadowTheme(darkTheme = darkTheme) {
+            OneClawTheme(darkTheme = darkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     AppNavGraph(

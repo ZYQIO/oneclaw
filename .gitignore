@@ -41,3 +41,8 @@ material-theme.zip
 *.swp
 *.log
 .claude/worktrees/
+
+**/secrets.xml
+.kotlin
+release.jks
+signing.properties

@@ -87,7 +87,7 @@ private val darkScheme = darkColorScheme(
 )
 
 @Composable
-fun OneClawShadowTheme(
+fun OneClawTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit

@@ -49,7 +49,7 @@ fun SetupScreen(
                 .padding(24.dp)
         ) {
             Text(
-                text = "Welcome to OneClawShadow",
+                text = "Welcome to OneClaw",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.primary
             )

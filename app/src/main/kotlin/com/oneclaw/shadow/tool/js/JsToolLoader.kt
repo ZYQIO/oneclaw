@@ -32,7 +32,7 @@ class JsToolLoader(
 ) {
     companion object {
         private const val TAG = "JsToolLoader"
-        private const val EXTERNAL_TOOLS_DIR = "OneClawShadow/tools"
+        private const val EXTERNAL_TOOLS_DIR = "OneClaw/tools"
         private const val ASSETS_TOOLS_DIR = "js/tools"
         private val TOOL_NAME_REGEX = Regex("^[a-z][a-z0-9_]*$")
         private val FUNCTION_NAME_REGEX = Regex("^[a-zA-Z_\$][a-zA-Z0-9_\$]*$")

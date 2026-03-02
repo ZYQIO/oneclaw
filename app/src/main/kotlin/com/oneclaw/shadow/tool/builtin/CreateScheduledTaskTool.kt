@@ -173,7 +173,7 @@ class CreateScheduledTaskTool(
                 val warning = if (!createResult.alarmRegistered) {
                     "\n\nWarning: Exact alarm permission is not granted. " +
                         "The task has been saved but will not trigger at the scheduled time. " +
-                        "Please ask the user to go to Settings > Apps > OneClawShadow > " +
+                        "Please ask the user to go to Settings > Apps > OneClaw > " +
                         "Alarms & reminders to enable the permission."
                 } else {
                     ""

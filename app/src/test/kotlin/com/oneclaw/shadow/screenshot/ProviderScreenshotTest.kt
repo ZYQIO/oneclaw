@@ -14,7 +14,7 @@ import com.oneclaw.shadow.feature.provider.ProviderListItem
 import com.oneclaw.shadow.feature.provider.ProviderListScreenContent
 import com.oneclaw.shadow.feature.provider.ProviderListUiState
 import com.oneclaw.shadow.feature.provider.SettingsScreen
-import com.oneclaw.shadow.ui.theme.OneClawShadowTheme
+import com.oneclaw.shadow.ui.theme.OneClawTheme
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -53,7 +53,7 @@ class ProviderScreenshotTest {
 
     private fun themed(content: @Composable () -> Unit) {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = false, dynamicColor = false) {
+            OneClawTheme(darkTheme = false, dynamicColor = false) {
                 content()
             }
         }
@@ -150,7 +150,7 @@ class ProviderScreenshotTest {
     @Test
     fun providerListScreen_darkTheme() {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = true, dynamicColor = false) {
+            OneClawTheme(darkTheme = true, dynamicColor = false) {
                 ProviderListScreenContent(
                     uiState = ProviderListUiState(
                         providers = listOf(

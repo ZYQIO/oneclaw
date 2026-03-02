@@ -10,7 +10,7 @@ import com.oneclaw.shadow.feature.session.SessionDrawerContentInternal
 import com.oneclaw.shadow.feature.session.SessionListItem
 import com.oneclaw.shadow.feature.session.SessionListUiState
 import com.oneclaw.shadow.feature.session.UndoState
-import com.oneclaw.shadow.ui.theme.OneClawShadowTheme
+import com.oneclaw.shadow.ui.theme.OneClawTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,7 +58,7 @@ class SessionDrawerScreenshotTest {
 
     private fun themed(content: @Composable () -> Unit) {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = false, dynamicColor = false) {
+            OneClawTheme(darkTheme = false, dynamicColor = false) {
                 content()
             }
         }
@@ -194,7 +194,7 @@ class SessionDrawerScreenshotTest {
     @Test
     fun sessionDrawer_darkTheme() {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = true, dynamicColor = false) {
+            OneClawTheme(darkTheme = true, dynamicColor = false) {
                 SessionDrawerContentInternal(
                     uiState = SessionListUiState(sessions = sampleSessions, isLoading = false),
                     onNewConversation = {},

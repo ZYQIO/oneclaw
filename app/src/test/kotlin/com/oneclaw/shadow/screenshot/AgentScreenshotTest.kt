@@ -17,7 +17,7 @@ import com.oneclaw.shadow.feature.chat.ChatMessageItem
 import com.oneclaw.shadow.feature.chat.ChatTopBar
 import com.oneclaw.shadow.feature.chat.EmptyChatState
 import com.oneclaw.shadow.feature.chat.MessageList
-import com.oneclaw.shadow.ui.theme.OneClawShadowTheme
+import com.oneclaw.shadow.ui.theme.OneClawTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,7 +35,7 @@ class AgentScreenshotTest {
 
     private fun themed(content: @Composable () -> Unit) {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = false, dynamicColor = false) {
+            OneClawTheme(darkTheme = false, dynamicColor = false) {
                 content()
             }
         }
@@ -116,7 +116,7 @@ class AgentScreenshotTest {
     @Test
     fun agentList_darkTheme() {
         composeRule.setContent {
-            OneClawShadowTheme(darkTheme = true, dynamicColor = false) {
+            OneClawTheme(darkTheme = true, dynamicColor = false) {
                 AgentListScreenContent(
                     uiState = AgentListUiState(
                         agents = listOf(
