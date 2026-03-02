@@ -11,25 +11,13 @@ class ApiKeyStorage(context: Context) {
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val prefs: SharedPreferences = try {
-        EncryptedSharedPreferences.create(
-            context,
-            "oneclaw_api_keys",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (e: Exception) {
-        // Keystore key may be invalidated after reinstall; wipe the stale file and recreate
-        context.deleteSharedPreferences("oneclaw_api_keys")
-        EncryptedSharedPreferences.create(
-            context,
-            "oneclaw_api_keys",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    }
+    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
+        context,
+        "oneclaw_api_keys",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
     // In DEBUG builds, a plain SharedPreferences file is used as a fallback so that
     // instrumented tests can inject API keys without requiring EncryptedSharedPreferences
