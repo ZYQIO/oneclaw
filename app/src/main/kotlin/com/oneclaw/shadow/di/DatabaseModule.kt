@@ -12,6 +12,7 @@ val databaseModule = module {
             AppDatabase::class.java,
             "oneclaw.db"
         )
+            .fallbackToDestructiveMigration()
             .addCallback(AppDatabase.createSeedCallback())
             .build()
     }
