@@ -26,6 +26,7 @@ class AlarmScheduler(
     fun scheduleTask(task: ScheduledTask): Boolean {
         val triggerAt = task.nextTriggerAt ?: return false
         if (!exactAlarmHelper.canScheduleExactAlarms()) {
+            ExactAlarmEventBus.emitPermissionNeeded()
             return false
         }
         val pendingIntent = createPendingIntent(task.id)

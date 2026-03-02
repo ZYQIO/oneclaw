@@ -126,7 +126,11 @@ import com.oneclaw.shadow.feature.session.SessionListViewModel
 import com.oneclaw.shadow.feature.skill.ui.SkillSelectionBottomSheet
 import com.oneclaw.shadow.feature.skill.ui.SlashCommandPopup
 import com.oneclaw.shadow.bridge.BridgeStateTracker
+import com.oneclaw.shadow.feature.schedule.ExactAlarmPermissionDialog
+import com.oneclaw.shadow.feature.schedule.alarm.ExactAlarmEventBus
+import com.oneclaw.shadow.feature.schedule.alarm.ExactAlarmHelper
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -204,6 +208,14 @@ fun ChatScreen(
     LaunchedEffect(Unit) {
         BridgeStateTracker.newSessionFromBridge.collect { sessionId ->
             viewModel.initialize(sessionId)
+        }
+    }
+
+    // Show exact alarm permission dialog when AI tool path triggers it
+    var showExactAlarmDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        ExactAlarmEventBus.permissionNeeded.collect {
+            showExactAlarmDialog = true
         }
     }
 
@@ -411,6 +423,17 @@ fun ChatScreen(
         ImageViewerDialog(
             imagePath = imagePath,
             onDismiss = { viewModel.closeImageViewer() }
+        )
+    }
+
+    if (showExactAlarmDialog) {
+        val exactAlarmHelper: ExactAlarmHelper = koinInject()
+        ExactAlarmPermissionDialog(
+            onGoToSettings = {
+                showExactAlarmDialog = false
+                context.startActivity(exactAlarmHelper.buildSettingsIntent())
+            },
+            onDismiss = { showExactAlarmDialog = false }
         )
     }
 }
