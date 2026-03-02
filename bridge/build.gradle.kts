@@ -32,6 +32,7 @@ android {
         }
         unitTests {
             isIncludeAndroidResources = true
+            isReturnDefaultValues = true
         }
     }
 }
