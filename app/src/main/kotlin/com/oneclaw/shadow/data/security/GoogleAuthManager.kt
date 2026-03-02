@@ -136,9 +136,11 @@ class GoogleAuthManager(
         try {
             val consentUrl = buildConsentUrl(clientId, redirectUri)
 
-            // Launch browser on Main dispatcher without FLAG_ACTIVITY_NEW_TASK
+            // Launch browser -- FLAG_ACTIVITY_NEW_TASK required when starting
+            // from Application context (not an Activity)
             withContext(Dispatchers.Main) {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(consentUrl))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
             }
 
@@ -158,25 +160,18 @@ class GoogleAuthManager(
 
                 // Retry token exchange -- the first attempt may fail because
                 // the app is still backgrounded and Android restricts network.
+                // Only retry the exchange itself; once tokens are obtained, save
+                // them immediately so they are not lost if userinfo fetch fails.
                 var lastError: Exception? = null
+                var tokens: TokenResponse? = null
                 repeat(3) { attempt ->
                     if (attempt > 0) {
                         Log.d(TAG, "Token exchange retry $attempt after: ${lastError?.message}")
                         delay(3000)
                     }
                     try {
-                        val tokens = exchangeCodeForTokens(authCode, clientId, clientSecret, redirectUri)
-                        val email = fetchUserEmail(tokens.accessToken)
-
-                        prefs.edit()
-                            .putString(KEY_REFRESH_TOKEN, tokens.refreshToken)
-                            .putString(KEY_ACCESS_TOKEN, tokens.accessToken)
-                            .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + tokens.expiresInMs)
-                            .putString(KEY_EMAIL, email)
-                            .apply()
-
-                        Log.i(TAG, "Authorization successful for $email")
-                        return@withContext AppResult.Success(email)
+                        tokens = exchangeCodeForTokens(authCode, clientId, clientSecret, redirectUri)
+                        return@repeat // success, stop retrying
                     } catch (e: UnknownHostException) {
                         lastError = e
                         Log.e(TAG, "Token exchange failed (DNS): ${e.message}")
@@ -189,12 +184,36 @@ class GoogleAuthManager(
                     }
                 }
 
-                val errorMsg = when (lastError) {
-                    is UnknownHostException -> "Network unavailable. Check your internet connection and try again."
-                    is SocketTimeoutException -> "Connection timed out. Check your internet connection and try again."
-                    else -> lastError?.message ?: "Authorization failed"
+                val exchangedTokens = tokens
+                    ?: return@withContext AppResult.Error(
+                        exception = lastError ?: Exception("Authorization failed"),
+                        message = when (lastError) {
+                            is UnknownHostException -> "Network unavailable. Check your internet connection and try again."
+                            is SocketTimeoutException -> "Connection timed out. Check your internet connection and try again."
+                            else -> lastError?.message ?: "Authorization failed"
+                        }
+                    )
+
+                // Save tokens immediately (before userinfo fetch)
+                prefs.edit()
+                    .putString(KEY_REFRESH_TOKEN, exchangedTokens.refreshToken)
+                    .putString(KEY_ACCESS_TOKEN, exchangedTokens.accessToken)
+                    .putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + exchangedTokens.expiresInMs)
+                    .apply()
+
+                // Fetch email (best-effort, not required for auth to succeed)
+                val email = try {
+                    fetchUserEmail(exchangedTokens.accessToken)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not fetch user email (non-fatal)", e)
+                    null
                 }
-                AppResult.Error(exception = lastError ?: Exception(errorMsg), message = errorMsg)
+                if (email != null) {
+                    prefs.edit().putString(KEY_EMAIL, email).apply()
+                }
+
+                Log.i(TAG, "Authorization successful for ${email ?: "(email unknown)"}")
+                AppResult.Success(email ?: "Authorized")
             }
         } finally {
             withContext(Dispatchers.IO + NonCancellable) { serverSocket.close() }
@@ -262,14 +281,15 @@ class GoogleAuthManager(
     // --- Private helpers ---
 
     internal fun buildConsentUrl(clientId: String, redirectUri: String): String {
-        val scopeString = SCOPES.joinToString(" ")
-        return "$AUTH_URL?" +
-            "client_id=${Uri.encode(clientId)}" +
-            "&redirect_uri=${Uri.encode(redirectUri)}" +
-            "&response_type=code" +
-            "&scope=${Uri.encode(scopeString)}" +
-            "&access_type=offline" +
-            "&prompt=consent"
+        return Uri.parse(AUTH_URL).buildUpon()
+            .appendQueryParameter("client_id", clientId)
+            .appendQueryParameter("redirect_uri", redirectUri)
+            .appendQueryParameter("response_type", "code")
+            .appendQueryParameter("scope", SCOPES.joinToString(" "))
+            .appendQueryParameter("access_type", "offline")
+            .appendQueryParameter("prompt", "consent")
+            .build()
+            .toString()
     }
 
     internal fun waitForAuthCode(serverSocket: ServerSocket): String? {
@@ -312,6 +332,7 @@ class GoogleAuthManager(
             .map { it.split("=", limit = 2) }
             .find { it[0] == "code" }
             ?.getOrNull(1)
+            ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
     }
 
     private suspend fun exchangeCodeForTokens(
@@ -382,7 +403,7 @@ class GoogleAuthManager(
         }
     }
 
-    private suspend fun fetchUserEmail(accessToken: String): String {
+    private suspend fun fetchUserEmail(accessToken: String): String? {
         return withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url(USERINFO_URL)
@@ -390,12 +411,10 @@ class GoogleAuthManager(
                 .build()
 
             val response = okHttpClient.newCall(request).execute()
-            val responseBody = response.body?.string()
-                ?: throw IOException("Empty userinfo response")
+            val responseBody = response.body?.string() ?: return@withContext null
 
             val jsonObj = json.parseToJsonElement(responseBody).jsonObject
             jsonObj["email"]?.jsonPrimitive?.content
-                ?: throw IOException("No email in userinfo response")
         }
     }
 
