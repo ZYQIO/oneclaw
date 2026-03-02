@@ -84,13 +84,7 @@ fun AgentDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        when {
-                            uiState.isNewAgent -> "Create Agent"
-                            uiState.isBuiltIn -> uiState.name
-                            else -> "Edit Agent"
-                        }
-                    )
+                    Text(if (uiState.isNewAgent) "Create Agent" else "Edit Agent")
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -98,13 +92,11 @@ fun AgentDetailScreen(
                     }
                 },
                 actions = {
-                    if (!uiState.isBuiltIn || uiState.hasRuntimeChanges) {
-                        TextButton(
-                            onClick = { viewModel.saveAgent() },
-                            enabled = uiState.hasUnsavedChanges && !uiState.isSaving
-                        ) {
-                            Text("Save")
-                        }
+                    TextButton(
+                        onClick = { viewModel.saveAgent() },
+                        enabled = uiState.hasUnsavedChanges && !uiState.isSaving
+                    ) {
+                        Text("Save")
                     }
                 }
             )
@@ -142,7 +134,6 @@ fun AgentDetailScreen(
                             value = uiState.name,
                             onValueChange = { viewModel.updateName(it) },
                             label = { Text("Name") },
-                            readOnly = uiState.isBuiltIn,
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -151,7 +142,6 @@ fun AgentDetailScreen(
                             value = uiState.description,
                             onValueChange = { viewModel.updateDescription(it) },
                             label = { Text("Description (optional)") },
-                            readOnly = uiState.isBuiltIn,
                             maxLines = 3,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -160,7 +150,6 @@ fun AgentDetailScreen(
                             value = uiState.systemPrompt,
                             onValueChange = { viewModel.updateSystemPrompt(it) },
                             label = { Text("System Prompt *") },
-                            readOnly = uiState.isBuiltIn,
                             minLines = 5,
                             maxLines = 15,
                             modifier = Modifier.fillMaxWidth()
@@ -182,7 +171,7 @@ fun AgentDetailScreen(
                         availableModels = uiState.availableModels,
                         onSelect = { providerId, modelId -> viewModel.setPreferredModel(providerId, modelId) },
                         onClear = { viewModel.clearPreferredModel() },
-                        enabled = !uiState.isBuiltIn,
+                        enabled = true,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -303,6 +292,14 @@ fun AgentDetailScreen(
                                 Text("Clone Agent")
                             }
                         }
+                        if (uiState.isBuiltIn && !uiState.isNewAgent) {
+                            TextButton(
+                                onClick = { viewModel.showResetConfirmation() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Reset to Defaults")
+                            }
+                        }
                         if (!uiState.isBuiltIn && !uiState.isNewAgent) {
                             TextButton(
                                 onClick = { viewModel.showDeleteConfirmation() },
@@ -331,6 +328,26 @@ fun AgentDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissDeleteConfirmation() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (uiState.showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissResetConfirmation() },
+            title = { Text("Reset Agent") },
+            text = {
+                Text("This will restore all settings to their defaults. Your changes will be lost.")
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.resetAgent() }) {
+                    Text("Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissResetConfirmation() }) {
                     Text("Cancel")
                 }
             }

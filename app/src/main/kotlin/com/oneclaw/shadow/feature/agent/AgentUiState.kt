@@ -51,6 +51,7 @@ data class AgentDetailUiState(
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val showDeleteDialog: Boolean = false,
+    val showResetDialog: Boolean = false,
     val navigateBack: Boolean = false
 ) {
     val hasRuntimeChanges: Boolean

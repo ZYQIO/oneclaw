@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oneclaw.shadow.core.model.Agent
+import com.oneclaw.shadow.core.model.AgentConstants
 import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.core.repository.ProviderRepository
 import com.oneclaw.shadow.core.util.AppResult
@@ -163,11 +164,11 @@ class AgentDetailViewModel(
                 val orig = originalAgent ?: return@launch
                 val updated = Agent(
                     id = state.agentId!!,
-                    name = if (state.isBuiltIn) orig.name else state.name.trim(),
-                    description = if (state.isBuiltIn) orig.description else state.description.trim().ifBlank { null },
-                    systemPrompt = if (state.isBuiltIn) orig.systemPrompt else state.systemPrompt.trim(),
-                    preferredProviderId = if (state.isBuiltIn) orig.preferredProviderId else state.preferredProviderId,
-                    preferredModelId = if (state.isBuiltIn) orig.preferredModelId else state.preferredModelId,
+                    name = state.name.trim(),
+                    description = state.description.trim().ifBlank { null },
+                    systemPrompt = state.systemPrompt.trim(),
+                    preferredProviderId = state.preferredProviderId,
+                    preferredModelId = state.preferredModelId,
                     temperature = state.temperature,
                     maxIterations = state.maxIterations,
                     isBuiltIn = orig.isBuiltIn,
@@ -260,6 +261,57 @@ class AgentDetailViewModel(
                             errorMessage = result.message
                         )
                     }
+                }
+            }
+        }
+    }
+
+    fun showResetConfirmation() { _uiState.update { it.copy(showResetDialog = true) } }
+    fun dismissResetConfirmation() { _uiState.update { it.copy(showResetDialog = false) } }
+
+    fun resetAgent() {
+        val orig = originalAgent ?: return
+        val reset = orig.copy(
+            name = AgentConstants.GENERAL_ASSISTANT_NAME,
+            description = AgentConstants.GENERAL_ASSISTANT_DESCRIPTION,
+            systemPrompt = AgentConstants.GENERAL_ASSISTANT_SYSTEM_PROMPT,
+            preferredProviderId = null,
+            preferredModelId = null,
+            temperature = AgentConstants.GENERAL_ASSISTANT_DEFAULT_TEMPERATURE,
+            maxIterations = AgentConstants.GENERAL_ASSISTANT_DEFAULT_MAX_ITERATIONS,
+            webSearchEnabled = AgentConstants.GENERAL_ASSISTANT_DEFAULT_WEB_SEARCH
+        )
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
+            when (val result = agentRepository.updateAgent(reset)) {
+                is AppResult.Success -> {
+                    originalAgent = reset
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            showResetDialog = false,
+                            name = reset.name,
+                            description = reset.description ?: "",
+                            systemPrompt = reset.systemPrompt,
+                            preferredProviderId = reset.preferredProviderId,
+                            preferredModelId = reset.preferredModelId,
+                            webSearchEnabled = reset.webSearchEnabled,
+                            temperature = reset.temperature,
+                            maxIterations = reset.maxIterations,
+                            savedName = reset.name,
+                            savedDescription = reset.description ?: "",
+                            savedSystemPrompt = reset.systemPrompt,
+                            savedPreferredProviderId = reset.preferredProviderId,
+                            savedPreferredModelId = reset.preferredModelId,
+                            savedWebSearchEnabled = reset.webSearchEnabled,
+                            savedTemperature = reset.temperature,
+                            savedMaxIterations = reset.maxIterations,
+                            successMessage = "Agent reset to defaults."
+                        )
+                    }
+                }
+                is AppResult.Error -> _uiState.update {
+                    it.copy(isSaving = false, showResetDialog = false, errorMessage = result.message)
                 }
             }
         }

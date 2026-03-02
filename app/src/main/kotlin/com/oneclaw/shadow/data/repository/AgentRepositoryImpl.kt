@@ -39,12 +39,6 @@ class AgentRepositoryImpl(
                 message = "Agent not found.",
                 code = ErrorCode.VALIDATION_ERROR
             )
-        if (existing.isBuiltIn) {
-            return AppResult.Error(
-                message = "Built-in agents cannot be edited.",
-                code = ErrorCode.VALIDATION_ERROR
-            )
-        }
         val updated = agent.copy(updatedAt = System.currentTimeMillis())
         agentDao.update(updated.toEntity())
         return AppResult.Success(Unit)

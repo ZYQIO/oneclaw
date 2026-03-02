@@ -42,7 +42,7 @@ import java.util.concurrent.Executors
         TaskExecutionRecordEntity::class,
         AttachmentEntity::class
     ],
-    version = 12,
+    version = 1,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -92,9 +92,10 @@ abstract class AppDatabase : RoomDatabase() {
 
                     // Seed built-in General Assistant agent
                     val systemPrompt = AgentConstants.GENERAL_ASSISTANT_SYSTEM_PROMPT.replace("'", "''")
+                    val description = AgentConstants.GENERAL_ASSISTANT_DESCRIPTION.replace("'", "''")
                     db.execSQL(
-                        """INSERT INTO agents (id, name, description, system_prompt, tool_ids, preferred_provider_id, preferred_model_id, temperature, max_iterations, is_built_in, created_at, updated_at)
-                           VALUES ('${AgentConstants.GENERAL_ASSISTANT_ID}', '${AgentConstants.GENERAL_ASSISTANT_NAME}', 'A general-purpose AI assistant with access to all tools.', '$systemPrompt', '[]', NULL, NULL, NULL, 100, 1, $now, $now)"""
+                        """INSERT INTO agents (id, name, description, system_prompt, tool_ids, preferred_provider_id, preferred_model_id, temperature, max_iterations, is_built_in, web_search_enabled, created_at, updated_at)
+                           VALUES ('${AgentConstants.GENERAL_ASSISTANT_ID}', '${AgentConstants.GENERAL_ASSISTANT_NAME}', '$description', '$systemPrompt', '[]', NULL, NULL, ${AgentConstants.GENERAL_ASSISTANT_DEFAULT_TEMPERATURE}, ${AgentConstants.GENERAL_ASSISTANT_DEFAULT_MAX_ITERATIONS}, 1, 1, $now, $now)"""
                     )
                 }
             }
