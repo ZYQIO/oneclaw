@@ -6,19 +6,15 @@ import java.io.File
 
 /**
  * Injects file system functions into the QuickJS context.
- * Applies the same path restrictions as ReadFileTool / WriteFileTool.
+ * All paths are confined to [allowedRoot] (typically context.filesDir).
  */
-object FsBridge {
+class FsBridge(private val allowedRoot: File) {
 
-    private const val MAX_FILE_SIZE = 1024 * 1024  // 1MB, same as ReadFileTool
+    private val canonicalRoot: String = allowedRoot.canonicalPath
 
-    private val RESTRICTED_PATHS = listOf(
-        "/data/data/",
-        "/data/user/",
-        "/system/",
-        "/proc/",
-        "/sys/"
-    )
+    companion object {
+        private const val MAX_FILE_SIZE = 1024 * 1024  // 1MB, same as ReadFileTool
+    }
 
     fun inject(quickJs: QuickJs) {
         quickJs.define("fs") {
@@ -56,17 +52,20 @@ object FsBridge {
         }
     }
 
-    private fun validatePath(path: String): String {
-        val canonicalPath = File(path).canonicalPath
-        for (restricted in RESTRICTED_PATHS) {
-            if (canonicalPath.startsWith(restricted)) {
-                throw SecurityException("Access denied: path is restricted ($restricted)")
-            }
+    internal fun validatePath(path: String): String {
+        val resolved = if (File(path).isAbsolute) {
+            File(path)
+        } else {
+            File(allowedRoot, path)
+        }
+        val canonicalPath = resolved.canonicalPath
+        if (!canonicalPath.startsWith(canonicalRoot + File.separator) && canonicalPath != canonicalRoot) {
+            throw SecurityException("Access denied: path is outside app storage")
         }
         return canonicalPath
     }
 
-    private fun readFile(path: String): String {
+    internal fun readFile(path: String): String {
         val canonical = validatePath(path)
         val file = File(canonical)
 
@@ -81,26 +80,26 @@ object FsBridge {
         return file.readText(Charsets.UTF_8)
     }
 
-    private fun writeFile(path: String, content: String) {
+    internal fun writeFile(path: String, content: String) {
         val canonical = validatePath(path)
         val file = File(canonical)
         file.parentFile?.mkdirs()
         file.writeText(content, Charsets.UTF_8)
     }
 
-    private fun appendFile(path: String, content: String) {
+    internal fun appendFile(path: String, content: String) {
         val canonical = validatePath(path)
         val file = File(canonical)
         file.parentFile?.mkdirs()
         file.appendText(content, Charsets.UTF_8)
     }
 
-    private fun fileExists(path: String): Boolean {
+    internal fun fileExists(path: String): Boolean {
         return try {
             val canonical = validatePath(path)
             File(canonical).exists()
         } catch (e: SecurityException) {
-            false  // restricted paths report as non-existent
+            false  // paths outside allowed root report as non-existent
         }
     }
 }

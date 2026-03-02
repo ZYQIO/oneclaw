@@ -65,7 +65,7 @@ class PdfInfoToolTest {
         assertEquals("pdf_info", def.name)
         assertTrue(def.parametersSchema.required.contains("path"))
         assertTrue(def.parametersSchema.properties.containsKey("path"))
-        assertTrue(def.requiredPermissions.contains("android.permission.READ_EXTERNAL_STORAGE"))
+        assertTrue(def.requiredPermissions.isEmpty())
         assertEquals(15, def.timeoutSeconds)
     }
 

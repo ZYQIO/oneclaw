@@ -754,12 +754,12 @@ function execute(params) {
 ```json
 {
   "name": "read_file",
-  "description": "Read the contents of a file from local storage",
+  "description": "Read the contents of a file from app-private storage",
   "parameters": {
     "properties": {
       "path": {
         "type": "string",
-        "description": "The absolute file path to read (e.g., '/storage/emulated/0/Documents/notes.txt')"
+        "description": "The file path to read (confined to app-private storage)"
       },
       "encoding": {
         "type": "string",
@@ -769,7 +769,7 @@ function execute(params) {
     },
     "required": ["path"]
   },
-  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "requiredPermissions": [],
   "timeoutSeconds": 10
 }
 ```
@@ -789,12 +789,12 @@ function execute(params) {
 ```json
 {
   "name": "write_file",
-  "description": "Write contents to a file on local storage",
+  "description": "Write contents to a file in app-private storage",
   "parameters": {
     "properties": {
       "path": {
         "type": "string",
-        "description": "The absolute file path to write (e.g., '/storage/emulated/0/Documents/output.txt')"
+        "description": "The file path to write (confined to app-private storage)"
       },
       "content": {
         "type": "string",
@@ -809,7 +809,7 @@ function execute(params) {
     },
     "required": ["path", "content"]
   },
-  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "requiredPermissions": [],
   "timeoutSeconds": 10
 }
 ```

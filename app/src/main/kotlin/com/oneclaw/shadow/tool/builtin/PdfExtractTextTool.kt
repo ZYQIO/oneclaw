@@ -50,7 +50,7 @@ class PdfExtractTextTool(
             ),
             required = listOf("path")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 30
     )
 

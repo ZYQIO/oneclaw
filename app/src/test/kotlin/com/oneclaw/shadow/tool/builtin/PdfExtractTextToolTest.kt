@@ -69,7 +69,7 @@ class PdfExtractTextToolTest {
         assertTrue(def.parametersSchema.properties.containsKey("path"))
         assertTrue(def.parametersSchema.properties.containsKey("pages"))
         assertTrue(def.parametersSchema.properties.containsKey("max_chars"))
-        assertTrue(def.requiredPermissions.contains("android.permission.READ_EXTERNAL_STORAGE"))
+        assertTrue(def.requiredPermissions.isEmpty())
         assertEquals(30, def.timeoutSeconds)
     }
 

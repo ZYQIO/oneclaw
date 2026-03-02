@@ -63,15 +63,6 @@ class ToolExecutionEngine(
         // 5. Check Android permissions
         val missing = permissionChecker.getMissingPermissions(tool.definition.requiredPermissions)
         if (missing.isNotEmpty()) {
-            // Special handling for MANAGE_EXTERNAL_STORAGE
-            if (android.Manifest.permission.MANAGE_EXTERNAL_STORAGE in missing) {
-                permissionChecker.requestManageExternalStorage()
-                return ToolResult.error(
-                    "permission_denied",
-                    "File access requires 'All files access' permission. " +
-                        "Please enable it in Settings > Apps > OneClawShadow > Permissions."
-                )
-            }
             val granted = permissionChecker.requestPermissions(missing)
             if (!granted) {
                 return ToolResult.error(

@@ -491,8 +491,8 @@ class CreateJsToolTool(
                 "required_permissions" to ToolParameter(
                     type = "string",
                     description = "Comma-separated Android permission names the tool needs. " +
-                        "Common: 'android.permission.MANAGE_EXTERNAL_STORAGE' for file access. " +
-                        "Omit if no special permissions needed."
+                        "Example: 'android.permission.ACCESS_FINE_LOCATION' for location access. " +
+                        "Omit if no special permissions needed (most tools need none)."
                 ),
                 "timeout_seconds" to ToolParameter(
                     type = "integer",
@@ -1208,7 +1208,7 @@ Storage per tool: ~1-10KB for manifest + source (negligible).
 
 **Approach**: Only add a `/create-tool` skill that instructs the AI to use existing `write_file` tool to write .json and .js files, then reload tools.
 
-**Rejected because**: The `write_file` tool writes to external storage requiring MANAGE_EXTERNAL_STORAGE permission. There's no tool to reload the registry after writing files. The AI would need complex multi-step file operations prone to errors. A dedicated tool provides atomic create-and-register operations with validation.
+**Rejected because**: The `write_file` tool writes to app-private storage via FsBridge. There's no tool to reload the registry after writing files. The AI would need complex multi-step file operations prone to errors. A dedicated tool provides atomic create-and-register operations with validation.
 
 ### 2. Single `manage_js_tool` with action parameter
 

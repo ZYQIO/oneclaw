@@ -491,7 +491,8 @@ class CreateJsToolTool(
                 "required_permissions" to ToolParameter(
                     type = "string",
                     description = "Comma-separated Android permission names the tool needs. " +
-                        "Common: 'android.permission.MANAGE_EXTERNAL_STORAGE' for file access. " +
+                        "Example: 'android.permission.ACCESS_FINE_LOCATION' for location access. " +
+                        "File access uses app-private storage and needs no permissions. " +
                         "Omit if no special permissions needed."
                 ),
                 "timeout_seconds" to ToolParameter(
@@ -1207,7 +1208,7 @@ Parameters:
 
 **方案**：仅添加 `/create-tool` 技能，指示 AI 使用现有的 `write_file` 工具写入 .json 和 .js 文件，然后重新加载工具。
 
-**被拒绝原因**：`write_file` 工具写入外部存储，需要 MANAGE_EXTERNAL_STORAGE 权限。写入文件后没有工具可以重新加载注册表。AI 需要执行容易出错的复杂多步文件操作。专用工具提供带验证的原子性创建并注册操作。
+**被拒绝原因**：`write_file` 工具写入应用私有存储。写入文件后没有工具可以重新加载注册表。AI 需要执行容易出错的复杂多步文件操作。专用工具提供带验证的原子性创建并注册操作。
 
 ### 2. 单个带 action 参数的 `manage_js_tool`
 

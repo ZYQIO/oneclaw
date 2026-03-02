@@ -1,11 +1,11 @@
 {
   "name": "read_file",
-  "description": "Read the contents of a file from local storage",
+  "description": "Read the contents of a file from app-private storage",
   "parameters": {
     "properties": {
       "path": {
         "type": "string",
-        "description": "The absolute file path to read (e.g., '/storage/emulated/0/Documents/notes.txt')"
+        "description": "File path relative to app storage (e.g., 'documents/notes.txt') or an absolute path within app storage"
       },
       "encoding": {
         "type": "string",
@@ -15,6 +15,6 @@
     },
     "required": ["path"]
   },
-  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "requiredPermissions": [],
   "timeoutSeconds": 10
 }

@@ -225,7 +225,7 @@ class PdfInfoTool(
             ),
             required = listOf("path")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 15
     )
 
@@ -326,7 +326,7 @@ class PdfExtractTextTool(
             ),
             required = listOf("path")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 30
     )
 
@@ -440,7 +440,7 @@ class PdfRenderPageTool(
             ),
             required = listOf("path", "page")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 30
     )
 
@@ -677,7 +677,7 @@ Returns on error:
 
 ## 安全考量
 
-1. **文件访问**：工具接受绝对文件路径。Android 的权限系统（READ_EXTERNAL_STORAGE）控制应用可访问哪些文件。`ToolExecutionEngine` 通过 `requiredPermissions` 字段在工具执行前请求此权限。
+1. **文件访问**：工具接受文件路径。文件从应用私有存储（context.filesDir）中访问，无需外部存储权限。路径通过 FsBridge 允许列表验证，确保只能访问应用存储范围内的文件。
 
 2. **资源管理**：`PDDocument`、`PdfRenderer`、`ParcelFileDescriptor` 和 `Bitmap` 对象均在 try-finally 块中被正确关闭或回收，以防止资源泄漏。
 

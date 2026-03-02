@@ -225,7 +225,7 @@ class PdfInfoTool(
             ),
             required = listOf("path")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 15
     )
 
@@ -326,7 +326,7 @@ class PdfExtractTextTool(
             ),
             required = listOf("path")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 30
     )
 
@@ -440,7 +440,7 @@ class PdfRenderPageTool(
             ),
             required = listOf("path", "page")
         ),
-        requiredPermissions = listOf("android.permission.READ_EXTERNAL_STORAGE"),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 30
     )
 
@@ -677,7 +677,7 @@ All errors follow the existing `ToolResult.error(errorType, errorMessage)` patte
 
 ## Security Considerations
 
-1. **File access**: Tools accept absolute file paths. Android's permission system (READ_EXTERNAL_STORAGE) controls which files the app can access. The `ToolExecutionEngine` requests this permission before tool execution via the `requiredPermissions` field.
+1. **File access**: Tools accept file paths within app-private storage. No external storage permissions are required -- file access is confined to app-private storage (context.filesDir) via FsBridge allowlist validation.
 
 2. **Resource management**: PDDocument, PdfRenderer, ParcelFileDescriptor, and Bitmap objects are properly closed/recycled in try-finally blocks to prevent resource leaks.
 

@@ -30,7 +30,8 @@ import java.io.File
 class JsExecutionEngine(
     private val okHttpClient: OkHttpClient,
     private val libraryBridge: LibraryBridge,
-    private val googleAuthManager: GoogleAuthManager? = null
+    private val googleAuthManager: GoogleAuthManager? = null,
+    private val filesDir: File? = null
 ) {
     companion object {
         private const val TAG = "JsExecutionEngine"
@@ -118,7 +119,9 @@ class JsExecutionEngine(
             ConsoleBridge.inject(this, toolName)
 
             // Inject bridge: fs
-            FsBridge.inject(this)
+            if (filesDir != null) {
+                FsBridge(filesDir).inject(this)
+            }
 
             // Inject bridge: fetch
             FetchBridge.inject(this, okHttpClient)

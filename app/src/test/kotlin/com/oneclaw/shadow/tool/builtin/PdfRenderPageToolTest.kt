@@ -55,7 +55,7 @@ class PdfRenderPageToolTest {
         assertTrue(def.parametersSchema.properties.containsKey("path"))
         assertTrue(def.parametersSchema.properties.containsKey("page"))
         assertTrue(def.parametersSchema.properties.containsKey("dpi"))
-        assertTrue(def.requiredPermissions.contains("android.permission.READ_EXTERNAL_STORAGE"))
+        assertTrue(def.requiredPermissions.isEmpty())
         assertEquals(30, def.timeoutSeconds)
     }
 

@@ -58,7 +58,7 @@ class CreateJsToolTool(
                 "required_permissions" to ToolParameter(
                     type = "string",
                     description = "Comma-separated Android permission names the tool needs. " +
-                        "Common: 'android.permission.MANAGE_EXTERNAL_STORAGE' for file access. " +
+                        "File access within app storage needs no permission. " +
                         "Omit if no special permissions needed."
                 ),
                 "timeout_seconds" to ToolParameter(

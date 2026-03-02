@@ -116,7 +116,7 @@ data class ToolDefinition(
     val name: String,                          // Unique tool name, snake_case (e.g., "read_file")
     val description: String,                   // Human-readable description (one sentence)
     val parametersSchema: ToolParametersSchema, // Structured parameter schema
-    val requiredPermissions: List<String>,      // Android permissions needed (e.g., "android.permission.READ_EXTERNAL_STORAGE")
+    val requiredPermissions: List<String>,      // Android permissions needed (empty for most tools)
     val timeoutSeconds: Int                    // Max execution time
 )
 ```
@@ -674,8 +674,10 @@ class GetCurrentTimeTool : Tool {
 /**
  * Located in: tool/builtin/ReadFileTool.kt
  *
- * Uses direct file path access. Requires MANAGE_EXTERNAL_STORAGE permission
- * on Android 11+ for accessing files outside app-specific directories.
+ * File access is confined to app-private storage (context.filesDir).
+ * Paths are validated by FsBridge using an allowlist approach --
+ * only paths under the app's private storage directory are permitted.
+ * No external storage permissions are required.
  */
 class ReadFileTool : Tool {
 
@@ -690,7 +692,7 @@ class ReadFileTool : Tool {
             properties = mapOf(
                 "path" to ToolParameter(
                     type = "string",
-                    description = "The absolute file path to read (e.g., '/storage/emulated/0/Documents/notes.txt')"
+                    description = "The file path to read (confined to app-private storage)"
                 ),
                 "encoding" to ToolParameter(
                     type = "string",
@@ -700,7 +702,7 @@ class ReadFileTool : Tool {
             ),
             required = listOf("path")
         ),
-        requiredPermissions = buildFileReadPermissions(),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 10
     )
 
@@ -709,12 +711,12 @@ class ReadFileTool : Tool {
             ?: return ToolResult.error("validation_error", "Parameter 'path' is required")
         val encoding = parameters["encoding"] as? String ?: "UTF-8"
 
-        // Security: prevent access to app-internal files
+        // FsBridge validates the path against the allowlist (app-private storage only)
         val normalizedPath = File(path).canonicalPath
-        if (isRestrictedPath(normalizedPath)) {
+        if (!isAllowedPath(normalizedPath)) {
             return ToolResult.error(
-                "permission_denied",
-                "Access denied: cannot read app-internal or system files"
+                "path_not_allowed",
+                "Access denied: path is outside app-private storage"
             )
         }
 
@@ -750,66 +752,19 @@ class ReadFileTool : Tool {
             ToolResult.error("execution_error", "Failed to read file: ${e.message}")
         }
     }
-
-    private fun isRestrictedPath(canonicalPath: String): Boolean {
-        val restricted = listOf(
-            "/data/data/",           // App-internal storage
-            "/data/user/",           // App-internal storage (alternate path)
-            "/system/",              // System files
-            "/proc/",               // Process info
-            "/sys/"                  // Kernel info
-        )
-        return restricted.any { canonicalPath.startsWith(it) }
-    }
-}
-
-/**
- * Build the appropriate file read permissions based on Android version.
- */
-private fun buildFileReadPermissions(): List<String> {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        // Android 11+: need MANAGE_EXTERNAL_STORAGE for broad file access
-        listOf(android.Manifest.permission.MANAGE_EXTERNAL_STORAGE)
-    } else {
-        listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
-    }
 }
 ```
-
-**Note on MANAGE_EXTERNAL_STORAGE**: This is a special permission that cannot be granted through the standard permission dialog. It requires navigating to system settings. The `PermissionChecker` needs special handling for this:
-
-```kotlin
-// In PermissionChecker, special case for MANAGE_EXTERNAL_STORAGE
-fun hasManageExternalStoragePermission(): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        Environment.isExternalStorageManager()
-    } else {
-        true // Not needed on older versions
-    }
-}
-
-/**
- * Open the system settings page for MANAGE_EXTERNAL_STORAGE.
- * Returns immediately -- the user must manually toggle the permission.
- * The tool will check again on the next execution attempt.
- */
-fun requestManageExternalStorage(context: Context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-            data = Uri.parse("package:${context.packageName}")
-        }
-        context.startActivity(intent)
-    }
-}
-```
-
-For V1, when `MANAGE_EXTERNAL_STORAGE` is not granted, the tool returns an error message guiding the user to enable it in Settings. This is standard behavior for apps requiring this permission.
 
 ### 3. WriteFileTool
 
 ```kotlin
 /**
  * Located in: tool/builtin/WriteFileTool.kt
+ *
+ * File access is confined to app-private storage (context.filesDir).
+ * Paths are validated by FsBridge using an allowlist approach --
+ * only paths under the app's private storage directory are permitted.
+ * No external storage permissions are required.
  */
 class WriteFileTool : Tool {
 
@@ -820,7 +775,7 @@ class WriteFileTool : Tool {
             properties = mapOf(
                 "path" to ToolParameter(
                     type = "string",
-                    description = "The absolute file path to write (e.g., '/storage/emulated/0/Documents/output.txt')"
+                    description = "The file path to write (confined to app-private storage)"
                 ),
                 "content" to ToolParameter(
                     type = "string",
@@ -835,7 +790,7 @@ class WriteFileTool : Tool {
             ),
             required = listOf("path", "content")
         ),
-        requiredPermissions = buildFileWritePermissions(),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 10
     )
 
@@ -846,12 +801,12 @@ class WriteFileTool : Tool {
             ?: return ToolResult.error("validation_error", "Parameter 'content' is required")
         val mode = parameters["mode"] as? String ?: "overwrite"
 
-        // Security: prevent writing to app-internal or system paths
+        // FsBridge validates the path against the allowlist (app-private storage only)
         val normalizedPath = File(path).canonicalPath
-        if (isRestrictedPath(normalizedPath)) {
+        if (!isAllowedPath(normalizedPath)) {
             return ToolResult.error(
-                "permission_denied",
-                "Access denied: cannot write to app-internal or system paths"
+                "path_not_allowed",
+                "Access denied: path is outside app-private storage"
             )
         }
 
@@ -875,25 +830,6 @@ class WriteFileTool : Tool {
         } catch (e: Exception) {
             ToolResult.error("execution_error", "Failed to write file: ${e.message}")
         }
-    }
-
-    private fun isRestrictedPath(canonicalPath: String): Boolean {
-        val restricted = listOf(
-            "/data/data/",
-            "/data/user/",
-            "/system/",
-            "/proc/",
-            "/sys/"
-        )
-        return restricted.any { canonicalPath.startsWith(it) }
-    }
-}
-
-private fun buildFileWritePermissions(): List<String> {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        listOf(android.Manifest.permission.MANAGE_EXTERNAL_STORAGE)
-    } else {
-        listOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
     }
 }
 ```
@@ -1339,11 +1275,10 @@ val toolModule = module {
    a. Looks up "read_file" in ToolRegistry -> found
    b. Checks "read_file" is in agent's tool set -> yes
    c. Validates parameters -> path is present, valid
-   d. Checks permissions -> MANAGE_EXTERNAL_STORAGE
-      - If not granted -> returns error guiding user to Settings
-      - If granted -> continues
+   d. Checks permissions -> none required (file access confined to app-private storage)
    e. Executes ReadFileTool.execute() on Dispatchers.IO with 10s timeout
-   f. ReadFileTool reads the file, returns ToolResult.success(fileContents)
+   f. FsBridge validates path is within app-private storage allowlist
+   g. ReadFileTool reads the file, returns ToolResult.success(fileContents)
 
 5. ToolExecutionEngine returns (ToolResult.success, durationMs=45)
 
@@ -1395,7 +1330,7 @@ val toolModule = module {
 | Missing required param | `validation_error` | "Missing required parameter: 'path'" | Model can retry with correct params |
 | Wrong param type | `validation_error` | "Parameter 'path' expected type 'string' but got Int" | Model can retry |
 | Permission denied | `permission_denied` | "Required permissions were denied: ..." | Model informs user |
-| MANAGE_EXTERNAL_STORAGE not granted | `permission_denied` | "File access requires 'All files access' permission. Please enable it in Settings > Apps > OneClawShadow > Permissions." | Model guides user |
+| Path outside app-private storage | `path_not_allowed` | "Access denied: path is outside app-private storage" | Model informed, can retry with valid path |
 | File not found | `file_not_found` | "File not found: /path/to/file" | Model can inform user or try another path |
 | File too large | `file_too_large` | "File is too large (X bytes). Maximum: 1MB." | Model can inform user |
 | Restricted path | `permission_denied` | "Access denied: cannot read app-internal or system files" | Security boundary enforced |
@@ -1430,8 +1365,7 @@ The app never crashes from a tool error. The model always gets a result (success
 
 ### Phase 2: Permission System
 9. [ ] Implement `PermissionChecker` with suspending permission request
-10. [ ] Implement `MANAGE_EXTERNAL_STORAGE` special case handling
-11. [ ] Integrate `PermissionChecker` with `MainActivity` (bind/unbind lifecycle)
+10. [ ] Integrate `PermissionChecker` with `MainActivity` (bind/unbind lifecycle)
 
 ### Phase 3: Execution Engine
 12. [ ] Implement `ToolExecutionEngine.executeTool()` (single tool)
@@ -1455,7 +1389,7 @@ The app never crashes from a tool error. The model always gets a result (success
 ### Phase 6: DI & Integration
 25. [ ] Set up `ToolModule` in Koin
 26. [ ] Register all built-in tools in `ToolRegistry`
-27. [ ] Add `MANAGE_EXTERNAL_STORAGE` and `INTERNET` to AndroidManifest.xml
+27. [ ] Add `INTERNET` to AndroidManifest.xml
 28. [ ] Unit test all tools with mock data
 29. [ ] Integration test: tool registration -> execution -> result
 
@@ -1598,7 +1532,7 @@ Steps:
 
 ## Security Considerations
 
-1. **File access boundaries**: `ReadFileTool` and `WriteFileTool` block access to `/data/data/`, `/data/user/`, `/system/`, `/proc/`, `/sys/` via path canonicalization and prefix checking.
+1. **File access boundaries**: `ReadFileTool` and `WriteFileTool` are confined to app-private storage (context.filesDir) via FsBridge allowlist validation. No external storage permissions are required.
 2. **No arbitrary code execution**: Tools are compiled into the app. V1 does not support user-defined or downloaded tools.
 3. **HTTP tool**: No restrictions on HTTP vs HTTPS, since users may intentionally access local/HTTP services. The tool does not add any credentials -- users control what URLs the AI accesses.
 4. **Tool results in database**: Tool results (including file contents and HTTP responses) are stored in the messages table. They have the same security level as other messages. Sensitive data in tool results is the user's responsibility.
@@ -1619,7 +1553,7 @@ Steps:
 
 - [ ] **HTTP response body improvement**: V1 uses simple truncation at 100KB. Future improvement: for `text/html` responses, strip `<script>`, `<style>`, `<nav>`, `<footer>` tags and convert to plain text before truncating. This would greatly improve the usefulness of web page fetching. This requires an HTML parsing library (e.g., Jsoup) and is deferred post-V1.
 - [ ] **File size limit**: 1MB max for `read_file`. Should this be configurable? For V1, hardcoded is fine.
-- [ ] **MANAGE_EXTERNAL_STORAGE on Play Store**: If publishing to Play Store, this permission requires justification. The app's use case (AI agent runtime with file access) is a valid justification, similar to file managers.
+- [x] **~~MANAGE_EXTERNAL_STORAGE on Play Store~~**: Resolved. File access is now confined to app-private storage via FsBridge allowlist validation. MANAGE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE, and WRITE_EXTERNAL_STORAGE permissions have been removed.
 
 ## Future Improvements
 
@@ -1639,8 +1573,6 @@ Steps:
 - [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
 - [Anthropic Tool Use](https://docs.anthropic.com/en/docs/build-with-claude/tool-use)
 - [Gemini Function Calling](https://ai.google.dev/gemini-api/docs/function-calling)
-- [Android MANAGE_EXTERNAL_STORAGE](https://developer.android.com/training/data-storage/manage-all-files)
-
 ## Change History
 
 | Date | Version | Changes | Owner |

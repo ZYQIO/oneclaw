@@ -769,7 +769,7 @@ function execute(params) {
     },
     "required": ["path"]
   },
-  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "requiredPermissions": [],
   "timeoutSeconds": 10
 }
 ```
@@ -809,7 +809,7 @@ function execute(params) {
     },
     "required": ["path", "content"]
   },
-  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "requiredPermissions": [],
   "timeoutSeconds": 10
 }
 ```

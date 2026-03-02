@@ -116,7 +116,7 @@ data class ToolDefinition(
     val name: String,                          // 唯一工具名称，snake_case（如 "read_file"）
     val description: String,                   // 人类可读描述（一句话）
     val parametersSchema: ToolParametersSchema, // 结构化参数 schema
-    val requiredPermissions: List<String>,      // 所需 Android 权限（如 "android.permission.READ_EXTERNAL_STORAGE"）
+    val requiredPermissions: List<String>,      // 所需 Android 权限（如 "android.permission.ACCESS_FINE_LOCATION"）
     val timeoutSeconds: Int                    // 最大执行时间
 )
 ```
@@ -537,28 +537,6 @@ class PermissionChecker(private val context: Context) {
         pendingContinuation = null
     }
 
-    /**
-     * 检查是否有 MANAGE_EXTERNAL_STORAGE 权限（Android 11+ 特殊权限）。
-     */
-    fun hasManageExternalStoragePermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            true
-        }
-    }
-
-    /**
-     * 打开 MANAGE_EXTERNAL_STORAGE 的系统设置页面。
-     */
-    fun requestManageExternalStorage(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                data = Uri.parse("package:${context.packageName}")
-            }
-            context.startActivity(intent)
-        }
-    }
 }
 ```
 
@@ -666,8 +644,9 @@ class GetCurrentTimeTool : Tool {
 /**
  * 位于：tool/builtin/ReadFileTool.kt
  *
- * 使用直接文件路径访问。在 Android 11+ 上访问应用专属目录外的文件
- * 需要 MANAGE_EXTERNAL_STORAGE 权限。
+ * 文件访问限定在应用私有存储（context.filesDir）内。
+ * 路径通过 FsBridge 允许列表验证，确保只能访问应用存储范围内的文件。
+ * 无需额外 Android 权限。
  */
 class ReadFileTool : Tool {
 
@@ -677,12 +656,12 @@ class ReadFileTool : Tool {
 
     override val definition = ToolDefinition(
         name = "read_file",
-        description = "Read the contents of a file from local storage",
+        description = "Read the contents of a file from app-private storage",
         parametersSchema = ToolParametersSchema(
             properties = mapOf(
                 "path" to ToolParameter(
                     type = "string",
-                    description = "The absolute file path to read (e.g., '/storage/emulated/0/Documents/notes.txt')"
+                    description = "The file path to read (confined to app-private storage)"
                 ),
                 "encoding" to ToolParameter(
                     type = "string",
@@ -692,7 +671,7 @@ class ReadFileTool : Tool {
             ),
             required = listOf("path")
         ),
-        requiredPermissions = buildFileReadPermissions(),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 10
     )
 
@@ -701,12 +680,12 @@ class ReadFileTool : Tool {
             ?: return ToolResult.error("validation_error", "Parameter 'path' is required")
         val encoding = parameters["encoding"] as? String ?: "UTF-8"
 
-        // 安全性：阻止访问应用内部文件
+        // 安全性：通过 FsBridge 允许列表验证路径在应用私有存储范围内
         val normalizedPath = File(path).canonicalPath
-        if (isRestrictedPath(normalizedPath)) {
+        if (!isAllowedPath(normalizedPath)) {
             return ToolResult.error(
-                "permission_denied",
-                "Access denied: cannot read app-internal or system files"
+                "path_not_allowed",
+                "Path outside app storage: access is confined to app-private storage"
             )
         }
 
@@ -743,17 +722,9 @@ class ReadFileTool : Tool {
         }
     }
 
-    private fun isRestrictedPath(canonicalPath: String): Boolean {
-        val restricted = listOf("/data/data/", "/data/user/", "/system/", "/proc/", "/sys/")
-        return restricted.any { canonicalPath.startsWith(it) }
-    }
-}
-
-private fun buildFileReadPermissions(): List<String> {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        listOf(android.Manifest.permission.MANAGE_EXTERNAL_STORAGE)
-    } else {
-        listOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+    private fun isAllowedPath(canonicalPath: String): Boolean {
+        // FsBridge 允许列表验证：路径必须在应用私有存储（context.filesDir）内
+        return canonicalPath.startsWith(context.filesDir.canonicalPath)
     }
 }
 ```
@@ -763,17 +734,20 @@ private fun buildFileReadPermissions(): List<String> {
 ```kotlin
 /**
  * 位于：tool/builtin/WriteFileTool.kt
+ *
+ * 文件写入限定在应用私有存储（context.filesDir）内。
+ * 路径通过 FsBridge 允许列表验证，无需额外 Android 权限。
  */
 class WriteFileTool : Tool {
 
     override val definition = ToolDefinition(
         name = "write_file",
-        description = "Write contents to a file on local storage",
+        description = "Write contents to a file in app-private storage",
         parametersSchema = ToolParametersSchema(
             properties = mapOf(
                 "path" to ToolParameter(
                     type = "string",
-                    description = "The absolute file path to write (e.g., '/storage/emulated/0/Documents/output.txt')"
+                    description = "The file path to write (confined to app-private storage)"
                 ),
                 "content" to ToolParameter(
                     type = "string",
@@ -788,7 +762,7 @@ class WriteFileTool : Tool {
             ),
             required = listOf("path", "content")
         ),
-        requiredPermissions = buildFileWritePermissions(),
+        requiredPermissions = emptyList(),
         timeoutSeconds = 10
     )
 
@@ -799,11 +773,12 @@ class WriteFileTool : Tool {
             ?: return ToolResult.error("validation_error", "Parameter 'content' is required")
         val mode = parameters["mode"] as? String ?: "overwrite"
 
+        // 安全性：通过 FsBridge 允许列表验证路径在应用私有存储范围内
         val normalizedPath = File(path).canonicalPath
-        if (isRestrictedPath(normalizedPath)) {
+        if (!isAllowedPath(normalizedPath)) {
             return ToolResult.error(
-                "permission_denied",
-                "Access denied: cannot write to app-internal or system paths"
+                "path_not_allowed",
+                "Path outside app storage: access is confined to app-private storage"
             )
         }
 
@@ -828,17 +803,9 @@ class WriteFileTool : Tool {
         }
     }
 
-    private fun isRestrictedPath(canonicalPath: String): Boolean {
-        val restricted = listOf("/data/data/", "/data/user/", "/system/", "/proc/", "/sys/")
-        return restricted.any { canonicalPath.startsWith(it) }
-    }
-}
-
-private fun buildFileWritePermissions(): List<String> {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        listOf(android.Manifest.permission.MANAGE_EXTERNAL_STORAGE)
-    } else {
-        listOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    private fun isAllowedPath(canonicalPath: String): Boolean {
+        // FsBridge 允许列表验证：路径必须在应用私有存储（context.filesDir）内
+        return canonicalPath.startsWith(context.filesDir.canonicalPath)
     }
 }
 ```
@@ -1227,9 +1194,8 @@ val toolModule = module {
    a. 在 ToolRegistry 中查找 "read_file" -> 找到
    b. 检查 "read_file" 在 Agent 工具集中 -> 是
    c. 验证参数 -> path 存在，有效
-   d. 检查权限 -> MANAGE_EXTERNAL_STORAGE
-      - 未授予 -> 返回错误引导用户到设置
-      - 已授予 -> 继续
+   d. 检查权限 -> 无需额外权限（应用私有存储）
+      - 继续执行
    e. 在 Dispatchers.IO 上执行 ReadFileTool.execute()，10秒超时
    f. ReadFileTool 读取文件，返回 ToolResult.success(fileContents)
 
@@ -1283,7 +1249,7 @@ val toolModule = module {
 | 缺少必填参数 | `validation_error` | "Missing required parameter: 'path'" | 模型可用正确参数重试 |
 | 参数类型错误 | `validation_error` | "Parameter 'path' expected type 'string' but got Int" | 模型可重试 |
 | 权限被拒绝 | `permission_denied` | "Required permissions were denied: ..." | 模型告知用户 |
-| MANAGE_EXTERNAL_STORAGE 未授予 | `permission_denied` | "File access requires 'All files access' permission..." | 模型引导用户 |
+| 路径超出应用存储范围 | `path_not_allowed` | "Path outside app storage: access is confined to app-private storage" | 模型告知用户文件操作仅限于应用私有存储 |
 | 文件未找到 | `file_not_found` | "File not found: /path/to/file" | 模型可告知用户或尝试其他路径 |
 | 文件太大 | `file_too_large` | "File is too large (X bytes). Maximum: 1MB." | 模型可告知用户 |
 | 受限路径 | `permission_denied` | "Access denied: cannot read app-internal or system files" | 安全边界强制执行 |
@@ -1308,8 +1274,7 @@ val toolModule = module {
 
 ### 阶段 2：权限系统
 9. [ ] 实现 `PermissionChecker`，包含挂起式权限请求
-10. [ ] 实现 `MANAGE_EXTERNAL_STORAGE` 特殊处理
-11. [ ] 将 `PermissionChecker` 与 `MainActivity` 集成（绑定/解绑生命周期）
+10. [ ] 将 `PermissionChecker` 与 `MainActivity` 集成（绑定/解绑生命周期）
 
 ### 阶段 3：执行引擎
 12. [ ] 实现 `ToolExecutionEngine.executeTool()`（单工具）
@@ -1333,7 +1298,7 @@ val toolModule = module {
 ### 阶段 6：DI 与集成
 25. [ ] 在 Koin 中设置 `ToolModule`
 26. [ ] 在 `ToolRegistry` 中注册所有内置工具
-27. [ ] 在 AndroidManifest.xml 中添加 `MANAGE_EXTERNAL_STORAGE` 和 `INTERNET` 权限
+27. [ ] 在 AndroidManifest.xml 中添加 `INTERNET` 权限
 28. [ ] 使用 mock 数据对所有工具进行单元测试
 29. [ ] 集成测试：工具注册 -> 执行 -> 结果
 
@@ -1476,7 +1441,7 @@ val toolModule = module {
 
 ## 安全考虑
 
-1. **文件访问边界**：`ReadFileTool` 和 `WriteFileTool` 通过路径规范化和前缀检查阻止访问 `/data/data/`、`/data/user/`、`/system/`、`/proc/`、`/sys/`。
+1. **文件访问边界**：`ReadFileTool` 和 `WriteFileTool` 的文件访问限定在应用私有存储（context.filesDir）内，通过 FsBridge 允许列表验证路径，无需外部存储权限。
 2. **无任意代码执行**：工具编译在应用中。V1 不支持用户定义或下载的工具。
 3. **HTTP 工具**：不限制 HTTP vs HTTPS，因为用户可能有意访问本地/HTTP 服务。工具不添加任何凭据 -- 用户控制 AI 访问哪些 URL。
 4. **数据库中的工具结果**：工具结果（包括文件内容和 HTTP 响应）存储在 messages 表中。与其他消息安全级别相同。工具结果中的敏感数据由用户负责。
@@ -1497,7 +1462,7 @@ val toolModule = module {
 
 - [ ] **HTTP 响应体改进**：V1 使用简单的 100KB 截断。未来改进：对 `text/html` 响应，去除 `<script>`、`<style>`、`<nav>`、`<footer>` 标签并转为纯文本后再截断。这将大大提高网页抓取的实用性。需要 HTML 解析库（如 Jsoup），推迟到 V1 之后。
 - [ ] **文件大小限制**：`read_file` 最大 1MB。是否应可配置？V1 硬编码即可。
-- [ ] **Play Store 上的 MANAGE_EXTERNAL_STORAGE**：如果发布到 Play Store，此权限需要正当理由。应用的用例（具有文件访问功能的 AI Agent 运行时）是有效的理由，类似文件管理器。
+- [x] **~~Play Store 上的 MANAGE_EXTERNAL_STORAGE~~**：已解决 -- 文件访问现已限定在应用私有存储（context.filesDir），使用 FsBridge 允许列表方式，不再需要 MANAGE_EXTERNAL_STORAGE 权限。
 
 ## 未来改进
 
@@ -1517,8 +1482,6 @@ val toolModule = module {
 - [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
 - [Anthropic Tool Use](https://docs.anthropic.com/en/docs/build-with-claude/tool-use)
 - [Gemini Function Calling](https://ai.google.dev/gemini-api/docs/function-calling)
-- [Android MANAGE_EXTERNAL_STORAGE](https://developer.android.com/training/data-storage/manage-all-files)
-
 ## 变更历史
 
 | 日期 | 版本 | 变更内容 | 变更人 |

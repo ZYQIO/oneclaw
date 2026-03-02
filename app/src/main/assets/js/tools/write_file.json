@@ -1,11 +1,11 @@
 {
   "name": "write_file",
-  "description": "Write contents to a file on local storage",
+  "description": "Write contents to a file in app-private storage",
   "parameters": {
     "properties": {
       "path": {
         "type": "string",
-        "description": "The absolute file path to write (e.g., '/storage/emulated/0/Documents/output.txt')"
+        "description": "File path relative to app storage (e.g., 'documents/output.txt') or an absolute path within app storage"
       },
       "content": {
         "type": "string",
@@ -20,6 +20,6 @@
     },
     "required": ["path", "content"]
   },
-  "requiredPermissions": ["android.permission.MANAGE_EXTERNAL_STORAGE"],
+  "requiredPermissions": [],
   "timeoutSeconds": 10
 }

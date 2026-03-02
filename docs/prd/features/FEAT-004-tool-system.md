@@ -70,7 +70,7 @@ Each tool must implement:
 | Name | Unique identifier (e.g., `read_file`). Follows snake_case convention. |
 | Description | Human-readable description of what the tool does (one sentence). Used in AI prompt and shown to users in Agent config. |
 | Parameter Schema | JSON Schema defining the input parameters the tool accepts. |
-| Required Permissions | List of Android permissions this tool needs (if any). E.g., `READ_EXTERNAL_STORAGE`, `ACCESS_FINE_LOCATION`. |
+| Required Permissions | List of Android permissions this tool needs (if any). E.g., `ACCESS_FINE_LOCATION`. Most tools require no permissions. |
 | Timeout | Maximum execution time in seconds. Default: 30 seconds. Can be overridden per tool. |
 | Execute Function | The actual implementation that receives parameters and returns a result. |
 
@@ -145,19 +145,19 @@ V1 ships with the following starter tools:
 #### 2. `read_file`
 - **Description**: Read the contents of a file from local storage
 - **Parameters**:
-  - `path` (string, required): The absolute file path to read
+  - `path` (string, required): The file path to read (confined to app-private storage)
   - `encoding` (string, optional): File encoding. Defaults to "UTF-8".
-- **Required Permissions**: `READ_EXTERNAL_STORAGE` (or `READ_MEDIA_*` on Android 13+)
+- **Required Permissions**: None (file access is scoped to app-private storage)
 - **Timeout**: 10 seconds
 - **Returns**: File contents as a string. For binary files, returns an error suggesting a different approach.
 
 #### 3. `write_file`
 - **Description**: Write contents to a file on local storage
 - **Parameters**:
-  - `path` (string, required): The absolute file path to write
+  - `path` (string, required): The file path to write (confined to app-private storage)
   - `content` (string, required): The content to write
   - `mode` (string, optional): Write mode -- "overwrite" (default) or "append"
-- **Required Permissions**: `WRITE_EXTERNAL_STORAGE` (or appropriate permission on Android 13+)
+- **Required Permissions**: None (file access is scoped to app-private storage)
 - **Timeout**: 10 seconds
 - **Returns**: Confirmation with file path and bytes written
 
@@ -307,7 +307,7 @@ Tool selection UI in Agent configuration is defined in FEAT-002. The Tool System
 - File tool failures (permission, not found, etc.) return clear errors
 
 ### Security
-- File tools only access user-accessible storage (not app-internal files or system files)
+- File tools are confined to app-private storage (context.filesDir) via FsBridge allowlist validation
 - HTTP tool respects HTTPS; no restriction on HTTP for user-intended requests
 - Tool results may contain sensitive data -- they are stored in the session history with the same security as other messages
 
