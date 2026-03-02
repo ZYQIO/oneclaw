@@ -1,8 +1,11 @@
 package com.oneclaw.shadow.bridge
 
 import com.oneclaw.shadow.bridge.channel.ChannelType
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -36,6 +39,13 @@ object BridgeStateTracker {
         _channelStates.update { current ->
             current - type
         }
+    }
+
+    private val _newSessionFromBridge = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val newSessionFromBridge: SharedFlow<String> = _newSessionFromBridge.asSharedFlow()
+
+    fun emitNewSessionFromBridge(sessionId: String) {
+        _newSessionFromBridge.tryEmit(sessionId)
     }
 
     fun reset() {

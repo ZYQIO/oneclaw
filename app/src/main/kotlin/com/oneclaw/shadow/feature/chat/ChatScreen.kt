@@ -125,6 +125,7 @@ import com.oneclaw.shadow.feature.session.SessionDrawerContent
 import com.oneclaw.shadow.feature.session.SessionListViewModel
 import com.oneclaw.shadow.feature.skill.ui.SkillSelectionBottomSheet
 import com.oneclaw.shadow.feature.skill.ui.SlashCommandPopup
+import com.oneclaw.shadow.bridge.BridgeStateTracker
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -196,6 +197,13 @@ fun ChatScreen(
                 lastItem.offset + lastItem.size <= info.viewportEndOffset + 1
         }.collect { atBottom ->
             if (atBottom) shouldAutoScrollState.value = true
+        }
+    }
+
+    // Switch to a new session when the bridge creates one (e.g. /clear from Telegram)
+    LaunchedEffect(Unit) {
+        BridgeStateTracker.newSessionFromBridge.collect { sessionId ->
+            viewModel.initialize(sessionId)
         }
     }
 

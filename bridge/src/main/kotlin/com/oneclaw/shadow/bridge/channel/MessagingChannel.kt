@@ -61,6 +61,7 @@ abstract class MessagingChannel(
         // 4. Handle /clear command
         if (msg.text.trim() == "/clear") {
             val newConversationId = conversationMapper.createNewConversation()
+            BridgeStateTracker.emitNewSessionFromBridge(newConversationId)
             val clearMessage = BridgeMessage(
                 content = "Conversation cleared. Starting a new conversation.",
                 timestamp = System.currentTimeMillis()

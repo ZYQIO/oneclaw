@@ -20,6 +20,14 @@ class BridgeConversationManagerImpl(
     }
 
     override suspend fun createNewConversation(): String {
+        val prevId = sessionRepository.getMostRecentSessionId()
+        if (prevId != null) {
+            val prevSession = sessionRepository.getSessionById(prevId)
+            if (prevSession != null && prevSession.messageCount == 0) {
+                sessionRepository.softDeleteSession(prevId)
+            }
+        }
+
         val agentId = resolveAgentId()
         val now = System.currentTimeMillis()
         val session = Session(
