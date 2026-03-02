@@ -1,11 +1,13 @@
 package com.oneclaw.shadow.feature.bridge
 
 import com.oneclaw.shadow.bridge.BridgeAgentExecutor
+import com.oneclaw.shadow.bridge.BridgeMessage
 import com.oneclaw.shadow.core.model.AttachmentType
 import com.oneclaw.shadow.core.repository.AgentRepository
 import com.oneclaw.shadow.data.local.AttachmentFileManager
+import com.oneclaw.shadow.feature.chat.ChatEvent
 import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.UUID
 
@@ -18,7 +20,7 @@ class BridgeAgentExecutorImpl(
         conversationId: String,
         userMessage: String,
         imagePaths: List<String>
-    ) {
+    ): BridgeMessage? {
         val agentId = resolveAgentId()
         val pendingAttachments = imagePaths.mapNotNull { path ->
             val file = File(path)
@@ -36,12 +38,37 @@ class BridgeAgentExecutorImpl(
                 durationMs = null
             )
         }
-        sendMessageUseCase.execute(
-            sessionId = conversationId,
-            userText = userMessage,
-            agentId = agentId,
-            pendingAttachments = pendingAttachments
-        ).collect()
+        var lastResponseContent: String? = null
+        var lastResponseTimestamp: Long = 0L
+
+        try {
+            sendMessageUseCase.execute(
+                sessionId = conversationId,
+                userText = userMessage,
+                agentId = agentId,
+                pendingAttachments = pendingAttachments
+            ).collect { event ->
+                when (event) {
+                    is ChatEvent.ResponseComplete -> {
+                        lastResponseContent = event.message.content
+                        lastResponseTimestamp = event.message.createdAt
+                    }
+                    else -> { /* other events not needed by bridge */ }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Agent execution failed; return null so caller can fall back
+            return null
+        }
+
+        val content = lastResponseContent
+        return if (content != null && content.isNotBlank()) {
+            BridgeMessage(content = content, timestamp = lastResponseTimestamp)
+        } else {
+            null
+        }
     }
 
     private fun mimeTypeFromExtension(ext: String): String = when (ext.lowercase()) {

@@ -82,21 +82,18 @@ abstract class MessagingChannel(
             }
         }
 
-        // 7. Execute agent concurrently (SendMessageUseCase inserts the user message internally)
+        // 7. Execute agent and get direct response
         val beforeTimestamp = System.currentTimeMillis()
-        val agentJob = scope.launch {
-            agentExecutor.executeMessage(
-                conversationId = conversationId,
-                userMessage = msg.text,
-                imagePaths = msg.imagePaths
-            )
-        }
-
-        // 8. Wait for agent to finish, then fetch the final response
         val response = try {
             withTimeout(AGENT_RESPONSE_TIMEOUT_MS) {
-                agentJob.join()
-                messageObserver.awaitNextAssistantMessage(
+                // executeMessage now returns the final response directly
+                val directResponse = agentExecutor.executeMessage(
+                    conversationId = conversationId,
+                    userMessage = msg.text,
+                    imagePaths = msg.imagePaths
+                )
+                // Use direct response; fall back to DB observer if null
+                directResponse ?: messageObserver.awaitNextAssistantMessage(
                     conversationId = conversationId,
                     afterTimestamp = beforeTimestamp,
                     timeoutMs = 10_000
@@ -108,7 +105,7 @@ abstract class MessagingChannel(
                 timestamp = System.currentTimeMillis()
             )
         } finally {
-            // 9. Cancel typing
+            // 8. Cancel typing
             typingJob.cancel()
         }
 

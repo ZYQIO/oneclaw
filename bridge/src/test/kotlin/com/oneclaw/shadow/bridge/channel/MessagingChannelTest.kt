@@ -48,8 +48,10 @@ class MessagingChannelTest {
         every { preferences.getAllowedTelegramUserIds() } returns emptySet()
         every { preferences.getLastChatId(any()) } returns null
         coEvery { conversationMapper.resolveConversationId() } returns "test-conv-id"
-        coEvery { messageObserver.awaitNextAssistantMessage(any(), any(), any()) } returns
+        coEvery { agentExecutor.executeMessage(any(), any(), any()) } returns
                 BridgeMessage("Agent response", System.currentTimeMillis())
+        coEvery { messageObserver.awaitNextAssistantMessage(any(), any(), any()) } returns
+                BridgeMessage("Observer response", System.currentTimeMillis())
 
         channel = TestMessagingChannel(
             channelType = ChannelType.TELEGRAM,
@@ -83,6 +85,28 @@ class MessagingChannelTest {
         assertTrue(sentResponses.isNotEmpty(), "Expected at least one response sent")
         assertEquals("chat-123", sentResponses.first().first)
         assertEquals("Agent response", sentResponses.first().second.content)
+        // Verify response came directly from executor, not observer
+        coVerify(exactly = 0) { messageObserver.awaitNextAssistantMessage(any(), any(), any()) }
+    }
+
+    @Test
+    fun `processInboundMessage falls back to observer when executor returns null`() = runTest {
+        coEvery { agentExecutor.executeMessage(any(), any(), any()) } returns null
+
+        val msg = ChannelMessage(
+            externalChatId = "chat-123",
+            senderName = "User",
+            senderId = "user-1",
+            text = "Hello",
+            messageId = "msg-fallback"
+        )
+
+        channel.testProcessInboundMessage(msg)
+
+        assertTrue(sentResponses.isNotEmpty(), "Expected at least one response sent")
+        assertEquals("chat-123", sentResponses.first().first)
+        assertEquals("Observer response", sentResponses.first().second.content)
+        coVerify { messageObserver.awaitNextAssistantMessage(any(), any(), any()) }
     }
 
     @Test

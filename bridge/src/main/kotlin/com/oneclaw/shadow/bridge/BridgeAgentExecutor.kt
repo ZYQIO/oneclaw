@@ -5,5 +5,5 @@ interface BridgeAgentExecutor {
         conversationId: String,
         userMessage: String,
         imagePaths: List<String> = emptyList()
-    )
+    ): BridgeMessage?
 }
