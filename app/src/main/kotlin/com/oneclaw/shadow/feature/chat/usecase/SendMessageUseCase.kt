@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class SendMessageUseCase(
@@ -132,9 +133,15 @@ class SendMessageUseCase(
         )
         sessionRepository.setActive(sessionId, true)
 
-        // 5. Build dynamic tool list: start with core tools only
-        val loadedGroupNames = mutableSetOf<String>()
+        // 5. Build dynamic tool list: start with core tools, restore previously loaded groups (RFC-044)
+        val existingMessages = messageRepository.getMessagesSnapshot(sessionId)
+        val previouslyLoadedGroups = restoreLoadedGroups(existingMessages)
+        val loadedGroupNames = previouslyLoadedGroups.toMutableSet()
         val activeToolDefs = toolRegistry.getCoreToolDefinitions().toMutableList()
+        for (groupName in previouslyLoadedGroups) {
+            val groupDefs = toolRegistry.getGroupToolDefinitions(groupName)
+            activeToolDefs.addAll(groupDefs)
+        }
 
         // Determine effective max iterations from agent or global default
         val effectiveMaxRounds = if (agent.maxIterations == null || agent.maxIterations >= 200) Int.MAX_VALUE else agent.maxIterations
@@ -470,6 +477,33 @@ class SendMessageUseCase(
 
         return if (basePrompt.isBlank()) registryPrompt
         else "$basePrompt\n\n---\n\n$registryPrompt"
+    }
+
+    /**
+     * RFC-044: Scan message history for previously successful load_tool_group calls.
+     * Returns the set of group names that were loaded in prior turns.
+     */
+    private fun restoreLoadedGroups(messages: List<Message>): Set<String> {
+        val groups = mutableSetOf<String>()
+        for (msg in messages) {
+            if (msg.type == MessageType.TOOL_CALL &&
+                msg.toolName == "load_tool_group" &&
+                msg.toolStatus == ToolCallStatus.SUCCESS &&
+                msg.toolInput != null
+            ) {
+                try {
+                    val params = kotlinx.serialization.json.Json.parseToJsonElement(msg.toolInput)
+                        .jsonObject
+                    val groupName = params["group_name"]?.jsonPrimitive?.content
+                    if (groupName != null) {
+                        groups.add(groupName)
+                    }
+                } catch (_: Exception) {
+                    // Malformed tool_input -- skip
+                }
+            }
+        }
+        return groups
     }
 
     private fun extractGroupName(
