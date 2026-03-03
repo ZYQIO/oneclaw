@@ -1,18 +1,29 @@
 package com.oneclaw.shadow.tool.js.bridge
 
+import android.util.Log
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.define
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
  * Injects file system functions into the QuickJS context.
  * All paths are confined to [allowedRoot] (typically context.filesDir).
+ *
+ * If [onFileWritten] is provided, it is called fire-and-forget after every
+ * successful write or append, enabling RFC-050 git auto-commit.
  */
-class FsBridge(private val allowedRoot: File) {
+class FsBridge(
+    private val allowedRoot: File,
+    private val onFileWritten: (suspend (relativePath: String, message: String) -> Unit)? = null
+) {
 
     private val canonicalRoot: String = allowedRoot.canonicalPath
 
     companion object {
+        private const val TAG = "FsBridge"
         private const val MAX_FILE_SIZE = 1024 * 1024  // 1MB, same as ReadFileTool
     }
 
@@ -85,6 +96,7 @@ class FsBridge(private val allowedRoot: File) {
         val file = File(canonical)
         file.parentFile?.mkdirs()
         file.writeText(content, Charsets.UTF_8)
+        fireCommit(canonical, "file: write $path")
     }
 
     internal fun appendFile(path: String, content: String) {
@@ -92,6 +104,7 @@ class FsBridge(private val allowedRoot: File) {
         val file = File(canonical)
         file.parentFile?.mkdirs()
         file.appendText(content, Charsets.UTF_8)
+        fireCommit(canonical, "file: append $path")
     }
 
     internal fun fileExists(path: String): Boolean {
@@ -100,6 +113,20 @@ class FsBridge(private val allowedRoot: File) {
             File(canonical).exists()
         } catch (e: SecurityException) {
             false  // paths outside allowed root report as non-existent
+        }
+    }
+
+    private fun fireCommit(canonicalPath: String, message: String) {
+        val callback = onFileWritten ?: return
+        val relativePath = File(canonicalPath).canonicalPath
+            .removePrefix(allowedRoot.canonicalPath)
+            .trimStart('/')
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                callback(relativePath, message)
+            } catch (e: Exception) {
+                Log.w(TAG, "Git commit after file write failed: ${e.message}")
+            }
         }
     }
 }

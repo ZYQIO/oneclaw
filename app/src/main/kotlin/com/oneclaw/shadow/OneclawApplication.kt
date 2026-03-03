@@ -17,10 +17,13 @@ import com.oneclaw.shadow.feature.schedule.usecase.CleanupExecutionHistoryUseCas
 import com.oneclaw.shadow.bridge.BridgePreferences
 import com.oneclaw.shadow.bridge.service.BridgeWatchdogWorker
 import com.oneclaw.shadow.bridge.service.MessagingBridgeService
+import com.oneclaw.shadow.data.git.AppGitRepository
+import com.oneclaw.shadow.data.git.GitGcWorker
 import com.oneclaw.shadow.di.appModule
 import com.oneclaw.shadow.di.bridgeModule
 import com.oneclaw.shadow.di.databaseModule
 import com.oneclaw.shadow.di.featureModule
+import com.oneclaw.shadow.di.gitModule
 import com.oneclaw.shadow.di.memoryModule
 import com.oneclaw.shadow.di.networkModule
 import com.oneclaw.shadow.di.repositoryModule
@@ -52,9 +55,16 @@ class OneclawApplication : Application() {
                 toolModule,
                 featureModule,
                 memoryModule,
-                bridgeModule
+                bridgeModule,
+                gitModule
             )
         }
+
+        // RFC-050: Initialize git repository asynchronously
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            get<AppGitRepository>(AppGitRepository::class.java).initOrOpen()
+        }
+        GitGcWorker.schedule(this)
 
         // RFC-008: Register app lifecycle observer for foreground detection
         get<AppLifecycleObserver>(AppLifecycleObserver::class.java).register()

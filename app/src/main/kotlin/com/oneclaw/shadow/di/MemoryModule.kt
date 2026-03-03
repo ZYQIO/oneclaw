@@ -16,7 +16,7 @@ import org.koin.dsl.module
 
 val memoryModule = module {
     // Data layer
-    single { MemoryFileStorage(androidContext()) }
+    single { MemoryFileStorage(androidContext(), get()) }
     single { EmbeddingEngine(androidContext()) }
 
     // Search components

@@ -24,6 +24,11 @@ import com.oneclaw.shadow.tool.builtin.PdfExtractTextTool
 import com.oneclaw.shadow.tool.builtin.PdfInfoTool
 import com.oneclaw.shadow.tool.builtin.PdfRenderPageTool
 import com.oneclaw.shadow.tool.builtin.RunScheduledTaskTool
+import com.oneclaw.shadow.tool.builtin.GitBundleTool
+import com.oneclaw.shadow.tool.builtin.GitDiffTool
+import com.oneclaw.shadow.tool.builtin.GitLogTool
+import com.oneclaw.shadow.tool.builtin.GitRestoreTool
+import com.oneclaw.shadow.tool.builtin.GitShowTool
 import com.oneclaw.shadow.tool.builtin.SaveMemoryTool
 import com.oneclaw.shadow.tool.builtin.UpdateMemoryTool
 import com.oneclaw.shadow.tool.builtin.SearchHistoryTool
@@ -64,8 +69,8 @@ import org.koin.dsl.module
 
 val toolModule = module {
 
-    // JS Execution Engine (OkHttpClient, LibraryBridge, GoogleAuthManager, filesDir)
-    single { JsExecutionEngine(get(), get(), get(), androidContext().filesDir) }
+    // JS Execution Engine (OkHttpClient, LibraryBridge, GoogleAuthManager, filesDir, AppGitRepository)
+    single { JsExecutionEngine(get(), get(), get(), androidContext().filesDir, get()) }
 
     // Environment Variable Store
     single { EnvironmentVariableStore(androidContext()) }
@@ -338,6 +343,25 @@ val toolModule = module {
                 Log.e("ToolModule", "Failed to register delete_js_tool: ${e.message}")
             }
 
+            // --- git group ---
+            val gitSourceInfo = ToolSourceInfo(
+                type = ToolSourceType.BUILTIN,
+                groupName = "git"
+            )
+            listOf(
+                get<GitLogTool>(),
+                get<GitShowTool>(),
+                get<GitDiffTool>(),
+                get<GitRestoreTool>(),
+                get<GitBundleTool>()
+            ).forEach { tool ->
+                try {
+                    register(tool, gitSourceInfo)
+                } catch (e: Exception) {
+                    Log.e("ToolModule", "Failed to register ${tool.definition.name}: ${e.message}")
+                }
+            }
+
             // --- provider group ---
             val providerSourceInfo = ToolSourceInfo(
                 type = ToolSourceType.BUILTIN,
@@ -453,6 +477,11 @@ val toolModule = module {
                 name = "js_tools",
                 displayName = "JS Tools",
                 description = "Create, list, update, and delete user JavaScript tools"
+            ))
+            registerGroup(ToolGroupDefinition(
+                name = "git",
+                displayName = "Git Versioning",
+                description = "View git history, inspect commits, diff versions, restore files, and export bundles"
             ))
 
             // --- Built-in JS tools from assets ---

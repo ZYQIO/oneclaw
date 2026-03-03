@@ -23,6 +23,7 @@ open class UserFileStorage(private val context: Context) {
         if (!dir.exists() || !dir.isDirectory) return emptyList()
 
         return dir.listFiles()
+            ?.filter { it.name != ".git" && it.name != ".gitignore" }
             ?.map { file -> fileToInfo(file) }
             ?.sortedWith(compareByDescending<FileInfo> { it.isDirectory }.thenBy { it.name.lowercase() })
             ?: emptyList()

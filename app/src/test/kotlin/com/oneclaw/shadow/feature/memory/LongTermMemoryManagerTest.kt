@@ -1,6 +1,7 @@
 package com.oneclaw.shadow.feature.memory
 
 import android.content.Context
+import com.oneclaw.shadow.data.git.AppGitRepository
 import com.oneclaw.shadow.feature.memory.longterm.LongTermMemoryManager
 import com.oneclaw.shadow.feature.memory.longterm.MemorySections
 import com.oneclaw.shadow.feature.memory.storage.MemoryFileStorage
@@ -27,7 +28,8 @@ class LongTermMemoryManagerTest {
     fun setup() {
         val mockContext = mockk<Context>()
         every { mockContext.filesDir } returns tempDir
-        storage = MemoryFileStorage(mockContext)
+        val mockGitRepo = mockk<AppGitRepository>(relaxed = true)
+        storage = MemoryFileStorage(mockContext, mockGitRepo)
         manager = LongTermMemoryManager(storage)
     }
 

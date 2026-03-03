@@ -1,8 +1,5 @@
 package com.oneclaw.shadow.feature.memory
 
-import com.oneclaw.shadow.core.repository.ProviderRepository
-import com.oneclaw.shadow.data.remote.adapter.ModelApiAdapterFactory
-import com.oneclaw.shadow.data.security.ApiKeyStorage
 import com.oneclaw.shadow.feature.memory.compaction.MemoryCompactor
 import com.oneclaw.shadow.feature.memory.longterm.LongTermMemoryManager
 import com.oneclaw.shadow.feature.memory.storage.MemoryFileStorage
@@ -10,7 +7,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.spyk
-import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -43,17 +39,16 @@ class MemoryCompactorTest {
     }
 
     @Test
-    fun `compactIfNeeded with content below threshold returns false and no backup created`() = runTest {
+    fun `compactIfNeeded with content below threshold returns false`() = runTest {
         coEvery { longTermMemoryManager.readMemory() } returns "short content"
 
         val result = compactor.compactIfNeeded()
 
         assertFalse(result)
-        verify(exactly = 0) { memoryFileStorage.createBackup() }
     }
 
     @Test
-    fun `compactIfNeeded with content above threshold creates backup and calls LLM`() = runTest {
+    fun `compactIfNeeded with content above threshold calls LLM`() = runTest {
         val longContent = "- A fact about the user".repeat(150) // > 3000 chars
         coEvery { longTermMemoryManager.readMemory() } returns longContent
         coEvery { compactor.callLlm(any()) } returns validResponse
@@ -61,7 +56,6 @@ class MemoryCompactorTest {
         val result = compactor.compactIfNeeded()
 
         assertTrue(result)
-        verify { memoryFileStorage.createBackup() }
         coVerify { longTermMemoryManager.writeMemory(validResponse) }
     }
 
@@ -74,8 +68,6 @@ class MemoryCompactorTest {
         val result = compactor.compactIfNeeded()
 
         assertFalse(result)
-        // Backup still created as safety net before the LLM call
-        verify { memoryFileStorage.createBackup() }
         coVerify(exactly = 0) { longTermMemoryManager.writeMemory(any()) }
     }
 
@@ -98,7 +90,6 @@ class MemoryCompactorTest {
         val result = compactor.forceCompact()
 
         assertFalse(result)
-        verify(exactly = 0) { memoryFileStorage.createBackup() }
     }
 
     @Test
@@ -110,18 +101,17 @@ class MemoryCompactorTest {
         val result = compactor.forceCompact()
 
         assertTrue(result)
-        verify { memoryFileStorage.createBackup() }
         coVerify { longTermMemoryManager.writeMemory(validResponse) }
     }
 
     @Test
-    fun `compact success calls pruneOldBackups after writing`() = runTest {
+    fun `compact success overwrites memory with compacted content`() = runTest {
         val longContent = "- A fact about the user".repeat(150)
         coEvery { longTermMemoryManager.readMemory() } returns longContent
         coEvery { compactor.callLlm(any()) } returns validResponse
 
         compactor.compactIfNeeded()
 
-        verify { memoryFileStorage.pruneOldBackups(any()) }
+        coVerify { longTermMemoryManager.writeMemory(validResponse) }
     }
 }

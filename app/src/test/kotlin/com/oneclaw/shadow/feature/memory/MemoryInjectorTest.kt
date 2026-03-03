@@ -1,6 +1,7 @@
 package com.oneclaw.shadow.feature.memory
 
 import android.content.Context
+import com.oneclaw.shadow.data.git.AppGitRepository
 import com.oneclaw.shadow.data.local.dao.MemoryIndexDao
 import com.oneclaw.shadow.data.local.entity.MemoryIndexEntity
 import com.oneclaw.shadow.feature.memory.embedding.EmbeddingEngine
@@ -34,7 +35,8 @@ class MemoryInjectorTest {
     fun setup() {
         val mockContext = mockk<Context>()
         every { mockContext.filesDir } returns tempDir
-        val fileStorage = MemoryFileStorage(mockContext)
+        val mockGitRepo = mockk<AppGitRepository>(relaxed = true)
+        val fileStorage = MemoryFileStorage(mockContext, mockGitRepo)
         ltmManager = LongTermMemoryManager(fileStorage)
 
         val dao = mockk<MemoryIndexDao>()

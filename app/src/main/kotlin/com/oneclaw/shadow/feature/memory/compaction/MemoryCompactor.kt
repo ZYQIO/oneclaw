@@ -73,9 +73,6 @@ open class MemoryCompactor(
     }
 
     private suspend fun compact(content: String): Boolean {
-        // 1. Backup before compaction -- this is the safety net
-        memoryFileStorage.createBackup()
-
         val truncated = if (content.length > MAX_INPUT_CHARS) {
             content.take(MAX_INPUT_CHARS) + "\n\n[... truncated ...]"
         } else {
@@ -84,19 +81,16 @@ open class MemoryCompactor(
 
         val prompt = buildCompactionPrompt(truncated)
 
-        // 2. Call LLM for compaction
+        // 1. Call LLM for compaction
         val response = callLlm(prompt) ?: return false
 
-        // 3. Validate the response -- keep original if suspiciously short or blank
+        // 2. Validate the response -- keep original if suspiciously short or blank
         if (response.isBlank() || response.length < 50) {
             return false
         }
 
-        // 4. Overwrite with compacted content
+        // 3. Overwrite with compacted content (git history serves as the backup)
         longTermMemoryManager.writeMemory(response)
-
-        // 5. Prune old backups (keep most recent N)
-        memoryFileStorage.pruneOldBackups()
 
         return true
     }

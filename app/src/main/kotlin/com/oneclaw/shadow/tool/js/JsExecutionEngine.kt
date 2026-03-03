@@ -3,6 +3,7 @@ package com.oneclaw.shadow.tool.js
 import android.util.Log
 import com.dokar.quickjs.quickJs
 import com.oneclaw.shadow.core.model.ToolResult
+import com.oneclaw.shadow.data.git.AppGitRepository
 import com.oneclaw.shadow.data.security.GoogleAuthManager
 import com.oneclaw.shadow.tool.js.bridge.ConsoleBridge
 import com.oneclaw.shadow.tool.js.bridge.FetchBridge
@@ -31,7 +32,8 @@ class JsExecutionEngine(
     private val okHttpClient: OkHttpClient,
     private val libraryBridge: LibraryBridge,
     private val googleAuthManager: GoogleAuthManager? = null,
-    private val filesDir: File? = null
+    private val filesDir: File? = null,
+    private val appGitRepository: AppGitRepository? = null
 ) {
     companion object {
         private const val TAG = "JsExecutionEngine"
@@ -118,9 +120,13 @@ class JsExecutionEngine(
             // Inject bridge: console
             ConsoleBridge.inject(this, toolName)
 
-            // Inject bridge: fs
+            // Inject bridge: fs (with optional git auto-commit callback)
             if (filesDir != null) {
-                FsBridge(filesDir).inject(this)
+                val gitCommitCallback: (suspend (String, String) -> Unit)? =
+                    appGitRepository?.let { repo ->
+                        { relativePath, message -> repo.commitFile(relativePath, message) }
+                    }
+                FsBridge(filesDir, gitCommitCallback).inject(this)
             }
 
             // Inject bridge: fetch

@@ -1,17 +1,26 @@
 package com.oneclaw.shadow.feature.memory.storage
 
 import android.content.Context
+import android.util.Log
+import com.oneclaw.shadow.data.git.AppGitRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 /**
  * Handles file I/O for memory Markdown files.
  * Files are stored at getFilesDir()/memory/
+ * Auto-commits changes to the git repository after each write.
  */
 class MemoryFileStorage(
-    private val context: Context
+    private val context: Context,
+    private val appGitRepository: AppGitRepository
 ) {
+    companion object {
+        private const val TAG = "MemoryFileStorage"
+    }
+
     private val memoryDir: File
         get() = File(context.filesDir, "memory").also { it.mkdirs() }
 
@@ -21,13 +30,6 @@ class MemoryFileStorage(
     private val memoryFile: File
         get() = File(memoryDir, "MEMORY.md")
 
-    companion object {
-        const val MAX_BACKUPS = 5
-        private const val BACKUP_PREFIX = "MEMORY_backup_"
-        private const val BACKUP_SUFFIX = ".md"
-        private val BACKUP_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
-    }
-
     /**
      * Read MEMORY.md content. Returns null if file doesn't exist.
      */
@@ -36,66 +38,21 @@ class MemoryFileStorage(
     }
 
     /**
-     * Write full content to MEMORY.md.
+     * Write full content to MEMORY.md and auto-commit to git.
      */
     fun writeMemoryFile(content: String) {
         memoryFile.writeText(content)
-    }
-
-    /**
-     * Create a timestamped backup of MEMORY.md.
-     * Returns the backup file name, or null if there is nothing to back up.
-     */
-    fun createBackup(): String? {
-        val content = readMemoryFile() ?: return null
-        if (content.isBlank()) return null
-
-        val timestamp = LocalDateTime.now().format(BACKUP_TIMESTAMP_FORMAT)
-        val backupName = "$BACKUP_PREFIX$timestamp$BACKUP_SUFFIX"
-        val backupFile = File(memoryDir, backupName)
-        backupFile.writeText(content)
-        return backupName
-    }
-
-    /**
-     * Prune old backups, keeping only the most recent [maxBackups].
-     */
-    fun pruneOldBackups(maxBackups: Int = MAX_BACKUPS) {
-        val backups = memoryDir.listFiles { file ->
-            file.name.startsWith(BACKUP_PREFIX) && file.name.endsWith(BACKUP_SUFFIX)
-        }?.sortedByDescending { it.lastModified() } ?: return
-
-        if (backups.size > maxBackups) {
-            backups.drop(maxBackups).forEach { it.delete() }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                appGitRepository.commitFile("memory/MEMORY.md", "memory: update MEMORY.md")
+            } catch (e: Exception) {
+                Log.w(TAG, "Git commit after writeMemoryFile failed: ${e.message}")
+            }
         }
     }
 
     /**
-     * List all backup files, most recent first.
-     */
-    fun listBackups(): List<String> {
-        return memoryDir.listFiles { file ->
-            file.name.startsWith(BACKUP_PREFIX) && file.name.endsWith(BACKUP_SUFFIX)
-        }?.sortedByDescending { it.lastModified() }
-            ?.map { it.name }
-            ?: emptyList()
-    }
-
-    /**
-     * Restore MEMORY.md from a specific backup file.
-     * Returns true if restored successfully.
-     */
-    fun restoreFromBackup(backupName: String): Boolean {
-        val backupFile = File(memoryDir, backupName)
-        if (!backupFile.exists()) return false
-        val content = backupFile.readText()
-        if (content.isBlank()) return false
-        writeMemoryFile(content)
-        return true
-    }
-
-    /**
-     * Append content to a daily log file.
+     * Append content to a daily log file and auto-commit to git.
      * Creates the file with a header if it doesn't exist.
      */
     fun appendToDailyLog(date: String, content: String) {
@@ -104,6 +61,13 @@ class MemoryFileStorage(
             file.writeText("# Daily Log - $date\n\n")
         }
         file.appendText("$content\n\n---\n\n")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                appGitRepository.commitFile("memory/daily/$date.md", "log: add daily log $date")
+            } catch (e: Exception) {
+                Log.w(TAG, "Git commit after appendToDailyLog failed: ${e.message}")
+            }
+        }
     }
 
     /**

@@ -157,6 +157,9 @@ dependencies {
     // QuickJS JavaScript Engine
     implementation(libs.quickjs.android)
 
+    // JGit for RFC-050: Git-based File Versioning
+    implementation(libs.jgit)
+
     // RFC-024: Messaging Bridge module
     implementation(project(":bridge"))
 

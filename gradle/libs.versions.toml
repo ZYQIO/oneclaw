@@ -30,6 +30,7 @@ retrofitKotlinxSerialization = "1.0.0"
 roborazzi = "1.59.0"
 robolectric = "4.15.1"
 quickjs = "1.0.0-alpha13"
+jgit = "6.10.0.202406032230-r"
 
 [libraries]
 # AndroidX Core
@@ -112,6 +113,7 @@ roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", versi
 roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 quickjs-android = { group = "io.github.dokar3", name = "quickjs-kt-android", version.ref = "quickjs" }
+jgit = { group = "org.eclipse.jgit", name = "org.eclipse.jgit", version.ref = "jgit" }
 
 [plugins]
 roborazzi-plugin = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
