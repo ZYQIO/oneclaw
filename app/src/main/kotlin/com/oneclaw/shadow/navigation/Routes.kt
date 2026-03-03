@@ -60,4 +60,5 @@ sealed class Route(val path: String) {
     }
     data object GoogleAuth : Route("google-auth")
     data object BridgeSettings : Route("bridge-settings")
+    data object GitHistory : Route("git-history")
 }

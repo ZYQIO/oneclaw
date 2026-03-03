@@ -14,6 +14,7 @@ import com.oneclaw.shadow.feature.provider.ProviderDetailScreen
 import com.oneclaw.shadow.feature.provider.ProviderListScreen
 import com.oneclaw.shadow.feature.provider.SetupScreen
 import com.oneclaw.shadow.feature.provider.SettingsScreen
+import com.oneclaw.shadow.feature.memory.ui.GitHistoryScreen
 import com.oneclaw.shadow.feature.memory.ui.MemoryScreen
 import com.oneclaw.shadow.feature.settings.DataBackupScreen
 import com.oneclaw.shadow.feature.settings.GoogleAuthScreen
@@ -189,6 +190,13 @@ fun AppNavGraph(
 
         composable(Route.Memory.path) {
             MemoryScreen(
+                onNavigateBack = { navController.safePopBackStack() },
+                onNavigateToGitHistory = { navController.safeNavigate(Route.GitHistory.path) }
+            )
+        }
+
+        composable(Route.GitHistory.path) {
+            GitHistoryScreen(
                 onNavigateBack = { navController.safePopBackStack() }
             )
         }

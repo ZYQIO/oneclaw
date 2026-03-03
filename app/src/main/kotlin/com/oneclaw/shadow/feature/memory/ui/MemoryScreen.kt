@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +52,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun MemoryScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToGitHistory: () -> Unit = {},
     viewModel: MemoryViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -107,6 +109,9 @@ fun MemoryScreen(
                         IconButton(onClick = { viewModel.startEditingMemory() }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit memory")
                         }
+                    }
+                    IconButton(onClick = onNavigateToGitHistory) {
+                        Icon(Icons.Outlined.History, contentDescription = "Version history")
                     }
                     IconButton(
                         onClick = { viewModel.rebuildIndex() },
