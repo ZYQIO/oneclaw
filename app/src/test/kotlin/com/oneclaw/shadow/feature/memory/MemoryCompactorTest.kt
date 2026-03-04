@@ -114,4 +114,25 @@ class MemoryCompactorTest {
 
         coVerify { longTermMemoryManager.writeMemory(validResponse) }
     }
+
+    // RFC-052: Enhanced compaction prompt verification
+
+    @Test
+    fun `compaction prompt includes today date and expired entry removal rule`() = runTest {
+        val longContent = "- A fact about the user".repeat(150)
+        coEvery { longTermMemoryManager.readMemory() } returns longContent
+
+        var capturedPrompt = ""
+        coEvery { compactor.callLlm(any()) } answers {
+            capturedPrompt = firstArg<String>()
+            validResponse
+        }
+
+        compactor.compactIfNeeded()
+
+        assertTrue(capturedPrompt.contains("Today's Date"))
+        assertTrue(capturedPrompt.contains("expired temporal entries"))
+        assertTrue(capturedPrompt.contains("Maximum 10 entries per section"))
+        assertTrue(capturedPrompt.contains("Habits/Routines"))
+    }
 }

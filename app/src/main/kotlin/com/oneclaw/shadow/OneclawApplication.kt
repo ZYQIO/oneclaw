@@ -19,6 +19,7 @@ import com.oneclaw.shadow.bridge.service.BridgeWatchdogWorker
 import com.oneclaw.shadow.bridge.service.MessagingBridgeService
 import com.oneclaw.shadow.data.git.AppGitRepository
 import com.oneclaw.shadow.data.git.GitGcWorker
+import com.oneclaw.shadow.feature.memory.curator.CurationScheduler
 import com.oneclaw.shadow.di.appModule
 import com.oneclaw.shadow.di.bridgeModule
 import com.oneclaw.shadow.di.databaseModule
@@ -133,6 +134,9 @@ class OneclawApplication : Application() {
             ExistingPeriodicWorkPolicy.KEEP,
             watchdogRequest
         )
+
+        // RFC-052: Schedule daily memory curation
+        get<CurationScheduler>(CurationScheduler::class.java).scheduleCuration()
     }
 
     private fun checkDayChange(memoryTriggerManager: MemoryTriggerManager) {

@@ -2,6 +2,8 @@ package com.oneclaw.shadow.di
 
 import com.oneclaw.shadow.feature.memory.MemoryManager
 import com.oneclaw.shadow.feature.memory.compaction.MemoryCompactor
+import com.oneclaw.shadow.feature.memory.curator.CurationScheduler
+import com.oneclaw.shadow.feature.memory.curator.MemoryCurator
 import com.oneclaw.shadow.feature.memory.embedding.EmbeddingEngine
 import com.oneclaw.shadow.feature.memory.injection.MemoryInjector
 import com.oneclaw.shadow.feature.memory.log.DailyLogWriter
@@ -35,7 +37,7 @@ val memoryModule = module {
             apiKeyStorage = get(),
             adapterFactory = get(),
             memoryFileStorage = get(),
-            longTermMemoryManager = get(),
+            // RFC-052: removed longTermMemoryManager dependency
             memoryIndexDao = get(),
             embeddingEngine = get()
         )
@@ -53,6 +55,21 @@ val memoryModule = module {
         )
     }
 
+    // RFC-052: Memory curator
+    single {
+        MemoryCurator(
+            memoryFileStorage = get(),
+            longTermMemoryManager = get(),
+            memoryCompactor = get(),
+            providerRepository = get(),
+            apiKeyStorage = get(),
+            adapterFactory = get()
+        )
+    }
+
+    // RFC-052: Curation scheduler
+    single { CurationScheduler(androidContext()) }
+
     single {
         MemoryManager(
             dailyLogWriter = get(),
@@ -62,7 +79,8 @@ val memoryModule = module {
             memoryIndexDao = get(),
             memoryFileStorage = get(),
             embeddingEngine = get(),
-            memoryCompactor = get()
+            memoryCompactor = get(),
+            memoryCurator = get()
         )
     }
 

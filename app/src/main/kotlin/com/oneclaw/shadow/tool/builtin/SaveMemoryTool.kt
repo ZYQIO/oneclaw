@@ -27,6 +27,9 @@ DO NOT save:
 - Frequently changing info: "currently working on X", "today's task is Y"
 - Information already present in the system prompt memory section (check before saving!)
 - Inferred traits from a single interaction
+- Information already captured in daily conversation logs (episodic memory is handled separately)
+- Operational configuration: specific email addresses, filter rules, label IDs, API endpoints, version numbers
+- Scheduled events with specific dates (these expire and become noise; use calendar tools instead)
 
 Before saving, verify:
 1. Will this still be relevant 30 days from now?
@@ -44,7 +47,7 @@ Write concise, factual entries. Prefer updating existing facts over adding new e
                 "category" to ToolParameter(
                     type = "string",
                     description = "The memory section to place this entry in. " +
-                        "One of: profile, preferences, interests, workflow, projects, notes. " +
+                        "One of: profile, preferences, interests, habits, projects, notes. " +
                         "Defaults to notes if not specified."
                 )
             ),
@@ -91,7 +94,7 @@ Write concise, factual entries. Prefer updating existing facts over adding new e
                 "profile" -> "User Profile"
                 "preferences" -> "Preferences"
                 "interests" -> "Interests"
-                "workflow" -> "Workflow"
+                "habits", "routines", "workflow" -> "Habits/Routines"
                 "projects" -> "Projects"
                 else -> "Notes"
             }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -35,12 +36,15 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -157,7 +161,10 @@ fun MemoryScreen(
                     dates = uiState.dailyLogDates,
                     onDateClick = viewModel::selectDailyLog
                 )
-                2 -> StatsTab(uiState = uiState)
+                2 -> StatsTab(
+                    uiState = uiState,
+                    onCurationTimeChanged = viewModel::updateCurationTime
+                )
             }
         }
     }
@@ -261,13 +268,18 @@ private fun DailyLogsTab(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatsTab(uiState: MemoryUiState) {
+private fun StatsTab(
+    uiState: MemoryUiState,
+    onCurationTimeChanged: (Int, Int) -> Unit
+) {
     val stats = uiState.stats
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         if (stats == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -283,6 +295,15 @@ private fun StatsTab(uiState: MemoryUiState) {
             StatItem(
                 label = "Embedding model",
                 value = if (stats.embeddingModelLoaded) "Loaded" else "Not available (BM25 only)"
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // RFC-052: Curation schedule
+            CurationScheduleSection(
+                curationHour = uiState.curationHour,
+                curationMinute = uiState.curationMinute,
+                onTimeChanged = onCurationTimeChanged
             )
         }
     }
@@ -307,6 +328,75 @@ private fun StatItem(label: String, value: String) {
         )
     }
     HorizontalDivider()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CurationScheduleSection(
+    curationHour: Int,
+    curationMinute: Int,
+    onTimeChanged: (Int, Int) -> Unit
+) {
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showTimePicker = true }
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Memory Curation",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = "Runs daily at %02d:%02d".format(curationHour, curationMinute),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = curationHour,
+            initialMinute = curationMinute,
+            is24Hour = true
+        )
+
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Curation Time") },
+            text = {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onTimeChanged(timePickerState.hour, timePickerState.minute)
+                    showTimePicker = false
+                }) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 private fun formatBytes(bytes: Long): String {

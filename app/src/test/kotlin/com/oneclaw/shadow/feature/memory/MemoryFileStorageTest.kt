@@ -6,6 +6,7 @@ import com.oneclaw.shadow.feature.memory.storage.MemoryFileStorage
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -94,5 +95,32 @@ class MemoryFileStorageTest {
     fun `getTotalSize returns positive size after writing`() {
         storage.writeMemoryFile("some content here")
         assertTrue(storage.getTotalSize() > 0)
+    }
+
+    // RFC-052: writeDailyLog tests
+
+    @Test
+    fun `writeDailyLog overwrites existing daily log file`() {
+        storage.appendToDailyLog("2026-03-03", "first session summary")
+        storage.appendToDailyLog("2026-03-03", "second session summary")
+
+        val beforeConsolidation = storage.readDailyLog("2026-03-03")
+        assertTrue(beforeConsolidation!!.contains("first session"))
+        assertTrue(beforeConsolidation.contains("second session"))
+
+        // Overwrite with consolidated version
+        storage.writeDailyLog("2026-03-03", "# Daily Log - 2026-03-03\n\n- Consolidated summary")
+
+        val afterConsolidation = storage.readDailyLog("2026-03-03")
+        assertEquals("# Daily Log - 2026-03-03\n\n- Consolidated summary", afterConsolidation)
+        assertFalse(afterConsolidation!!.contains("first session"))
+    }
+
+    @Test
+    fun `writeDailyLog creates file if it does not exist`() {
+        storage.writeDailyLog("2026-03-04", "# Daily Log - 2026-03-04\n\n- New content")
+
+        val content = storage.readDailyLog("2026-03-04")
+        assertEquals("# Daily Log - 2026-03-04\n\n- New content", content)
     }
 }

@@ -71,6 +71,25 @@ class MemoryFileStorage(
     }
 
     /**
+     * Overwrite a daily log file with new content and auto-commit to git.
+     * Used by MemoryCurator for daily log consolidation (RFC-052).
+     */
+    fun writeDailyLog(date: String, content: String) {
+        val file = File(dailyLogDir, "$date.md")
+        file.writeText(content)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                appGitRepository.commitFile(
+                    "memory/daily/$date.md",
+                    "log: consolidate daily log $date"
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Git commit after writeDailyLog failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
      * Read a daily log file. Returns null if it doesn't exist.
      */
     fun readDailyLog(date: String): String? {

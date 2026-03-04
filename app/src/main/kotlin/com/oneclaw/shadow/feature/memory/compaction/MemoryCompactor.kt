@@ -105,21 +105,26 @@ The following is the current content of MEMORY.md:
 $content
 ```
 
+## Today's Date
+${java.time.LocalDate.now()}
+
 ## Instructions
 1. MERGE duplicate entries -- if the same fact appears multiple times, keep only the most recent/accurate version
 2. REMOVE contradictions -- if two entries conflict, keep only the latest one
 3. REMOVE transient information -- model preferences, temporary settings, one-time observations
-4. PRESERVE entries that the user explicitly asked to remember
-5. ORGANIZE into these standard sections:
-   - ## User Profile (profession, background, personality)
-   - ## Preferences (stable preferences for tools, UI, workflow)
+4. REMOVE expired temporal entries -- any entry containing a date that has already passed (deadlines, appointments, interviews, events)
+5. PRESERVE entries that the user explicitly asked to remember
+6. ORGANIZE into these standard sections:
+   - ## User Profile (name, profession, location, family, accounts)
+   - ## Preferences (stable preferences for tools, UI, interaction style)
    - ## Interests (hobbies, topics of interest)
-   - ## Workflow (recurring tasks, automation preferences, tool usage patterns)
+   - ## Habits/Routines (recurring behavioral patterns ONLY -- NOT operational config like email addresses, label IDs, or version numbers)
    - ## Projects (ongoing projects, tech stack details)
    - ## Notes (anything that doesn't fit above)
-6. Write concise bullet points (- prefix) under each section
-7. Remove empty sections entirely
-8. Keep the header "# Long-term Memory" at the top
+7. Write concise bullet points (- prefix) under each section
+8. Maximum 10 entries per section
+9. Remove empty sections entirely
+10. Keep the header "# Long-term Memory" at the top
 
 ## Output
 Return ONLY the compacted MEMORY.md content. No explanation, no commentary. Start with "# Long-term Memory".""".trimIndent()

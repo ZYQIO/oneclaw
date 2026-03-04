@@ -210,4 +210,33 @@ class SaveMemoryToolTest {
         coVerify { memoryManager.saveToLongTermMemory("Some fact") }
         coVerify(exactly = 0) { memoryManager.saveToLongTermMemoryInSection(any(), any()) }
     }
+
+    // RFC-052: Habits/Routines category mapping tests
+
+    @Test
+    fun `execute with category habits maps to Habits-Routines section`() = runTest {
+        coEvery { memoryManager.saveToLongTermMemoryInSection(any(), any()) } returns Result.success(Unit)
+
+        tool.execute(mapOf("content" to "Runs Gmail cleanup at 11 PM", "category" to "habits"))
+
+        coVerify { memoryManager.saveToLongTermMemoryInSection("Runs Gmail cleanup at 11 PM", "Habits/Routines") }
+    }
+
+    @Test
+    fun `execute with category routines maps to Habits-Routines section`() = runTest {
+        coEvery { memoryManager.saveToLongTermMemoryInSection(any(), any()) } returns Result.success(Unit)
+
+        tool.execute(mapOf("content" to "Morning standup at 10 AM", "category" to "routines"))
+
+        coVerify { memoryManager.saveToLongTermMemoryInSection("Morning standup at 10 AM", "Habits/Routines") }
+    }
+
+    @Test
+    fun `execute with category workflow maps to Habits-Routines section for backward compat`() = runTest {
+        coEvery { memoryManager.saveToLongTermMemoryInSection(any(), any()) } returns Result.success(Unit)
+
+        tool.execute(mapOf("content" to "Weekly review on Fridays", "category" to "workflow"))
+
+        coVerify { memoryManager.saveToLongTermMemoryInSection("Weekly review on Fridays", "Habits/Routines") }
+    }
 }

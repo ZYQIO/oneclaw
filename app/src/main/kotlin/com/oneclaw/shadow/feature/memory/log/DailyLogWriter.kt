@@ -15,7 +15,6 @@ import com.oneclaw.shadow.data.remote.adapter.ModelApiAdapterFactory
 import com.oneclaw.shadow.data.security.ApiKeyStorage
 import com.oneclaw.shadow.feature.memory.embedding.EmbeddingEngine
 import com.oneclaw.shadow.feature.memory.embedding.EmbeddingSerializer
-import com.oneclaw.shadow.feature.memory.longterm.LongTermMemoryManager
 import com.oneclaw.shadow.feature.memory.storage.MemoryFileStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -26,7 +25,10 @@ import java.util.UUID
 /**
  * Handles daily log extraction and writing.
  * Extracts new messages since lastLoggedMessageId, calls the AI model for
- * summarization, and writes the result to daily log + MEMORY.md.
+ * summarization, and writes the result to the daily log file.
+ *
+ * RFC-052: DailyLogWriter no longer writes to MEMORY.md.
+ * Long-term memory curation is handled by MemoryCurator on a daily schedule.
  */
 class DailyLogWriter(
     private val messageRepository: MessageRepository,
@@ -36,7 +38,6 @@ class DailyLogWriter(
     private val apiKeyStorage: ApiKeyStorage,
     private val adapterFactory: ModelApiAdapterFactory,
     private val memoryFileStorage: MemoryFileStorage,
-    private val longTermMemoryManager: LongTermMemoryManager,
     private val memoryIndexDao: MemoryIndexDao,
     private val embeddingEngine: EmbeddingEngine
 ) {
@@ -44,10 +45,8 @@ class DailyLogWriter(
         private const val TAG = "DailyLogWriter"
 
         private val SUMMARIZATION_SYSTEM_PROMPT = """
-            You are a memory extraction assistant. Your job is to summarize conversations
-            and extract important long-term facts. Be concise and factual.
-            Format your response exactly as requested with the two sections:
-            "## Daily Summary" and "## Long-term Facts".
+            You are a conversation summarization assistant. Your job is to summarize
+            conversations concisely and factually. Use bullet points.
         """.trimIndent()
     }
 
@@ -60,11 +59,10 @@ class DailyLogWriter(
      * 3. If no new messages, return early
      * 4. Build a summarization prompt with the new messages
      * 5. Call the AI model (non-streaming) for summarization
-     * 6. Parse the response into: daily_summary + long_term_facts
-     * 7. Append daily_summary to today's daily log file
-     * 8. Append long_term_facts to MEMORY.md (if any)
-     * 9. Index the new chunks (embed + store in Room)
-     * 10. Update the session's lastLoggedMessageId
+     * 6. Parse the response to extract the daily summary
+     * 7. Append daily summary to today's daily log file
+     * 8. Index the new chunks (embed + store in Room)
+     * 9. Update the session's lastLoggedMessageId
      */
     suspend fun writeDailyLog(sessionId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -135,20 +133,14 @@ class DailyLogWriter(
                 }
             }
 
-            // Parse response
-            val (dailySummary, longTermFacts) = parseSummarizationResponse(responseText)
+            // Parse response -- extract daily summary only (RFC-052: no long-term facts promotion)
+            val dailySummary = parseSummarizationResponse(responseText)
 
             // Write daily log
             val today = LocalDate.now().toString() // "2026-02-28"
             if (dailySummary.isNotBlank()) {
                 memoryFileStorage.appendToDailyLog(today, dailySummary)
                 indexChunks(dailySummary, "daily_log", today)
-            }
-
-            // Promote long-term facts
-            if (longTermFacts.isNotBlank()) {
-                longTermMemoryManager.appendMemory(longTermFacts)
-                indexChunks(longTermFacts, "long_term", null)
             }
 
             // Update lastLoggedMessageId
@@ -187,15 +179,11 @@ class DailyLogWriter(
 
     private fun buildSummarizationPrompt(conversationText: String): String {
         return """
-            |Summarize the following conversation. Provide two sections:
+            |Summarize the following conversation concisely. Provide:
             |
             |## Daily Summary
             |A concise summary of key topics discussed, decisions made, tasks completed,
             |and any notable information. Use bullet points.
-            |
-            |## Long-term Facts
-            |Extract any stable facts, user preferences, or important knowledge that should
-            |be remembered permanently. If none, write "None".
             |
             |---
             |Conversation:
@@ -203,26 +191,16 @@ class DailyLogWriter(
         """.trimMargin()
     }
 
-    internal fun parseSummarizationResponse(
-        response: String
-    ): Pair<String, String> {
+    /**
+     * Parse the summarization response to extract the daily summary.
+     * RFC-052: No longer extracts long-term facts -- only returns daily summary.
+     */
+    internal fun parseSummarizationResponse(response: String): String {
         val dailySummaryRegex = Regex(
-            "## Daily Summary\\s*\\n([\\s\\S]*?)(?=## Long-term Facts|$)",
+            "## Daily Summary\\s*\\n([\\s\\S]*?)$",
             RegexOption.IGNORE_CASE
         )
-        val longTermRegex = Regex(
-            "## Long-term Facts\\s*\\n([\\s\\S]*?)$",
-            RegexOption.IGNORE_CASE
-        )
-
-        val dailySummary = dailySummaryRegex.find(response)?.groupValues?.get(1)?.trim() ?: response.trim()
-        val longTermRaw = longTermRegex.find(response)?.groupValues?.get(1)?.trim() ?: ""
-        val longTermFacts = if (longTermRaw.equals("None", ignoreCase = true) ||
-            longTermRaw.equals("None.", ignoreCase = true) ||
-            longTermRaw.isBlank()
-        ) "" else longTermRaw
-
-        return dailySummary to longTermFacts
+        return dailySummaryRegex.find(response)?.groupValues?.get(1)?.trim() ?: response.trim()
     }
 
     private suspend fun resolveModel(agent: com.oneclaw.shadow.core.model.Agent): Pair<AiModel, Provider>? {

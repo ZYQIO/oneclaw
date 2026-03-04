@@ -3,6 +3,7 @@ package com.oneclaw.shadow.feature.memory.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oneclaw.shadow.feature.memory.MemoryManager
+import com.oneclaw.shadow.feature.memory.curator.CurationScheduler
 import com.oneclaw.shadow.feature.memory.longterm.LongTermMemoryManager
 import com.oneclaw.shadow.feature.memory.model.MemoryStats
 import com.oneclaw.shadow.feature.memory.storage.MemoryFileStorage
@@ -23,19 +24,24 @@ data class MemoryUiState(
     val editingContent: String = "",
     val isRebuildingIndex: Boolean = false,
     val rebuildSuccess: Boolean? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val curationHour: Int = CurationScheduler.DEFAULT_HOUR,
+    val curationMinute: Int = CurationScheduler.DEFAULT_MINUTE
 )
 
 class MemoryViewModel(
     private val memoryManager: MemoryManager,
     private val longTermMemoryManager: LongTermMemoryManager,
-    private val memoryFileStorage: MemoryFileStorage
+    private val memoryFileStorage: MemoryFileStorage,
+    private val curationScheduler: CurationScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MemoryUiState())
     val uiState: StateFlow<MemoryUiState> = _uiState.asStateFlow()
 
     init {
+        val (hour, minute) = curationScheduler.getCurationTime()
+        _uiState.update { it.copy(curationHour = hour, curationMinute = minute) }
         loadAll()
     }
 
@@ -135,5 +141,10 @@ class MemoryViewModel(
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun updateCurationTime(hour: Int, minute: Int) {
+        curationScheduler.setCurationTime(hour, minute)
+        _uiState.update { it.copy(curationHour = hour, curationMinute = minute) }
     }
 }

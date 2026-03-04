@@ -13,7 +13,7 @@ object MemorySections {
         "User Profile",
         "Preferences",
         "Interests",
-        "Workflow",
+        "Habits/Routines",
         "Projects",
         "Notes"
     )

@@ -216,7 +216,7 @@ class LongTermMemoryManagerTest {
     @Test
     fun `MemorySections has correct standard sections`() {
         assertEquals(
-            listOf("User Profile", "Preferences", "Interests", "Workflow", "Projects", "Notes"),
+            listOf("User Profile", "Preferences", "Interests", "Habits/Routines", "Projects", "Notes"),
             MemorySections.STANDARD_SECTIONS
         )
     }

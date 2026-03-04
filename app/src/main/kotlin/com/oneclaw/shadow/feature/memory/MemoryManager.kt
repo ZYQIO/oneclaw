@@ -3,6 +3,7 @@ package com.oneclaw.shadow.feature.memory
 import com.oneclaw.shadow.data.local.dao.MemoryIndexDao
 import com.oneclaw.shadow.data.local.entity.MemoryIndexEntity
 import com.oneclaw.shadow.feature.memory.compaction.MemoryCompactor
+import com.oneclaw.shadow.feature.memory.curator.MemoryCurator
 import com.oneclaw.shadow.feature.memory.embedding.EmbeddingEngine
 import com.oneclaw.shadow.feature.memory.embedding.EmbeddingSerializer
 import com.oneclaw.shadow.feature.memory.injection.MemoryInjector
@@ -28,7 +29,8 @@ class MemoryManager(
     private val memoryIndexDao: MemoryIndexDao,
     private val memoryFileStorage: MemoryFileStorage,
     private val embeddingEngine: EmbeddingEngine,
-    private val memoryCompactor: MemoryCompactor? = null
+    private val memoryCompactor: MemoryCompactor? = null,
+    private val memoryCurator: MemoryCurator? = null
 ) {
     /**
      * Flush daily log for a session.
@@ -157,6 +159,19 @@ class MemoryManager(
             try { rebuildIndex() } catch (_: Exception) {}
         }
         return compacted
+    }
+
+    /**
+     * Run memory curation (MemoryCurator).
+     * Called by MemoryCurationWorker on daily schedule.
+     * Returns true if MEMORY.md was updated.
+     */
+    suspend fun curateMemory(): Boolean {
+        val curated = memoryCurator?.curate() ?: return false
+        if (curated) {
+            try { rebuildIndex() } catch (_: Exception) {}
+        }
+        return curated
     }
 
     /**
