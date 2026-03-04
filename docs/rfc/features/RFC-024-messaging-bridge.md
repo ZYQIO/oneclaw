@@ -900,7 +900,7 @@ dependencies {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -908,7 +908,7 @@ dependencies {
     <application>
         <service
             android:name=".service.MessagingBridgeService"
-            android:foregroundServiceType="dataSync"
+            android:foregroundServiceType="remoteMessaging"
             android:exported="false" />
     </application>
 
@@ -1217,7 +1217,7 @@ while (isActive) {
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
-| Background service killed by Android battery optimization | High | High | Foreground service (`dataSync` type) + `START_STICKY` + watchdog worker + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dialog shown when bridge is first enabled |
+| Background service killed by Android battery optimization | High | High | Foreground service (`remoteMessaging` type) + `START_STICKY` + watchdog worker + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dialog shown when bridge is first enabled |
 | Platform API changes break channel implementations | Medium | Medium | Each channel is isolated; can update/disable individually |
 | NanoHTTPD limitations under load | Low | Low | WebChat/LINE are typically low-volume; can replace if needed |
 | Port conflicts with other apps | Medium | Low | Configurable ports; clear error reporting |

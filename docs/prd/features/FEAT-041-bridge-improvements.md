@@ -58,7 +58,7 @@ FEAT-041 consolidates improvements to the Messaging Bridge (FEAT-024) based on u
 - `BridgeBootReceiver` listens for `BOOT_COMPLETED` and auto-starts the bridge service if it was enabled before the device shut down.
 
 #### 6. Foreground Notification Persistence (Previously Implemented)
-- Fixed `foregroundServiceType` from `specialUse` to `dataSync` for correct system behavior.
+- Fixed `foregroundServiceType` from `specialUse` to `remoteMessaging` for correct system behavior. (`dataSync` was used intermediately but causes a 6-hour Android 14+ time limit; `remoteMessaging` has no such restriction and is the correct type for a persistent messaging service.)
 - `ACTION_RESTART` intent ensures the foreground notification persists when channels are reloaded.
 
 #### 7. Duplicate Message Prevention (Previously Implemented)

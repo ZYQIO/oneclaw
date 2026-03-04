@@ -58,7 +58,7 @@ FEAT-041 根据用户测试反馈，整合了对消息桥接（FEAT-024）的多
 - `BridgeBootReceiver` 监听 `BOOT_COMPLETED` 事件，若设备关机前桥接服务已启用，则自动重启该服务。
 
 #### 6. 前台通知持久化（此前已实现）
-- 将 `foregroundServiceType` 从 `specialUse` 修正为 `dataSync`，以获得正确的系统行为。
+- 将 `foregroundServiceType` 从 `specialUse` 修正为 `remoteMessaging`，以获得正确的系统行为。（中间曾短暂使用 `dataSync`，但该类型在 Android 14+ 上有 6 小时时间限制；`remoteMessaging` 无此限制，且是持久消息服务的正确类型。）
 - `ACTION_RESTART` intent 确保在频道重新加载时前台通知持续显示。
 
 #### 7. 重复消息防止（此前已实现）

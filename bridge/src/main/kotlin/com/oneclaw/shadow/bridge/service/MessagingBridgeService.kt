@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -17,7 +16,6 @@ import com.oneclaw.shadow.bridge.BridgeBroadcaster
 import com.oneclaw.shadow.bridge.BridgeMessageObserver
 import com.oneclaw.shadow.bridge.BridgePreferences
 import com.oneclaw.shadow.bridge.BridgeStateTracker
-import com.oneclaw.shadow.bridge.channel.ChannelType
 import com.oneclaw.shadow.bridge.channel.ConversationMapper
 import com.oneclaw.shadow.bridge.channel.MessagingChannel
 import com.oneclaw.shadow.bridge.channel.discord.DiscordChannel
@@ -68,7 +66,13 @@ class MessagingBridgeService : Service() {
 
     private fun startBridge() {
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
+        try {
+            startForeground(NOTIFICATION_ID, createNotification())
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed, stopping service: ${e.message}")
+            stopSelf()
+            return
+        }
 
         if (preferences.isWakeLockEnabled()) {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -222,7 +226,13 @@ class MessagingBridgeService : Service() {
 
     private fun restartBridge() {
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
+        try {
+            startForeground(NOTIFICATION_ID, createNotification())
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed on restart, stopping service: ${e.message}")
+            stopSelf()
+            return
+        }
         serviceScope.launch {
             channelMutex.withLock {
                 // Stop existing channels

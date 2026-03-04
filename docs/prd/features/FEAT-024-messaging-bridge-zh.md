@@ -240,7 +240,7 @@
 
 ### 兼容性
 - Android API 26+（minSdk）
-- 后台执行：前台服务（`dataSync` 类型）+ 可选唤醒锁 + 电池优化豁免
+- 后台执行：前台服务（`remoteMessaging` 类型）+ 可选唤醒锁 + 电池优化豁免
 - 网络：支持 WiFi 和移动数据
 - WebChat/LINE Webhook 服务器仅在局域网内可访问（不内置端口转发）
 

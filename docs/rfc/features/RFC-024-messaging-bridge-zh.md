@@ -900,7 +900,7 @@ dependencies {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -908,7 +908,7 @@ dependencies {
     <application>
         <service
             android:name=".service.MessagingBridgeService"
-            android:foregroundServiceType="dataSync"
+            android:foregroundServiceType="remoteMessaging"
             android:exported="false" />
     </application>
 
@@ -1217,7 +1217,7 @@ while (isActive) {
 
 | 风险 | 影响 | 概率 | 缓解措施 |
 |------|--------|-------------|------------|
-| Android 电量优化导致后台服务被杀 | 高 | 高 | 前台服务（`dataSync` 类型）+ `START_STICKY` + 看门狗 Worker + 首次开启 Bridge 时通过 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 对话框引导用户加入白名单 |
+| Android 电量优化导致后台服务被杀 | 高 | 高 | 前台服务（`remoteMessaging` 类型）+ `START_STICKY` + 看门狗 Worker + 首次开启 Bridge 时通过 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 对话框引导用户加入白名单 |
 | 平台 API 变更导致频道实现失效 | 中 | 中 | 各频道相互隔离，可单独更新或禁用 |
 | NanoHTTPD 在高负载下的局限性 | 低 | 低 | WebChat/LINE 通常是低流量场景；如需要可替换 |
 | 与其他应用的端口冲突 | 中 | 低 | 端口可配置；提供清晰的错误报告 |

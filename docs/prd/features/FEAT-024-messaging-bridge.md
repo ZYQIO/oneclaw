@@ -240,7 +240,7 @@ Optional (nice to have):
 
 ### Compatibility
 - Android API 26+ (minSdk)
-- Background execution: foreground service (`dataSync` type) + optional wake lock + battery optimization exemption
+- Background execution: foreground service (`remoteMessaging` type) + optional wake lock + battery optimization exemption
 - Network: works on WiFi and mobile data
 - WebChat/LINE webhook servers accessible only on local network (no port forwarding built in)
 
