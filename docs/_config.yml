@@ -4,6 +4,8 @@ theme: minima
 baseurl: "/oneclaw"
 url: "https://gnhua.github.io"
 
+header_pages: []
+
 markdown: kramdown
 highlighter: rouge
 
