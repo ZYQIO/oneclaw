@@ -2,6 +2,9 @@ package com.oneclaw.shadow.feature.bridge
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -34,7 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,6 +59,37 @@ fun BridgeSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var showBatteryOptDialog by remember { mutableStateOf(false) }
+
+    if (showBatteryOptDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatteryOptDialog = false },
+            title = { Text("Allow background running") },
+            text = {
+                Text(
+                    "For the Messaging Bridge to work reliably when the screen is off, " +
+                    "please disable battery optimization for this app. " +
+                    "Tap \"Go to Settings\" and select \"Don't optimize\" or \"No restrictions\"."
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showBatteryOptDialog = false
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    }
+                    context.startActivity(intent)
+                }) {
+                    Text("Go to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatteryOptDialog = false }) {
+                    Text("Skip")
+                }
+            }
+        )
+    }
 
     // Restart bridge when leaving screen so credential/token changes take effect
     DisposableEffect(Unit) {
@@ -100,6 +136,10 @@ fun BridgeSettingsScreen(
                     viewModel.toggleBridge(enabled)
                     if (enabled) {
                         MessagingBridgeService.start(context)
+                        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                        if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                            showBatteryOptDialog = true
+                        }
                     } else {
                         MessagingBridgeService.stop(context)
                     }

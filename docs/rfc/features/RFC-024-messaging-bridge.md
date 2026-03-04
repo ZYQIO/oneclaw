@@ -900,19 +900,28 @@ dependencies {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application>
         <service
             android:name=".service.MessagingBridgeService"
-            android:foregroundServiceType="specialUse"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
     </application>
 
 </manifest>
 ```
+
+The app manifest (`:app` module) additionally declares:
+
+```xml
+<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+```
+
+This permission is used to prompt the user to exempt the app from battery optimization when the bridge is first enabled. It is declared in `:app` rather than `:bridge` because it triggers a system dialog from an Activity context. Google Play allows this permission for communication/messaging apps; a declaration must be submitted in Play Console explaining the use case.
 
 ### Navigation Integration
 
@@ -1208,7 +1217,7 @@ while (isActive) {
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
-| Background service killed by Android battery optimization | High | High | Foreground service + watchdog worker + user guidance to disable battery optimization |
+| Background service killed by Android battery optimization | High | High | Foreground service (`dataSync` type) + `START_STICKY` + watchdog worker + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dialog shown when bridge is first enabled |
 | Platform API changes break channel implementations | Medium | Medium | Each channel is isolated; can update/disable individually |
 | NanoHTTPD limitations under load | Low | Low | WebChat/LINE are typically low-volume; can replace if needed |
 | Port conflicts with other apps | Medium | Low | Configurable ports; clear error reporting |

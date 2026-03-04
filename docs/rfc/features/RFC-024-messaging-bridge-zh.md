@@ -900,19 +900,28 @@ dependencies {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application>
         <service
             android:name=".service.MessagingBridgeService"
-            android:foregroundServiceType="specialUse"
+            android:foregroundServiceType="dataSync"
             android:exported="false" />
     </application>
 
 </manifest>
 ```
+
+`:app` 模块的清单文件额外声明：
+
+```xml
+<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+```
+
+该权限用于在用户首次开启 Bridge 时弹出系统对话框，引导用户将 app 加入电池优化白名单。声明在 `:app` 而非 `:bridge` 模块，因为需要从 Activity 上下文触发系统对话框。Google Play 允许通讯/消息类 app 使用该权限；上架时需在 Play Console 填写权限用途声明。
 
 ### 导航集成
 
@@ -1208,7 +1217,7 @@ while (isActive) {
 
 | 风险 | 影响 | 概率 | 缓解措施 |
 |------|--------|-------------|------------|
-| Android 电量优化导致后台服务被杀 | 高 | 高 | 前台服务 + 看门狗 Worker + 引导用户关闭电量优化 |
+| Android 电量优化导致后台服务被杀 | 高 | 高 | 前台服务（`dataSync` 类型）+ `START_STICKY` + 看门狗 Worker + 首次开启 Bridge 时通过 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 对话框引导用户加入白名单 |
 | 平台 API 变更导致频道实现失效 | 中 | 中 | 各频道相互隔离，可单独更新或禁用 |
 | NanoHTTPD 在高负载下的局限性 | 低 | 低 | WebChat/LINE 通常是低流量场景；如需要可替换 |
 | 与其他应用的端口冲突 | 中 | 低 | 端口可配置；提供清晰的错误报告 |

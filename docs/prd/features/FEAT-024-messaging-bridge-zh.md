@@ -76,6 +76,7 @@
 - 可选唤醒锁，防止设备在桥接运行期间进入休眠
 - 看门狗 Worker（WorkManager），在服务意外停止时重新启动
 - 通过 `ACTION_START` / `ACTION_STOP` Intent 实现干净的启停生命周期
+- 用户首次开启 Bridge 时弹出电池优化豁免引导对话框，引导用户通过系统对话框将 app 加入白名单（`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`）
 
 ### 用户交互流程
 ```
@@ -239,7 +240,7 @@
 
 ### 兼容性
 - Android API 26+（minSdk）
-- 后台执行：前台服务 + 可选唤醒锁
+- 后台执行：前台服务（`dataSync` 类型）+ 可选唤醒锁 + 电池优化豁免
 - 网络：支持 WiFi 和移动数据
 - WebChat/LINE Webhook 服务器仅在局域网内可访问（不内置端口转发）
 

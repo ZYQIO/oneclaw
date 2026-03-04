@@ -76,6 +76,7 @@ Outbound (Broadcast):
 - Optional wake lock to prevent device sleep during bridge operation
 - Watchdog worker (WorkManager) that restarts the service if it unexpectedly stops
 - Clean start/stop lifecycle with `ACTION_START` / `ACTION_STOP` intents
+- Battery optimization exemption prompt shown once when the bridge is first enabled, guiding the user to whitelist the app via the system dialog (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`)
 
 ### User Interaction Flow
 ```
@@ -239,7 +240,7 @@ Optional (nice to have):
 
 ### Compatibility
 - Android API 26+ (minSdk)
-- Background execution: foreground service + optional wake lock
+- Background execution: foreground service (`dataSync` type) + optional wake lock + battery optimization exemption
 - Network: works on WiFi and mobile data
 - WebChat/LINE webhook servers accessible only on local network (no port forwarding built in)
 
