@@ -46,3 +46,4 @@ material-theme.zip
 .kotlin
 release.jks
 signing.properties
+.claude/
