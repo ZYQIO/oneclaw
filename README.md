@@ -23,6 +23,8 @@ OneClaw is a **local-first, BYOK (Bring Your Own Key)** AI assistant for Android
 
 All data stays on your device. You provide your own API keys. Nothing is collected.
 
+This is a full rewrite of the original codebase. The previous git history has been retired and the app has been rebuilt from scratch using a documentation-driven process -- every feature is specified in a [Product Requirements Document](docs/prd/00-overview.md) before any code is written.
+
 ## Screenshots
 
 <p align="center">
