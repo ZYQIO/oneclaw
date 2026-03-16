@@ -11,10 +11,10 @@
 
 | 字段 | 内容 |
 |------|------|
-| 最后更新 | 2026-02-27 |
+| 最后更新 | 2026-03-16 |
 | App 版本 | 0.1.0 |
-| 最后实现的 RFC | RFC-001（对话交互）+ RFC-002（Agent 管理） |
-| 当前状态 | 完整应用已实现：Setup、Provider 管理、Tool 系统、Session 管理、Agent 管理和流式 Chat |
+| 最后实现的 RFC | 远程控制基础版（模块 + OneClaw 集成骨架） |
+| 当前状态 | 完整应用已实现：Setup、Provider 管理、Tool 系统、Session 管理、Agent 管理、流式 Chat，以及远程控制初始集成 |
 
 ---
 
@@ -37,16 +37,18 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 
 ## 当前 App 状态
 
-截至最后实现的 RFC（RFC-001 + RFC-002），App 支持以下功能：
+截至当前实现状态，App 支持以下功能：
 - 首次启动引导流程（选择 Provider、输入 API key、选择默认模型）
 - Provider 管理（列表、详情、API key、连接测试、模型列表）
 - 设置界面（含"Manage Agents"入口）
+- 设置界面（含"Remote Control"入口）
 - Tool 系统（后端 + AgentDetailScreen 中的每个 Agent 工具配置）
 - Session 管理（抽屉 UI，支持新建/切换/删除/重命名 Session）
 - Agent 管理（列表、创建、编辑、克隆、删除自定义 Agent；查看内置 Agent）
 - 流式 Chat：来自 OpenAI/Anthropic/Gemini 的 SSE 流式传输、工具调用循环、thinking blocks、消息历史
+- 远程控制基础能力：基于 broker 的设备列表、配对、会话开关、截图刷新、基础输入命令和远控工具组
 
-**所有计划的 RFC 均已实现。**
+**远程控制当前优先面向已 Root 的被控设备；非 Root 兼容路径仅完成脚手架。**
 
 ---
 
@@ -146,6 +148,18 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 
 **验证：**
 - 打开 Agent 列表界面（详细的 Agent 管理流程见流程 7）
+
+### 步骤 2.4：进入 Remote Control
+
+返回设置界面，点击"Remote Control"。
+
+**验证：**
+- 打开 Remote Control 界面
+- 可见 Broker URL 输入框
+- 可见 Pair code 输入框
+- 可见 Connect / Disconnect / Refresh 按钮
+- 当 broker 已连接且设备在线时，可渲染设备卡片
+- 选中设备后，可见 Pair / Open / Close / Snapshot / Home / Back / Tap Center 控件
 
 ---
 
@@ -439,7 +453,9 @@ AI 流式传输期间，点击停止按钮。
 
 ## 当前已知限制
 
-所有计划的 RFC 均已实现，暂无已知功能限制。
+- 远程控制完整能力仅在已 Root 且具备 `su`、`input`、`screencap` 能力的被控设备上实现。
+- 非 Root 兼容路径（`MediaProjection` + `AccessibilityService`）当前只有脚手架，尚未端到端打通。
+- 当前远程画面使用周期性截图刷新，还不是 H.264 实时流。
 
 ---
 
@@ -447,6 +463,7 @@ AI 流式传输期间，点击停止按钮。
 
 | 日期 | RFC | 变更内容 |
 |------|-----|---------|
+| 2026-03-16 | 远程控制基础版 | 新增 Remote Control 设置入口和人工测试流程，更新当前状态与限制说明 |
 | 2026-02-27 | RFC-003、RFC-004 | 初始版本，涵盖 Setup、Settings、Provider 管理流程 |
 | 2026-02-27 | RFC-005 | 更新当前状态，补充步骤 6.2 Session 抽屉细节，更新已知限制表 |
 | 2026-02-27 | RFC-001、RFC-002 | 完整重写流程 6（含流式 Chat），新增流程 7（Agent 管理），更新 App 状态和设置步骤 2.3，移除所有"未实现"限制说明 |

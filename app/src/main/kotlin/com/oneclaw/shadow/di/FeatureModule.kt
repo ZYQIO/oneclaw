@@ -16,6 +16,7 @@ import com.oneclaw.shadow.feature.chat.usecase.SendMessageUseCase
 import com.oneclaw.shadow.feature.provider.ProviderDetailViewModel
 import com.oneclaw.shadow.feature.provider.ProviderListViewModel
 import com.oneclaw.shadow.feature.provider.SetupViewModel
+import com.oneclaw.shadow.feature.remote.RemoteControlViewModel
 import com.oneclaw.shadow.feature.provider.usecase.FetchModelsUseCase
 import com.oneclaw.shadow.feature.provider.usecase.SetDefaultModelUseCase
 import com.oneclaw.shadow.feature.provider.usecase.TestConnectionUseCase
@@ -208,4 +209,7 @@ val featureModule = module {
     factory { DeleteFileUseCase(get()) }
     viewModelOf(::FileBrowserViewModel)
     viewModelOf(::FilePreviewViewModel)
+
+    // Remote control
+    viewModelOf(::RemoteControlViewModel)
 }

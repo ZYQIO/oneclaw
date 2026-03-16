@@ -11,10 +11,10 @@ This document is the cumulative, always-up-to-date guide for manually testing th
 
 | Field | Value |
 |-------|-------|
-| Last updated | 2026-02-27 |
+| Last updated | 2026-03-16 |
 | App version | 0.1.0 |
-| Last RFC implemented | RFC-001 (Chat Interaction) + RFC-002 (Agent Management) |
-| Status | Full app implemented: Setup, Provider management, Tool system, Session management, Agent management, and Chat with streaming |
+| Last RFC implemented | Remote Control foundation (modules + OneClaw integration scaffolding) |
+| Status | Full app implemented: Setup, Provider management, Tool system, Session management, Agent management, Chat with streaming, and initial Remote Control integration |
 
 ---
 
@@ -37,16 +37,18 @@ adb shell am start -n com.oneclaw.shadow/.MainActivity
 
 ## Current App State
 
-As of the last implemented RFC (RFC-001 + RFC-002), the app supports:
+As of the current implementation, the app supports:
 - First-launch setup flow (choose provider, enter API key, select default model)
 - Provider management (list, detail, API key, connection test, model list)
 - Settings screen with "Manage Agents" entry point
+- Settings screen with "Remote Control" entry point
 - Tool system (backend + per-agent tool configuration in AgentDetailScreen)
 - Session management (drawer UI with new/switch/delete/rename sessions)
 - Agent management (list, create, edit, clone, delete custom agents; view built-in agents)
 - Chat with streaming: SSE streaming from OpenAI/Anthropic/Gemini, tool call loop, thinking blocks, message history
+- Remote control foundation: broker-backed device list, pairing, session open/close, snapshot refresh, basic input commands, and remote tool group
 
-**All planned RFCs have been implemented.**
+**Remote control is currently optimized for rooted host devices. The non-root compatibility path is scaffolded but not complete.**
 
 ---
 
@@ -146,6 +148,18 @@ Go back to Settings, then tap "Manage Agents".
 
 **Verify:**
 - Agent list screen opens (see Flow 7 for detailed agent management flows)
+
+### Step 2.4: Navigate to Remote Control
+
+Go back to Settings, then tap "Remote Control".
+
+**Verify:**
+- Remote Control screen opens
+- Broker URL input is visible
+- Pair code input is visible
+- Connect / Disconnect / Refresh buttons are visible
+- Device cards render when a broker is connected and devices are online
+- Selecting a device exposes Pair / Open / Close / Snapshot / Home / Back / Tap Center controls
 
 ---
 
@@ -439,7 +453,9 @@ From the Chat screen, tap the agent name in the top bar.
 
 ## Known Limitations (current state)
 
-All planned RFCs are implemented. No known functional limitations.
+- Remote control is only fully implemented for rooted host devices that expose `su`, `input`, and `screencap`.
+- The non-root compatibility path (`MediaProjection` + `AccessibilityService`) is scaffolded but not yet end-to-end functional.
+- Live remote viewing currently uses repeated screenshots instead of H.264 streaming.
 
 ---
 
@@ -447,6 +463,7 @@ All planned RFCs are implemented. No known functional limitations.
 
 | Date | RFC | Changes |
 |------|-----|---------|
+| 2026-03-16 | Remote Control foundation | Added Settings entry and manual flow for Remote Control; updated current state and limitations |
 | 2026-02-27 | RFC-003, RFC-004 | Initial guide — covers Setup, Settings, Provider management flows |
 | 2026-02-27 | RFC-005 | Updated current state, Flow 6.2 session drawer detail, known limitations |
 | 2026-02-27 | RFC-001, RFC-002 | Complete rewrite of Flow 6 (full Chat with streaming), added Flow 7 (Agent Management), updated app state and Settings step 2.3, removed all "not yet implemented" limitations |

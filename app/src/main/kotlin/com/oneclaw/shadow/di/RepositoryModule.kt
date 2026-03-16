@@ -5,10 +5,12 @@ import com.oneclaw.shadow.core.repository.AttachmentRepository
 import com.oneclaw.shadow.core.repository.FileRepository
 import com.oneclaw.shadow.core.repository.MessageRepository
 import com.oneclaw.shadow.core.repository.ProviderRepository
+import com.oneclaw.shadow.core.repository.RemoteControllerGateway
 import com.oneclaw.shadow.core.repository.SessionRepository
 import com.oneclaw.shadow.core.repository.ScheduledTaskRepository
 import com.oneclaw.shadow.core.repository.SettingsRepository
 import com.oneclaw.shadow.core.repository.TaskExecutionRecordRepository
+import com.oneclaw.shadow.data.remotecontrol.RemoteControllerRepository
 import com.oneclaw.shadow.data.repository.AgentRepositoryImpl
 import com.oneclaw.shadow.data.repository.AttachmentRepositoryImpl
 import com.oneclaw.shadow.data.repository.FileRepositoryImpl
@@ -37,4 +39,6 @@ val repositoryModule = module {
     // RFC-025: File browsing
     single { UserFileStorage(androidContext()) }
     single<FileRepository> { FileRepositoryImpl(get()) }
+
+    single<RemoteControllerGateway> { RemoteControllerRepository(get(), get()) }
 }

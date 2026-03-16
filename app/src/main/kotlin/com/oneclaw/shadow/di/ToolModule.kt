@@ -34,6 +34,17 @@ import com.oneclaw.shadow.tool.builtin.UpdateMemoryTool
 import com.oneclaw.shadow.tool.builtin.SearchHistoryTool
 import com.oneclaw.shadow.tool.builtin.UpdateJsToolTool
 import com.oneclaw.shadow.tool.builtin.UpdateScheduledTaskTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteCloseSessionTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteInputTextTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteLaunchAppTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteListDevicesTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteOpenSessionTool
+import com.oneclaw.shadow.tool.builtin.remote.RemotePressKeyTool
+import com.oneclaw.shadow.tool.builtin.remote.RemotePullFileTool
+import com.oneclaw.shadow.tool.builtin.remote.RemotePushFileTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteSnapshotTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteSwipeTool
+import com.oneclaw.shadow.tool.builtin.remote.RemoteTapTool
 import com.oneclaw.shadow.tool.builtin.WebfetchTool
 import com.oneclaw.shadow.tool.builtin.config.AddModelTool
 import com.oneclaw.shadow.tool.builtin.config.CreateProviderTool
@@ -112,6 +123,19 @@ val toolModule = module {
     single { BrowserContentExtractor(androidContext()) }
     single { WebViewManager(androidContext(), get(), get()) }
     single { BrowserTool(androidContext(), get()) }
+
+    // Remote control tools
+    single { RemoteListDevicesTool(get()) }
+    single { RemoteOpenSessionTool(get()) }
+    single { RemoteSnapshotTool(androidContext(), get()) }
+    single { RemoteTapTool(get()) }
+    single { RemoteSwipeTool(get()) }
+    single { RemoteInputTextTool(get()) }
+    single { RemotePressKeyTool(get()) }
+    single { RemoteLaunchAppTool(get()) }
+    single { RemotePushFileTool(get()) }
+    single { RemotePullFileTool(get()) }
+    single { RemoteCloseSessionTool(get()) }
 
     // RFC-029: exec built-in tool
     single { ExecTool(androidContext()) }
@@ -380,6 +404,31 @@ val toolModule = module {
                 }
             }
 
+            // --- remote group ---
+            val remoteSourceInfo = ToolSourceInfo(
+                type = ToolSourceType.BUILTIN,
+                groupName = "remote"
+            )
+            listOf(
+                get<RemoteListDevicesTool>(),
+                get<RemoteOpenSessionTool>(),
+                get<RemoteSnapshotTool>(),
+                get<RemoteTapTool>(),
+                get<RemoteSwipeTool>(),
+                get<RemoteInputTextTool>(),
+                get<RemotePressKeyTool>(),
+                get<RemoteLaunchAppTool>(),
+                get<RemotePushFileTool>(),
+                get<RemotePullFileTool>(),
+                get<RemoteCloseSessionTool>()
+            ).forEach { tool ->
+                try {
+                    register(tool, remoteSourceInfo)
+                } catch (e: Exception) {
+                    Log.e("ToolModule", "Failed to register ${tool.definition.name}: ${e.message}")
+                }
+            }
+
             // --- model group ---
             val modelSourceInfo = ToolSourceInfo(
                 type = ToolSourceType.BUILTIN,
@@ -452,6 +501,11 @@ val toolModule = module {
                 name = "provider",
                 displayName = "Providers",
                 description = "List, create, update, and delete API providers"
+            ))
+            registerGroup(ToolGroupDefinition(
+                name = "remote",
+                displayName = "Remote Control",
+                description = "List paired devices, open sessions, capture snapshots, control input, and transfer files"
             ))
             registerGroup(ToolGroupDefinition(
                 name = "model",

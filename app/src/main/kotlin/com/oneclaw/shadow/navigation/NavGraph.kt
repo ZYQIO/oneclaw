@@ -14,6 +14,7 @@ import com.oneclaw.shadow.feature.provider.ProviderDetailScreen
 import com.oneclaw.shadow.feature.provider.ProviderListScreen
 import com.oneclaw.shadow.feature.provider.SetupScreen
 import com.oneclaw.shadow.feature.provider.SettingsScreen
+import com.oneclaw.shadow.feature.remote.RemoteControlScreen
 import com.oneclaw.shadow.feature.memory.ui.GitHistoryScreen
 import com.oneclaw.shadow.feature.memory.ui.MemoryScreen
 import com.oneclaw.shadow.feature.settings.DataBackupScreen
@@ -155,7 +156,14 @@ fun AppNavGraph(
                 onScheduledTasks = { navController.safeNavigate(Route.ScheduleList.path) },
                 onFiles = { navController.safeNavigate(Route.FileBrowser.path) },
                 onGoogleAccount = { navController.safeNavigate(Route.GoogleAuth.path) },
-                onBridgeSettings = { navController.safeNavigate(Route.BridgeSettings.path) }
+                onBridgeSettings = { navController.safeNavigate(Route.BridgeSettings.path) },
+                onRemoteControl = { navController.safeNavigate(Route.RemoteControl.path) }
+            )
+        }
+
+        composable(Route.RemoteControl.path) {
+            RemoteControlScreen(
+                onNavigateBack = { navController.safePopBackStack() }
             )
         }
 

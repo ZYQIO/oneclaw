@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OneClaw Remote Console</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="panel">
+      <h1>Remote Console</h1>
+      <label>
+        Broker WS URL
+        <input id="ws-url" type="text" placeholder="ws://127.0.0.1:8080/ws">
+      </label>
+      <div class="button-row">
+        <button id="connect-btn">Connect</button>
+        <button id="refresh-btn">Refresh Devices</button>
+      </div>
+      <label>
+        Pair Code
+        <input id="pair-code" type="text" placeholder="Enter pair code from the device">
+      </label>
+      <pre id="status">Disconnected</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Devices</h2>
+      <div id="device-list" class="device-list"></div>
+    </section>
+
+    <section class="panel control-panel">
+      <h2>Session Controls</h2>
+      <div class="button-row">
+        <button id="home-btn">Home</button>
+        <button id="back-btn">Back</button>
+        <button id="snapshot-btn">Snapshot</button>
+      </div>
+      <label>
+        Input Text
+        <input id="input-text" type="text" placeholder="Type text to inject remotely">
+      </label>
+      <div class="button-row">
+        <button id="send-text-btn">Send Text</button>
+      </div>
+      <label>
+        Remote Upload Path
+        <input id="remote-upload-path" type="text" placeholder="documents/demo.txt">
+      </label>
+      <input id="upload-file" type="file">
+      <div class="button-row">
+        <button id="upload-btn">Upload File</button>
+      </div>
+      <label>
+        Remote Download Path
+        <input id="remote-download-path" type="text" placeholder="documents/demo.txt">
+      </label>
+      <div class="button-row">
+        <button id="list-files-btn">List Files</button>
+        <button id="download-btn">Download File</button>
+      </div>
+      <pre id="file-list">Remote files will appear here.</pre>
+      <div class="snapshot-wrap">
+        <img id="snapshot-image" alt="Remote snapshot">
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Event Log</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

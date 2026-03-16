@@ -1,0 +1,146 @@
+:root {
+  color-scheme: light;
+  --bg: #f4efe6;
+  --panel: #fffaf2;
+  --ink: #1d1a16;
+  --muted: #6f6558;
+  --accent: #b85c38;
+  --accent-ink: #fff8f0;
+  --line: #d9c7b2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+  background:
+    radial-gradient(circle at top right, rgba(184, 92, 56, 0.18), transparent 24rem),
+    linear-gradient(180deg, #fbf6ee 0%, var(--bg) 100%);
+  color: var(--ink);
+}
+
+.app-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(29, 26, 22, 0.08);
+}
+
+.control-panel {
+  grid-column: span 2;
+}
+
+h1, h2 {
+  margin-top: 0;
+  font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+}
+
+label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+
+input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+button {
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #7b8c6a;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.device-list {
+  display: grid;
+  gap: 10px;
+}
+
+.device-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: white;
+}
+
+.device-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(184, 92, 56, 0.1);
+}
+
+.device-card h3 {
+  margin: 0 0 6px;
+}
+
+.snapshot-wrap {
+  margin-top: 12px;
+  min-height: 240px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px dashed var(--line);
+  background: #f7f0e6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#snapshot-image {
+  width: 100%;
+  display: block;
+  object-fit: contain;
+  min-height: 240px;
+}
+
+#file-list {
+  min-height: 120px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(29, 26, 22, 0.04);
+  padding: 12px;
+  border-radius: 12px;
+  min-height: 72px;
+}
+
+@media (max-width: 900px) {
+  .control-panel {
+    grid-column: span 1;
+  }
+}

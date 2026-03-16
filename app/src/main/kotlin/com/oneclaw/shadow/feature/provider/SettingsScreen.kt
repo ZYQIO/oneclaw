@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -68,6 +69,7 @@ fun SettingsScreen(
     onFiles: () -> Unit = {},
     onGoogleAccount: () -> Unit = {},
     onBridgeSettings: () -> Unit = {},
+    onRemoteControl: () -> Unit = {},
     themeManager: ThemeManager = koinInject()
 ) {
     val currentTheme by themeManager.themeMode.collectAsState()
@@ -139,6 +141,13 @@ fun SettingsScreen(
                 title = "Files",
                 subtitle = "Browse files saved by AI",
                 onClick = onFiles
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            SettingsItem(
+                icon = Icons.Filled.PhoneAndroid,
+                title = "Remote Control",
+                subtitle = "Connect to your Android remote host devices",
+                onClick = onRemoteControl
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             SettingsItem(

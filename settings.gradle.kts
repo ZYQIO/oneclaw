@@ -23,3 +23,5 @@ dependencyResolutionManagement {
 rootProject.name = "OneClaw"
 include(":app")
 include(":bridge")
+include(":remote-core")
+include(":remote-host")
