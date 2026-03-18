@@ -9,6 +9,7 @@ import { coerceSecretRef } from "../../config/types.secrets.js";
 import { withFileLock } from "../../infra/file-lock.js";
 import { resolveSecretRefString, type SecretRefResolveCache } from "../../secrets/resolve.js";
 import { refreshChutesTokens } from "../chutes-oauth.js";
+import { readCodexCliCredentialsCached } from "../cli-credentials.js";
 import { AUTH_STORE_LOCK_OPTIONS, log } from "./constants.js";
 import { resolveTokenExpiryState } from "./credential-state.js";
 import { formatAuthDoctorHint } from "./doctor.js";
@@ -33,6 +34,8 @@ const isOAuthProvider = (provider: string): provider is OAuthProvider =>
 
 const resolveOAuthProvider = (provider: string): OAuthProvider | null =>
   isOAuthProvider(provider) ? provider : null;
+
+const CODEX_CLI_FALLBACK_TTL_MS = 30_000;
 
 /** Bearer-token auth modes that are interchangeable (oauth tokens and raw tokens). */
 const BEARER_AUTH_MODES = new Set(["oauth", "token"]);
@@ -142,6 +145,57 @@ function adoptNewerMainOAuthCredential(params: {
     });
   }
   return null;
+}
+
+async function tryRecoverOpenAICodexFromCli(params: {
+  store: AuthProfileStore;
+  profileId: string;
+  agentDir?: string;
+  fallbackEmail?: string;
+}): Promise<{ apiKey: string; provider: string; email?: string } | null> {
+  const cliCred = readCodexCliCredentialsCached({
+    ttlMs: CODEX_CLI_FALLBACK_TTL_MS,
+  });
+  if (!cliCred || cliCred.provider !== "openai-codex" || Date.now() >= cliCred.expires) {
+    return null;
+  }
+
+  const existing = params.store.profiles[params.profileId];
+  const existingOAuth = existing?.type === "oauth" ? existing : undefined;
+  const isUnchanged =
+    existingOAuth &&
+    existingOAuth.provider === "openai-codex" &&
+    existingOAuth.access === cliCred.access &&
+    existingOAuth.refresh === cliCred.refresh &&
+    existingOAuth.expires === cliCred.expires;
+  if (isUnchanged) {
+    return null;
+  }
+
+  const email = existingOAuth?.email ?? params.fallbackEmail;
+  params.store.profiles[params.profileId] = {
+    ...existingOAuth,
+    ...cliCred,
+    type: "oauth",
+    provider: "openai-codex",
+    ...(email ? { email } : {}),
+  };
+  saveAuthProfileStore(params.store, params.agentDir);
+  log.info("recovered openai-codex credentials from codex cli", {
+    profileId: params.profileId,
+    agentDir: params.agentDir,
+    expires: new Date(cliCred.expires).toISOString(),
+  });
+
+  const recovered = params.store.profiles[params.profileId];
+  if (!recovered || recovered.type !== "oauth") {
+    return null;
+  }
+  return await buildOAuthProfileResult({
+    provider: recovered.provider,
+    credentials: recovered,
+    email: recovered.email,
+  });
 }
 
 async function refreshOAuthTokenWithLock(params: {
@@ -421,6 +475,18 @@ export async function resolveApiKeyForProfile(
         }
       } catch {
         // keep original error
+      }
+    }
+
+    if (cred.provider === "openai-codex") {
+      const recovered = await tryRecoverOpenAICodexFromCli({
+        store: refreshedStore,
+        profileId,
+        agentDir: params.agentDir,
+        fallbackEmail: cred.email,
+      });
+      if (recovered) {
+        return recovered;
       }
     }
 

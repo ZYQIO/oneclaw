@@ -3,21 +3,28 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureEnv } from "../../test-utils/env.js";
-import { resolveApiKeyForProfile } from "./oauth.js";
 import { ensureAuthProfileStore } from "./store.js";
 import type { AuthProfileStore } from "./types.js";
 
+const cliCredentialMocks = vi.hoisted(() => ({
+  readCodexCliCredentialsCached: vi.fn(() => null),
+}));
+
+vi.mock("../cli-credentials.js", () => ({
+  readCodexCliCredentialsCached: cliCredentialMocks.readCodexCliCredentialsCached,
+}));
+
+const { resolveApiKeyForProfile } = await import("./oauth.js");
+
 describe("resolveApiKeyForProfile fallback to main agent", () => {
-  const envSnapshot = captureEnv([
-    "OPENCLAW_STATE_DIR",
-    "OPENCLAW_AGENT_DIR",
-    "PI_CODING_AGENT_DIR",
-  ]);
+  const envSnapshot = captureEnv(["OPENCLAW_STATE_DIR", "OPENCLAW_AGENT_DIR", "PI_CODING_AGENT_DIR"]);
   let tmpDir: string;
   let mainAgentDir: string;
   let secondaryAgentDir: string;
 
   beforeEach(async () => {
+    cliCredentialMocks.readCodexCliCredentialsCached.mockReset();
+    cliCredentialMocks.readCodexCliCredentialsCached.mockReturnValue(null);
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "oauth-fallback-test-"));
     mainAgentDir = path.join(tmpDir, "agents", "main", "agent");
     secondaryAgentDir = path.join(tmpDir, "agents", "kids", "agent");
@@ -76,7 +83,6 @@ describe("resolveApiKeyForProfile fallback to main agent", () => {
 
   afterEach(async () => {
     vi.unstubAllGlobals();
-
     envSnapshot.restore();
 
     await fs.rm(tmpDir, { recursive: true, force: true });
@@ -300,5 +306,129 @@ describe("resolveApiKeyForProfile fallback to main agent", () => {
     await expect(resolveFromSecondaryAgent(profileId)).rejects.toThrow(
       /OAuth token refresh failed/,
     );
+  });
+
+  it("recovers openai-codex credentials from codex cli when refresh fails", async () => {
+    const profileId = "openai-codex:default";
+    const now = Date.now();
+    const expiredTime = now - 60 * 60 * 1000;
+    cliCredentialMocks.readCodexCliCredentialsCached.mockReturnValue({
+      type: "oauth",
+      provider: "openai-codex",
+      access: "codex-cli-access-token",
+      refresh: "codex-cli-refresh-token",
+      expires: now + 60 * 60 * 1000,
+      accountId: "acct_test",
+    });
+
+    const expiredStore: AuthProfileStore = {
+      version: 1,
+      profiles: {
+        [profileId]: {
+          type: "oauth",
+          provider: "openai-codex",
+          access: "expired-openclaw-access-token",
+          refresh: "expired-openclaw-refresh-token",
+          expires: expiredTime,
+        },
+      },
+    };
+    await fs.writeFile(path.join(mainAgentDir, "auth-profiles.json"), JSON.stringify(expiredStore));
+
+    const fetchSpy = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: "refresh token reused",
+            code: "refresh_token_reused",
+          },
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const loadedStore = ensureAuthProfileStore(mainAgentDir);
+    const result = await resolveApiKeyForProfile({
+      store: loadedStore,
+      profileId,
+      agentDir: mainAgentDir,
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.provider).toBe("openai-codex");
+    expect(result?.apiKey).toBe("codex-cli-access-token");
+
+    const updatedStore = JSON.parse(
+      await fs.readFile(path.join(mainAgentDir, "auth-profiles.json"), "utf8"),
+    ) as AuthProfileStore;
+    expect(updatedStore.profiles[profileId]).toMatchObject({
+      provider: "openai-codex",
+      type: "oauth",
+      access: "codex-cli-access-token",
+      refresh: "codex-cli-refresh-token",
+    });
+    const updated = updatedStore.profiles[profileId];
+    if (!updated || updated.type !== "oauth") {
+      throw new Error("expected oauth credentials");
+    }
+    expect(updated.expires).toBeGreaterThan(now);
+    expect(updated.expires).toBeLessThanOrEqual(now + 61 * 60 * 1000);
+  });
+
+  it("still throws when openai-codex refresh fails and codex cli credentials are expired", async () => {
+    const profileId = "openai-codex:default";
+    const now = Date.now();
+    const expiredTime = now - 60 * 60 * 1000;
+    cliCredentialMocks.readCodexCliCredentialsCached.mockReturnValue({
+      type: "oauth",
+      provider: "openai-codex",
+      access: "stale-codex-cli-access-token",
+      refresh: "stale-codex-cli-refresh-token",
+      expires: now - 1,
+      accountId: "acct_test",
+    });
+
+    const expiredStore: AuthProfileStore = {
+      version: 1,
+      profiles: {
+        [profileId]: {
+          type: "oauth",
+          provider: "openai-codex",
+          access: "expired-openclaw-access-token",
+          refresh: "expired-openclaw-refresh-token",
+          expires: expiredTime,
+        },
+      },
+    };
+    await fs.writeFile(path.join(mainAgentDir, "auth-profiles.json"), JSON.stringify(expiredStore));
+
+    const fetchSpy = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: "refresh token reused",
+            code: "refresh_token_reused",
+          },
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const loadedStore = ensureAuthProfileStore(mainAgentDir);
+    await expect(
+      resolveApiKeyForProfile({
+        store: loadedStore,
+        profileId,
+        agentDir: mainAgentDir,
+      }),
+    ).rejects.toThrow(/OAuth token refresh failed/);
   });
 });
