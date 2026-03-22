@@ -357,6 +357,7 @@ class LocalHostRemoteAccessServer(
             state.value.listenUrl?.let { put("listenUrl", JsonPrimitive(it)) }
           }.toString(),
       )
+      request.method == "GET" && uri.path == "$apiBasePath/examples" -> examplesResponse()
       request.method == "GET" && uri.path == apiBasePath -> jsonResponse(
         statusCode = 200,
         body =
@@ -367,6 +368,7 @@ class LocalHostRemoteAccessServer(
               buildJsonArray {
                 add(JsonPrimitive("GET $apiBasePath"))
                 add(JsonPrimitive("GET $apiBasePath/health"))
+                add(JsonPrimitive("GET $apiBasePath/examples"))
                 add(JsonPrimitive("GET $apiBasePath/identity"))
                 add(JsonPrimitive("GET $apiBasePath/config"))
                 add(JsonPrimitive("GET $apiBasePath/agents"))
@@ -544,6 +546,91 @@ class LocalHostRemoteAccessServer(
             },
           )
           put("advancedEnabled", JsonPrimitive(allowAdvancedInvokeCommands()))
+        }.toString(),
+    )
+  }
+
+  private fun examplesResponse(): HttpResponse {
+    val baseUrl = state.value.listenUrl ?: "http://<phone-ip>:${activeConfig?.port ?: 3945}"
+    val tokenPlaceholder = "<TOKEN>"
+    return jsonResponse(
+      statusCode = 200,
+      body =
+        buildJsonObject {
+          put("baseUrl", JsonPrimitive(baseUrl))
+          put("tokenPlaceholder", JsonPrimitive(tokenPlaceholder))
+          put(
+            "examples",
+            buildJsonArray {
+              add(
+                buildJsonObject {
+                  put("name", JsonPrimitive("health"))
+                  put("method", JsonPrimitive("GET"))
+                  put("path", JsonPrimitive("$apiBasePath/health"))
+                  put(
+                    "curl",
+                    JsonPrimitive(
+                      "curl -H 'Authorization: Bearer $tokenPlaceholder' $baseUrl$apiBasePath/health",
+                    ),
+                  )
+                },
+              )
+              add(
+                buildJsonObject {
+                  put("name", JsonPrimitive("chat-send-wait"))
+                  put("method", JsonPrimitive("POST"))
+                  put("path", JsonPrimitive("$apiBasePath/chat/send-wait"))
+                  put(
+                    "curl",
+                    JsonPrimitive(
+                      "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/chat/send-wait -d '{\"message\":\"Summarize my notifications\",\"waitMs\":30000}'",
+                    ),
+                  )
+                },
+              )
+              add(
+                buildJsonObject {
+                  put("name", JsonPrimitive("events"))
+                  put("method", JsonPrimitive("GET"))
+                  put("path", JsonPrimitive("$apiBasePath/events"))
+                  put(
+                    "curl",
+                    JsonPrimitive(
+                      "curl -H 'Authorization: Bearer $tokenPlaceholder' '$baseUrl$apiBasePath/events?cursor=0&waitMs=20000'",
+                    ),
+                  )
+                },
+              )
+              add(
+                buildJsonObject {
+                  put("name", JsonPrimitive("invoke-device-status"))
+                  put("method", JsonPrimitive("POST"))
+                  put("path", JsonPrimitive("$apiBasePath/invoke"))
+                  put(
+                    "curl",
+                    JsonPrimitive(
+                      "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"device.status\"}'",
+                    ),
+                  )
+                },
+              )
+              if (allowAdvancedInvokeCommands()) {
+                add(
+                  buildJsonObject {
+                    put("name", JsonPrimitive("invoke-camera-snap"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/invoke"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"camera.snap\"}'",
+                      ),
+                    )
+                  },
+                )
+              }
+            },
+          )
         }.toString(),
     )
   }

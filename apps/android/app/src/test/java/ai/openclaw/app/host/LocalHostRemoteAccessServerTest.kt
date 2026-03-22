@@ -199,6 +199,39 @@ class LocalHostRemoteAccessServerTest {
     }
   }
 
+  @Test
+  fun examples_returnsReadyToUseCurlTemplates() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/examples",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"chat-send-wait\""))
+      assertTrue(response.body.contains("/api/local-host/v1/events"))
+      assertTrue(response.body.contains("<TOKEN>"))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
   private fun request(
     port: Int,
     method: String,

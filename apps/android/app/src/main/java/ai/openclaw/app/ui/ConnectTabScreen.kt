@@ -100,6 +100,34 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   var passwordInput by rememberSaveable { mutableStateOf("") }
   var manualAuthorizationInput by rememberSaveable { mutableStateOf("") }
   var validationText by rememberSaveable { mutableStateOf<String?>(null) }
+  val remoteAccessExamples =
+    remember(localHostRemoteAccessUrl, localHostRemoteAccessAdvancedCommandsEnabled) {
+      val baseUrl = localHostRemoteAccessUrl?.trim().orEmpty().ifEmpty { "http://<phone-ip>:${localHostRemoteAccessPort}" }
+      buildString {
+        append("curl -H 'Authorization: Bearer <TOKEN>' ")
+        append("$baseUrl/api/local-host/v1/health")
+        append("\n\n")
+        append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
+        append("-H 'Content-Type: application/json' ")
+        append("$baseUrl/api/local-host/v1/chat/send-wait ")
+        append("-d '{\"message\":\"Summarize my notifications\",\"waitMs\":30000}'")
+        append("\n\n")
+        append("curl -H 'Authorization: Bearer <TOKEN>' ")
+        append("'$baseUrl/api/local-host/v1/events?cursor=0&waitMs=20000'")
+        append("\n\n")
+        append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
+        append("-H 'Content-Type: application/json' ")
+        append("$baseUrl/api/local-host/v1/invoke ")
+        append("-d '{\"command\":\"device.status\"}'")
+        if (localHostRemoteAccessAdvancedCommandsEnabled) {
+          append("\n\n")
+          append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
+          append("-H 'Content-Type: application/json' ")
+          append("$baseUrl/api/local-host/v1/invoke ")
+          append("-d '{\"command\":\"camera.snap\"}'")
+        }
+      }
+    }
 
   if (pendingTrust != null) {
     val prompt = pendingTrust!!
@@ -439,6 +467,18 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             },
             style = mobileCaption1,
             color = mobileTextSecondary,
+          )
+
+          OutlinedTextField(
+            value = remoteAccessExamples,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 8,
+            maxLines = 12,
+            textStyle = mobileCaption1.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+            shape = RoundedCornerShape(14.dp),
+            colors = outlinedColors(),
           )
 
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
