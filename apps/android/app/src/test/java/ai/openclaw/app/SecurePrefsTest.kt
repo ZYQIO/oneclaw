@@ -86,4 +86,32 @@ class SecurePrefsTest {
     assertFalse(prefs.hasOpenAICodexCredential.value)
     assertNull(prefs.loadOpenAICodexCredential())
   }
+
+  @Test
+  fun localHostRemoteAccess_settingsAndTokenPersist() {
+    val context = RuntimeEnvironment.getApplication()
+    val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)
+    val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.remote", Context.MODE_PRIVATE)
+    plainPrefs.edit().clear().commit()
+    securePrefs.edit().clear().commit()
+
+    val prefs = SecurePrefs(context, securePrefsOverride = securePrefs)
+    val initialToken = prefs.localHostRemoteAccessToken.value
+
+    assertFalse(prefs.localHostRemoteAccessEnabled.value)
+    assertEquals(3945, prefs.localHostRemoteAccessPort.value)
+    assertTrue(initialToken.startsWith("ocrt_"))
+
+    prefs.setLocalHostRemoteAccessEnabled(true)
+    prefs.setLocalHostRemoteAccessPort(4123)
+    val rotatedToken = prefs.regenerateLocalHostRemoteAccessToken()
+
+    assertTrue(prefs.localHostRemoteAccessEnabled.value)
+    assertEquals(4123, prefs.localHostRemoteAccessPort.value)
+    assertEquals(rotatedToken, prefs.localHostRemoteAccessToken.value)
+    assertTrue(rotatedToken.startsWith("ocrt_"))
+    assertTrue(rotatedToken != initialToken)
+    assertEquals(true, plainPrefs.getBoolean("localHost.remoteAccess.enabled", false))
+    assertEquals(4123, plainPrefs.getInt("localHost.remoteAccess.port", 0))
+  }
 }

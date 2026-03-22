@@ -20,6 +20,7 @@ import ai.openclaw.app.gateway.MutableGatewayRpcClient
 import ai.openclaw.app.gateway.MutableNodeGatewayRpcClient
 import ai.openclaw.app.gateway.GatewaySession
 import ai.openclaw.app.gateway.probeGatewayTlsFingerprint
+import ai.openclaw.app.host.LocalHostRemoteAccessServer
 import ai.openclaw.app.host.LocalHostRuntime
 import ai.openclaw.app.node.*
 import ai.openclaw.app.protocol.OpenClawCanvasA2UIAction
@@ -185,10 +186,33 @@ class NodeRuntime(
     json = json,
   )
 
+  private val localHostRemoteAccessServer: LocalHostRemoteAccessServer = LocalHostRemoteAccessServer(
+    scope = scope,
+    json = json,
+    handleLocalHostRequest = { method, paramsJson, timeoutMs ->
+      localHostRuntime.request(
+        role = "remote-operator",
+        method = method,
+        paramsJson = paramsJson,
+        timeoutMs = timeoutMs,
+      )
+    },
+    handleInvoke = { command, paramsJson ->
+      invokeDispatcher.handleInvoke(command, paramsJson)
+    },
+  )
+
   private enum class ConnectionBackend {
     Remote,
     Local,
   }
+
+  private data class RemoteAccessConfigSnapshot(
+    val mode: GatewayConnectionMode,
+    val enabled: Boolean,
+    val port: Int,
+    val token: String,
+  )
 
   data class GatewayTrustPrompt(
     val endpoint: GatewayEndpoint,
@@ -208,6 +232,12 @@ class NodeRuntime(
 
   private val _mainSessionKey = MutableStateFlow("main")
   val mainSessionKey: StateFlow<String> = _mainSessionKey.asStateFlow()
+
+  private val _localHostRemoteAccessStatusText = MutableStateFlow("Remote access is off.")
+  val localHostRemoteAccessStatusText: StateFlow<String> = _localHostRemoteAccessStatusText.asStateFlow()
+
+  private val _localHostRemoteAccessUrl = MutableStateFlow<String?>(null)
+  val localHostRemoteAccessUrl: StateFlow<String?> = _localHostRemoteAccessUrl.asStateFlow()
 
   private val cameraHudSeq = AtomicLong(0)
   private val _cameraHud = MutableStateFlow<CameraHudState?>(null)
@@ -639,6 +669,13 @@ class NodeRuntime(
     }
 
     scope.launch {
+      localHostRemoteAccessServer.state.collect { state ->
+        _localHostRemoteAccessStatusText.value = state.statusText
+        _localHostRemoteAccessUrl.value = state.listenUrl
+      }
+    }
+
+    scope.launch {
       prefs.talkEnabled.collect { enabled ->
         // MicCaptureManager handles STT + send to gateway.
         // TalkModeManager plays TTS on assistant responses.
@@ -650,6 +687,35 @@ class NodeRuntime(
         }
         externalAudioCaptureActive.value = enabled
       }
+    }
+
+    scope.launch {
+      combine(
+        prefs.gatewayConnectionMode,
+        prefs.localHostRemoteAccessEnabled,
+        prefs.localHostRemoteAccessPort,
+        prefs.localHostRemoteAccessToken,
+      ) { mode, enabled, port, token ->
+        RemoteAccessConfigSnapshot(
+          mode = mode,
+          enabled = enabled,
+          port = port,
+          token = token,
+        )
+      }.distinctUntilChanged()
+        .collect { config ->
+          when {
+            !config.enabled ->
+              localHostRemoteAccessServer.stop()
+            config.mode != GatewayConnectionMode.LocalHost ->
+              localHostRemoteAccessServer.stop(statusText = "Switch to Local Host to accept remote connections.")
+            else ->
+              localHostRemoteAccessServer.start(
+                port = config.port,
+                token = config.token,
+              )
+          }
+        }
     }
 
     scope.launch(Dispatchers.Default) {

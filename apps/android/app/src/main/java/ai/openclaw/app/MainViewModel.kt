@@ -67,6 +67,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val pendingGatewayTrust: StateFlow<NodeRuntime.GatewayTrustPrompt?> = runtimeState(initial = null) { it.pendingGatewayTrust }
   val seamColorArgb: StateFlow<Long> = runtimeState(initial = 0xFF0EA5E9) { it.seamColorArgb }
   val mainSessionKey: StateFlow<String> = runtimeState(initial = "main") { it.mainSessionKey }
+  val localHostRemoteAccessStatusText: StateFlow<String> = runtimeState(initial = "Remote access is off.") { it.localHostRemoteAccessStatusText }
+  val localHostRemoteAccessUrl: StateFlow<String?> = runtimeState(initial = null) { it.localHostRemoteAccessUrl }
 
   val cameraHud: StateFlow<CameraHudState?> = runtimeState(initial = null) { it.cameraHud }
   val cameraFlashToken: StateFlow<Long> = runtimeState(initial = 0L) { it.cameraFlashToken }
@@ -78,6 +80,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val locationPreciseEnabled: StateFlow<Boolean> = prefs.locationPreciseEnabled
   val preventSleep: StateFlow<Boolean> = prefs.preventSleep
   val gatewayConnectionMode: StateFlow<GatewayConnectionMode> = prefs.gatewayConnectionMode
+  val localHostRemoteAccessEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessEnabled
+  val localHostRemoteAccessPort: StateFlow<Int> = prefs.localHostRemoteAccessPort
+  val localHostRemoteAccessToken: StateFlow<String> = prefs.localHostRemoteAccessToken
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
@@ -159,6 +164,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setGatewayConnectionMode(value: GatewayConnectionMode) {
     prefs.setGatewayConnectionMode(value)
+  }
+
+  fun setLocalHostRemoteAccessEnabled(value: Boolean) {
+    prefs.setLocalHostRemoteAccessEnabled(value)
+  }
+
+  fun setLocalHostRemoteAccessPort(value: Int) {
+    prefs.setLocalHostRemoteAccessPort(value)
+  }
+
+  fun regenerateLocalHostRemoteAccessToken() {
+    prefs.regenerateLocalHostRemoteAccessToken()
   }
 
   fun setManualEnabled(value: Boolean) {

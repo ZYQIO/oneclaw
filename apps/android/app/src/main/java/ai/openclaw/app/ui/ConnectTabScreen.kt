@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +68,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   val connectionMode by viewModel.gatewayConnectionMode.collectAsState()
   val hasOpenAICodexCredential by viewModel.hasOpenAICodexCredential.collectAsState()
   val openAICodexAuthUiState by viewModel.openAICodexAuthUiState.collectAsState()
+  val localHostRemoteAccessEnabled by viewModel.localHostRemoteAccessEnabled.collectAsState()
+  val localHostRemoteAccessPort by viewModel.localHostRemoteAccessPort.collectAsState()
+  val localHostRemoteAccessToken by viewModel.localHostRemoteAccessToken.collectAsState()
+  val localHostRemoteAccessStatusText by viewModel.localHostRemoteAccessStatusText.collectAsState()
+  val localHostRemoteAccessUrl by viewModel.localHostRemoteAccessUrl.collectAsState()
   val manualHost by viewModel.manualHost.collectAsState()
   val manualPort by viewModel.manualPort.collectAsState()
   val manualTls by viewModel.manualTls.collectAsState()
@@ -89,6 +95,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   var manualHostInput by rememberSaveable { mutableStateOf(manualHost.ifBlank { "10.0.2.2" }) }
   var manualPortInput by rememberSaveable { mutableStateOf(manualPort.toString()) }
   var manualTlsInput by rememberSaveable { mutableStateOf(manualTls) }
+  var remoteAccessPortInput by rememberSaveable(localHostRemoteAccessPort) { mutableStateOf(localHostRemoteAccessPort.toString()) }
   var passwordInput by rememberSaveable { mutableStateOf("") }
   var manualAuthorizationInput by rememberSaveable { mutableStateOf("") }
   var validationText by rememberSaveable { mutableStateOf<String?>(null) }
@@ -298,6 +305,139 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           } else if (hasOpenAICodexCredential) {
             TextButton(onClick = { viewModel.clearOpenAICodexCredential() }) {
               Text("Clear auth", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileDanger)
+            }
+          }
+        }
+      }
+    }
+
+    if (connectionMode == GatewayConnectionMode.LocalHost) {
+      Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = mobileCardSurface,
+        border = BorderStroke(1.dp, mobileBorder),
+      ) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+              Text("Remote access", style = mobileHeadline, color = mobileText)
+              Text(
+                "Expose local-host chat and a small remote-control API on trusted networks or Tailscale.",
+                style = mobileCallout,
+                color = mobileTextSecondary,
+              )
+            }
+            Switch(
+              checked = localHostRemoteAccessEnabled,
+              onCheckedChange = { viewModel.setLocalHostRemoteAccessEnabled(it) },
+              colors =
+                SwitchDefaults.colors(
+                  checkedThumbColor = mobileAccent,
+                  checkedTrackColor = mobileAccentSoft,
+                ),
+            )
+          }
+
+          Text(
+            localHostRemoteAccessStatusText,
+            style = mobileCallout,
+            color =
+              when {
+                localHostRemoteAccessEnabled && !localHostRemoteAccessUrl.isNullOrBlank() -> mobileSuccess
+                localHostRemoteAccessEnabled -> mobileWarning
+                else -> mobileTextSecondary
+              },
+          )
+
+          localHostRemoteAccessUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            Text(
+              url,
+              style = mobileBody.copy(fontFamily = FontFamily.Monospace),
+              color = mobileText,
+            )
+          }
+
+          OutlinedTextField(
+            value = remoteAccessPortInput,
+            onValueChange = { remoteAccessPortInput = it.filter(Char::isDigit) },
+            placeholder = {
+              Text(
+                "Remote access port",
+                style = mobileBody,
+                color = mobileTextTertiary,
+              )
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+            shape = RoundedCornerShape(14.dp),
+            colors = outlinedColors(),
+          )
+
+          OutlinedTextField(
+            value = localHostRemoteAccessToken,
+            onValueChange = {},
+            readOnly = true,
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            maxLines = 3,
+            textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+            shape = RoundedCornerShape(14.dp),
+            colors = outlinedColors(),
+          )
+
+          Text(
+            "Use header `Authorization: Bearer <token>` for `/health`, `/chat/*`, and `/invoke`.",
+            style = mobileCaption1,
+            color = mobileTextSecondary,
+          )
+          Text(
+            "Remote `/invoke` currently allows `device.*` readouts and `system.notify` only.",
+            style = mobileCaption1,
+            color = mobileTextSecondary,
+          )
+
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+              onClick = {
+                val parsedPort = remoteAccessPortInput.toIntOrNull()
+                if (parsedPort == null || parsedPort !in 1..65535) {
+                  validationText = "Remote access port must be between 1 and 65535."
+                } else {
+                  validationText = null
+                  viewModel.setLocalHostRemoteAccessPort(parsedPort)
+                }
+              },
+              modifier = Modifier.height(44.dp),
+              shape = RoundedCornerShape(12.dp),
+              colors =
+                ButtonDefaults.buttonColors(
+                  containerColor = mobileSurface,
+                  contentColor = mobileText,
+                ),
+              border = BorderStroke(1.dp, mobileBorderStrong),
+            ) {
+              Text("Apply port", style = mobileCaption1.copy(fontWeight = FontWeight.Bold))
+            }
+
+            TextButton(onClick = { viewModel.regenerateLocalHostRemoteAccessToken() }) {
+              Text(
+                "Regenerate token",
+                style = mobileCallout.copy(fontWeight = FontWeight.SemiBold),
+                color = mobileAccent,
+              )
             }
           }
         }

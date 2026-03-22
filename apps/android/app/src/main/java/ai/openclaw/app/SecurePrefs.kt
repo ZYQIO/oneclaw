@@ -22,6 +22,7 @@ class SecurePrefs(
 ) {
   companion object {
     val defaultWakeWords: List<String> = listOf("openclaw", "claude")
+    private const val defaultLocalHostRemoteAccessPort = 3945
     private const val displayNameKey = "node.displayName"
     private const val locationModeKey = "location.enabledMode"
     private const val voiceWakeModeKey = "voiceWake.mode"
@@ -63,6 +64,18 @@ class SecurePrefs(
 
   private val _gatewayConnectionMode = MutableStateFlow(loadGatewayConnectionMode())
   val gatewayConnectionMode: StateFlow<GatewayConnectionMode> = _gatewayConnectionMode
+
+  private val _localHostRemoteAccessEnabled =
+    MutableStateFlow(plainPrefs.getBoolean("localHost.remoteAccess.enabled", false))
+  val localHostRemoteAccessEnabled: StateFlow<Boolean> = _localHostRemoteAccessEnabled
+
+  private val _localHostRemoteAccessPort =
+    MutableStateFlow(plainPrefs.getInt("localHost.remoteAccess.port", defaultLocalHostRemoteAccessPort))
+  val localHostRemoteAccessPort: StateFlow<Int> = _localHostRemoteAccessPort
+
+  private val _localHostRemoteAccessToken =
+    MutableStateFlow(loadOrCreateLocalHostRemoteAccessToken())
+  val localHostRemoteAccessToken: StateFlow<String> = _localHostRemoteAccessToken
 
   private val _manualEnabled =
     MutableStateFlow(plainPrefs.getBoolean("gateway.manual.enabled", false))
@@ -150,6 +163,23 @@ class SecurePrefs(
   fun setGatewayConnectionMode(value: GatewayConnectionMode) {
     plainPrefs.edit { putString("gateway.connection.mode", value.rawValue) }
     _gatewayConnectionMode.value = value
+  }
+
+  fun setLocalHostRemoteAccessEnabled(value: Boolean) {
+    plainPrefs.edit { putBoolean("localHost.remoteAccess.enabled", value) }
+    _localHostRemoteAccessEnabled.value = value
+  }
+
+  fun setLocalHostRemoteAccessPort(value: Int) {
+    plainPrefs.edit { putInt("localHost.remoteAccess.port", value) }
+    _localHostRemoteAccessPort.value = value
+  }
+
+  fun regenerateLocalHostRemoteAccessToken(): String {
+    val token = createRemoteAccessToken()
+    securePrefs.edit { putString("localHost.remoteAccess.token", token) }
+    _localHostRemoteAccessToken.value = token
+    return token
   }
 
   fun setManualEnabled(value: Boolean) {
@@ -366,6 +396,20 @@ class SecurePrefs(
   private fun loadGatewayConnectionMode(): GatewayConnectionMode {
     val stored = plainPrefs.getString("gateway.connection.mode", null)
     return GatewayConnectionMode.fromRawValue(stored)
+  }
+
+  private fun loadOrCreateLocalHostRemoteAccessToken(): String {
+    val existing = securePrefs.getString("localHost.remoteAccess.token", null)?.trim().orEmpty()
+    if (existing.isNotEmpty()) return existing
+    val fresh = createRemoteAccessToken()
+    securePrefs.edit { putString("localHost.remoteAccess.token", fresh) }
+    return fresh
+  }
+
+  private fun createRemoteAccessToken(): String {
+    val left = UUID.randomUUID().toString().replace("-", "")
+    val right = UUID.randomUUID().toString().replace("-", "")
+    return "ocrt_${left}${right}"
   }
 
   private fun loadWakeWords(): List<String> {
