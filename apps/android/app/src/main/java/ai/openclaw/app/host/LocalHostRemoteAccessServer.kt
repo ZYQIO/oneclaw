@@ -325,6 +325,64 @@ class LocalHostRemoteAccessServer(
             state.value.listenUrl?.let { put("listenUrl", JsonPrimitive(it)) }
           }.toString(),
       )
+      request.method == "GET" && uri.path == apiBasePath -> jsonResponse(
+        statusCode = 200,
+        body =
+          buildJsonObject {
+            put("ok", JsonPrimitive(true))
+            put(
+              "routes",
+              buildJsonArray {
+                add(JsonPrimitive("GET $apiBasePath"))
+                add(JsonPrimitive("GET $apiBasePath/health"))
+                add(JsonPrimitive("GET $apiBasePath/identity"))
+                add(JsonPrimitive("GET $apiBasePath/config"))
+                add(JsonPrimitive("GET $apiBasePath/agents"))
+                add(JsonPrimitive("GET $apiBasePath/talk"))
+                add(JsonPrimitive("GET $apiBasePath/voicewake"))
+                add(JsonPrimitive("POST $apiBasePath/voicewake"))
+                add(JsonPrimitive("GET $apiBasePath/chat/sessions"))
+                add(JsonPrimitive("GET $apiBasePath/chat/history"))
+                add(JsonPrimitive("POST $apiBasePath/chat/send"))
+                add(JsonPrimitive("POST $apiBasePath/chat/abort"))
+                add(JsonPrimitive("GET $apiBasePath/events"))
+                add(JsonPrimitive("POST $apiBasePath/invoke"))
+              },
+            )
+            put(
+              "allowedInvokeCommands",
+              buildJsonArray {
+                allowedInvokeCommands.forEach { command ->
+                  add(JsonPrimitive(command))
+                }
+              },
+            )
+          }.toString(),
+      )
+      request.method == "GET" && uri.path == "$apiBasePath/identity" -> forwardToLocalHost(
+        method = "gateway.identity.get",
+        params = null,
+      )
+      request.method == "GET" && uri.path == "$apiBasePath/config" -> forwardToLocalHost(
+        method = "config.get",
+        params = null,
+      )
+      request.method == "GET" && uri.path == "$apiBasePath/agents" -> forwardToLocalHost(
+        method = "agents.list",
+        params = null,
+      )
+      request.method == "GET" && uri.path == "$apiBasePath/talk" -> forwardToLocalHost(
+        method = "talk.config",
+        params = null,
+      )
+      request.method == "GET" && uri.path == "$apiBasePath/voicewake" -> forwardToLocalHost(
+        method = "voicewake.get",
+        params = null,
+      )
+      request.method == "POST" && uri.path == "$apiBasePath/voicewake" -> forwardToLocalHost(
+        method = "voicewake.set",
+        params = requireJsonBody(request),
+      )
       request.method == "GET" && uri.path == "$apiBasePath/chat/history" -> forwardToLocalHost(
         method = "chat.history",
         params =
