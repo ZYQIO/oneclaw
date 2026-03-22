@@ -13,6 +13,7 @@ import java.security.MessageDigest
 import java.util.ArrayDeque
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -103,6 +104,12 @@ internal class RemoteAccessEventBuffer(
   fun hasEventsAfter(cursor: Long): Boolean {
     synchronized(lock) {
       return events.any { it.id > cursor }
+    }
+  }
+
+  fun latestCursor(): Long {
+    synchronized(lock) {
+      return events.lastOrNull()?.id ?: 0L
     }
   }
 
@@ -344,6 +351,7 @@ class LocalHostRemoteAccessServer(
                 add(JsonPrimitive("GET $apiBasePath/chat/sessions"))
                 add(JsonPrimitive("GET $apiBasePath/chat/history"))
                 add(JsonPrimitive("POST $apiBasePath/chat/send"))
+                add(JsonPrimitive("POST $apiBasePath/chat/send-wait"))
                 add(JsonPrimitive("POST $apiBasePath/chat/abort"))
                 add(JsonPrimitive("GET $apiBasePath/events"))
                 add(JsonPrimitive("POST $apiBasePath/invoke"))
@@ -397,6 +405,7 @@ class LocalHostRemoteAccessServer(
         params = null,
       )
       request.method == "GET" && uri.path == "$apiBasePath/events" -> eventsResponse(uri)
+      request.method == "POST" && uri.path == "$apiBasePath/chat/send-wait" -> sendAndWaitForChat(requireJsonBody(request))
       request.method == "POST" && uri.path == "$apiBasePath/chat/send" -> forwardToLocalHost(
         method = "chat.send",
         params = requireJsonBody(request),
@@ -451,6 +460,45 @@ class LocalHostRemoteAccessServer(
           )
           put("nextCursor", JsonPrimitive(nextCursor))
           put("hasMore", JsonPrimitive(eventBuffer.hasEventsAfter(nextCursor)))
+        }.toString(),
+    )
+  }
+
+  private suspend fun sendAndWaitForChat(body: JsonObject): HttpResponse {
+    val waitMs = body["waitMs"].asLongOrNull()?.coerceIn(1_000L, 120_000L) ?: 30_000L
+    val cursor = eventBuffer.latestCursor()
+    val sendResponseBody = handleLocalHostRequest("chat.send", body.toString(), defaultTimeoutMs)
+    val sendResponse =
+      parseJsonOrNull(sendResponseBody).asObjectOrNull()
+        ?: throw HttpRequestException(500, "chat.send returned invalid JSON")
+    val runId = sendResponse["runId"].asStringOrNull()?.takeIf { it.isNotBlank() }
+      ?: throw HttpRequestException(500, "chat.send response was missing runId")
+    val terminalEvent = waitForTerminalRunEvent(runId = runId, cursor = cursor, waitMs = waitMs)
+    if (terminalEvent == null) {
+      return jsonResponse(
+        statusCode = 202,
+        body =
+          buildJsonObject {
+            put("ok", JsonPrimitive(true))
+            put("runId", JsonPrimitive(runId))
+            put("timedOut", JsonPrimitive(true))
+            put("nextCursor", JsonPrimitive(eventBuffer.latestCursor()))
+          }.toString(),
+      )
+    }
+    val parsedPayload = terminalEvent.payloadJson?.let(::parseJsonOrNull)
+    return jsonResponse(
+      statusCode = 200,
+      body =
+        buildJsonObject {
+          put("ok", JsonPrimitive(true))
+          put("runId", JsonPrimitive(runId))
+          put("timedOut", JsonPrimitive(false))
+          put("event", JsonPrimitive(terminalEvent.event))
+          put("cursor", JsonPrimitive(terminalEvent.id))
+          if (parsedPayload != null) {
+            put("payload", parsedPayload)
+          }
         }.toString(),
     )
   }
@@ -624,6 +672,7 @@ class LocalHostRemoteAccessServer(
 
   private fun statusLabel(statusCode: Int): String {
     return when (statusCode) {
+      202 -> "Accepted"
       200 -> "OK"
       204 -> "No Content"
       400 -> "Bad Request"
@@ -691,6 +740,47 @@ class LocalHostRemoteAccessServer(
       // Ignore listener cleanup failures while shutting down remote access.
     }
   }
+
+  private suspend fun waitForTerminalRunEvent(
+    runId: String,
+    cursor: Long,
+    waitMs: Long,
+  ): BufferedRemoteAccessEvent? {
+    val deadlineMs = System.currentTimeMillis() + waitMs
+    var nextCursor = cursor
+    while (true) {
+      val remainingMs = deadlineMs - System.currentTimeMillis()
+      if (remainingMs <= 0) {
+        return null
+      }
+      val events =
+        try {
+          eventBuffer.awaitAfter(
+            cursor = nextCursor,
+            limit = maxEventsPerResponse,
+            waitMs = remainingMs.coerceAtMost(maxEventWaitMs),
+          )
+        } catch (_: TimeoutCancellationException) {
+          return null
+        }
+      events.firstOrNull { event ->
+        isTerminalRunEvent(event = event, runId = runId)
+      }?.let { return it }
+      nextCursor = events.lastOrNull()?.id ?: nextCursor
+    }
+  }
+
+  private fun isTerminalRunEvent(
+    event: BufferedRemoteAccessEvent,
+    runId: String,
+  ): Boolean {
+    if (event.event != "chat") return false
+    val payload = event.payloadJson?.let(::parseJsonOrNull).asObjectOrNull() ?: return false
+    val payloadRunId = payload["runId"].asStringOrNull() ?: return false
+    val state = payload["state"].asStringOrNull()?.trim().orEmpty()
+    if (payloadRunId != runId) return false
+    return state == "final" || state == "error" || state == "aborted"
+  }
 }
 
 private class HttpRequestException(
@@ -703,6 +793,12 @@ private fun JsonElement?.asObjectOrNull(): JsonObject? = this as? JsonObject
 private fun JsonElement?.asStringOrNull(): String? =
   when (this) {
     is JsonPrimitive -> content
+    else -> null
+  }
+
+private fun JsonElement?.asLongOrNull(): Long? =
+  when (this) {
+    is JsonPrimitive -> content.toLongOrNull()
     else -> null
   }
 
