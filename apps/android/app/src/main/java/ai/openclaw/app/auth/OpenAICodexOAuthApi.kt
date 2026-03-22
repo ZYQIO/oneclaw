@@ -115,9 +115,10 @@ class OpenAICodexOAuthApi(
       if (!response.isSuccessful) {
         throw IllegalStateException(parseOAuthError(response.code, body))
       }
-      val refreshed = parseTokenResponse(body)
-      return refreshed.copy(
-        email = refreshed.email ?: current.email,
+      return parseTokenResponse(
+        body = body,
+        fallbackAccountId = current.accountId,
+        fallbackEmail = current.email,
       )
     }
   }
@@ -136,7 +137,11 @@ class OpenAICodexOAuthApi(
     return auth?.get("email").asStringOrNull()?.takeIf { it.isNotBlank() }
   }
 
-  private fun parseTokenResponse(body: String): OpenAICodexCredential {
+  private fun parseTokenResponse(
+    body: String,
+    fallbackAccountId: String? = null,
+    fallbackEmail: String? = null,
+  ): OpenAICodexCredential {
     val root =
       json.parseToJsonElement(body) as? JsonObject
         ?: throw IllegalStateException("OpenAI Codex OAuth returned invalid JSON")
@@ -146,14 +151,16 @@ class OpenAICodexOAuthApi(
     if (access.isEmpty() || refresh.isEmpty() || expiresIn == null) {
       throw IllegalStateException("OpenAI Codex OAuth response was missing required fields")
     }
-    val accountId = extractAccountId(access)
-      ?: throw IllegalStateException("Failed to extract accountId from token")
+    val accountId =
+      extractAccountId(access)
+        ?: fallbackAccountId?.takeIf { it.isNotBlank() }
+        ?: throw IllegalStateException("Failed to extract accountId from token")
     return OpenAICodexCredential(
       access = access,
       refresh = refresh,
       expires = clock() + expiresIn * 1000,
       accountId = accountId,
-      email = extractEmail(access),
+      email = extractEmail(access) ?: fallbackEmail,
     )
   }
 

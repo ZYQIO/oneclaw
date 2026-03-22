@@ -7,12 +7,12 @@ import android.net.Uri
 import ai.openclaw.app.SecurePrefs
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -145,9 +145,11 @@ class OpenAICodexAuthManager(
       return
     }
     active.server.cancelWait()
-    scope.launch {
+    waitJob?.cancel()
+    waitJob =
+      scope.launch {
       completeAuthorization(active = active, code = code)
-    }
+      }
   }
 
   fun cancelLogin() {
@@ -182,15 +184,19 @@ class OpenAICodexAuthManager(
         }
       prefs.saveOpenAICodexCredential(credential)
       active.server.close()
-      activeLogin = null
+      clearActiveLogin(active)
       _uiState.value =
         OpenAICodexAuthUiState(
           statusText = "OpenAI Codex is connected.",
           signedInEmail = credential.email,
         )
+    } catch (_: CancellationException) {
+      active.server.close()
+      clearActiveLogin(active)
+      return
     } catch (err: Throwable) {
       active.server.close()
-      activeLogin = null
+      clearActiveLogin(active)
       _uiState.value =
         OpenAICodexAuthUiState(
           errorText = err.message ?: "OpenAI sign-in failed.",
@@ -205,6 +211,12 @@ class OpenAICodexAuthManager(
     activeLogin?.server?.cancelWait()
     activeLogin?.server?.close()
     activeLogin = null
+  }
+
+  private fun clearActiveLogin(active: ActiveLogin) {
+    if (activeLogin === active) {
+      activeLogin = null
+    }
   }
 }
 
@@ -259,7 +271,6 @@ internal class OpenAICodexLoopbackServer private constructor(
   private val expectedState: String?,
 ) {
   companion object {
-    private const val callbackHost = "127.0.0.1"
     private const val callbackPort = 1455
     private const val callbackPath = "/auth/callback"
 
@@ -272,7 +283,8 @@ internal class OpenAICodexLoopbackServer private constructor(
     serverSocket =
       ServerSocket().apply {
         reuseAddress = true
-        bind(InetSocketAddress(InetAddress.getByName(callbackHost), callbackPort))
+        // Bind broadly so localhost callbacks can arrive over either IPv4 or IPv6.
+        bind(InetSocketAddress(callbackPort))
       },
     expectedState = expectedState,
   )
@@ -315,6 +327,10 @@ internal class OpenAICodexLoopbackServer private constructor(
 
   private fun handleSocket(socket: Socket) {
     socket.soTimeout = 10_000
+    if (!socket.inetAddress.isLoopbackAddress) {
+      writeHttpResponse(socket, 403, oauthErrorHtml("Only loopback callbacks are allowed."))
+      return
+    }
     val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
     val requestLine = reader.readLine() ?: return
     while (true) {

@@ -102,6 +102,49 @@ class OpenAICodexOAuthApiTest {
     assertEquals("hash-state", fromHash.state)
   }
 
+  @Test
+  fun refreshCredential_fallsBackToStoredAccountIdWhenJwtClaimIsMissing() {
+    val server = MockWebServer()
+    server.enqueue(
+      MockResponse().setResponseCode(200).setBody(
+        """
+          {
+            "access_token":"${fakeJwtWithoutAccountId(email = "next@example.com")}",
+            "refresh_token":"refresh-next",
+            "expires_in":3600
+          }
+        """.trimIndent(),
+      ),
+    )
+    server.start()
+
+    try {
+      val api =
+        OpenAICodexOAuthApi(
+          json = json,
+          client = OkHttpClient(),
+          tokenUrl = server.url("/oauth/token").toString(),
+        )
+
+      val credential =
+        api.refreshCredential(
+          OpenAICodexCredential(
+            access = "old-access",
+            refresh = "old-refresh",
+            expires = 0,
+            accountId = "acct_fallback",
+            email = "old@example.com",
+          ),
+        )
+
+      assertEquals("acct_fallback", credential.accountId)
+      assertEquals("next@example.com", credential.email)
+      assertEquals("refresh-next", credential.refresh)
+    } finally {
+      server.shutdown()
+    }
+  }
+
   private fun fakeJwt(
     accountId: String,
     email: String,
@@ -117,6 +160,17 @@ class OpenAICodexOAuthApiTest {
               put("chatgpt_account_id", JsonPrimitive(accountId))
             },
           )
+        }.toString(),
+      )
+    return "$header.$payload.signature"
+  }
+
+  private fun fakeJwtWithoutAccountId(email: String): String {
+    val header = base64Url("""{"alg":"HS256","typ":"JWT"}""")
+    val payload =
+      base64Url(
+        buildJsonObject {
+          put("email", JsonPrimitive(email))
         }.toString(),
       )
     return "$header.$payload.signature"
