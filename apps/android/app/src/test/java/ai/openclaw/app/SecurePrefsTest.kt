@@ -1,7 +1,12 @@
 package ai.openclaw.app
 
 import android.content.Context
+import ai.openclaw.app.auth.OpenAICodexCredential
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -34,5 +39,51 @@ class SecurePrefsTest {
     assertEquals("shared-token", prefs.loadGatewayToken())
     assertEquals("bootstrap-token", prefs.loadGatewayBootstrapToken())
     assertEquals("bootstrap-token", prefs.gatewayBootstrapToken.value)
+  }
+
+  @Test
+  fun gatewayConnectionMode_defaultsToRemoteAndPersistsLocalHost() {
+    val context = RuntimeEnvironment.getApplication()
+    val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)
+    plainPrefs.edit().clear().commit()
+
+    val prefs = SecurePrefs(context)
+    assertEquals(GatewayConnectionMode.RemoteGateway, prefs.gatewayConnectionMode.value)
+
+    prefs.setGatewayConnectionMode(GatewayConnectionMode.LocalHost)
+
+    assertEquals(GatewayConnectionMode.LocalHost, prefs.gatewayConnectionMode.value)
+    assertEquals("localHost", plainPrefs.getString("gateway.connection.mode", null))
+  }
+
+  @Test
+  fun openAICodexCredential_roundTripsThroughSecurePrefs() {
+    val context = RuntimeEnvironment.getApplication()
+    val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.codex", Context.MODE_PRIVATE)
+    securePrefs.edit().clear().commit()
+    val prefs = SecurePrefs(context, securePrefsOverride = securePrefs)
+    val expected =
+      OpenAICodexCredential(
+        access = "access-token",
+        refresh = "refresh-token",
+        expires = 123456789L,
+        accountId = "account-123",
+        email = "test@example.com",
+      )
+
+    assertFalse(prefs.hasOpenAICodexCredential.value)
+    assertNull(prefs.loadOpenAICodexCredential())
+
+    prefs.saveOpenAICodexCredential(expected)
+
+    val actual = prefs.loadOpenAICodexCredential()
+    assertTrue(prefs.hasOpenAICodexCredential.value)
+    assertNotNull(actual)
+    assertEquals(expected, actual)
+
+    prefs.clearOpenAICodexCredential()
+
+    assertFalse(prefs.hasOpenAICodexCredential.value)
+    assertNull(prefs.loadOpenAICodexCredential())
   }
 }

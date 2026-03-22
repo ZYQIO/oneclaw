@@ -88,7 +88,7 @@ class GatewaySession(
   private val onEvent: (event: String, payloadJson: String?) -> Unit,
   private val onInvoke: (suspend (InvokeRequest) -> InvokeResult)? = null,
   private val onTlsFingerprint: ((stableId: String, fingerprint: String) -> Unit)? = null,
-) {
+) : GatewayRpcClient {
   private companion object {
     // Keep connect timeout above observed gateway unauthorized close on lower-end devices.
     private const val CONNECT_RPC_TIMEOUT_MS = 12_000L
@@ -176,10 +176,10 @@ class GatewaySession(
     currentConnection?.closeQuietly()
   }
 
-  fun currentCanvasHostUrl(): String? = canvasHostUrl
-  fun currentMainSessionKey(): String? = mainSessionKey
+  override fun currentCanvasHostUrl(): String? = canvasHostUrl
+  override fun currentMainSessionKey(): String? = mainSessionKey
 
-  suspend fun sendNodeEvent(event: String, payloadJson: String?): Boolean {
+  override suspend fun sendNodeEvent(event: String, payloadJson: String?): Boolean {
     val conn = currentConnection ?: return false
     val parsedPayload = payloadJson?.let { parseJsonOrNull(it) }
     val params =
@@ -202,7 +202,7 @@ class GatewaySession(
     }
   }
 
-  suspend fun request(method: String, paramsJson: String?, timeoutMs: Long = 15_000): String {
+  override suspend fun request(method: String, paramsJson: String?, timeoutMs: Long = 15_000): String {
     val conn = currentConnection ?: throw IllegalStateException("not connected")
     val params =
       if (paramsJson.isNullOrBlank()) {

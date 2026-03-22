@@ -1,6 +1,6 @@
 package ai.openclaw.app.chat
 
-import ai.openclaw.app.gateway.GatewaySession
+import ai.openclaw.app.gateway.GatewayRpcClient
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +20,7 @@ import kotlinx.serialization.json.buildJsonObject
 
 class ChatController(
   private val scope: CoroutineScope,
-  private val session: GatewaySession,
+  private val session: GatewayRpcClient,
   private val json: Json,
   private val supportsChatSubscribe: Boolean,
 ) {

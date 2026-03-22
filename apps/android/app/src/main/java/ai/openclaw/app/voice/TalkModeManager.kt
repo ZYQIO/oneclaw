@@ -21,7 +21,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import androidx.core.content.ContextCompat
-import ai.openclaw.app.gateway.GatewaySession
+import ai.openclaw.app.gateway.GatewayRpcClient
 import ai.openclaw.app.isCanonicalMainSessionKey
 import ai.openclaw.app.normalizeMainKey
 import java.io.File
@@ -51,7 +51,7 @@ import kotlin.math.max
 class TalkModeManager(
   private val context: Context,
   private val scope: CoroutineScope,
-  private val session: GatewaySession,
+  private val session: GatewayRpcClient,
   private val supportsChatSubscribe: Boolean,
   private val isConnected: () -> Boolean,
 ) {
@@ -665,7 +665,7 @@ class TalkModeManager(
     }
   }
 
-  private suspend fun subscribeChatIfNeeded(session: GatewaySession, sessionKey: String) {
+  private suspend fun subscribeChatIfNeeded(session: GatewayRpcClient, sessionKey: String) {
     if (!supportsChatSubscribe) return
     val key = sessionKey.trim()
     if (key.isEmpty()) return
@@ -693,7 +693,7 @@ class TalkModeManager(
     return lines.joinToString("\n")
   }
 
-  private suspend fun sendChat(message: String, session: GatewaySession): String {
+  private suspend fun sendChat(message: String, session: GatewayRpcClient): String {
     val runId = UUID.randomUUID().toString()
     val params =
       buildJsonObject {
@@ -764,7 +764,7 @@ class TalkModeManager(
   }
 
   private suspend fun waitForAssistantText(
-    session: GatewaySession,
+    session: GatewayRpcClient,
     sinceSeconds: Double,
     timeoutMs: Long,
   ): String? {
@@ -778,7 +778,7 @@ class TalkModeManager(
   }
 
   private suspend fun fetchLatestAssistantText(
-    session: GatewaySession,
+    session: GatewayRpcClient,
     sinceSeconds: Double? = null,
   ): String? {
     val key = mainSessionKey.ifBlank { "main" }

@@ -75,11 +75,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val locationMode: StateFlow<LocationMode> = prefs.locationMode
   val locationPreciseEnabled: StateFlow<Boolean> = prefs.locationPreciseEnabled
   val preventSleep: StateFlow<Boolean> = prefs.preventSleep
+  val gatewayConnectionMode: StateFlow<GatewayConnectionMode> = prefs.gatewayConnectionMode
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
   val manualTls: StateFlow<Boolean> = prefs.manualTls
   val gatewayToken: StateFlow<String> = prefs.gatewayToken
+  val hasOpenAICodexCredential: StateFlow<Boolean> = prefs.hasOpenAICodexCredential
   val onboardingCompleted: StateFlow<Boolean> = prefs.onboardingCompleted
   val canvasDebugStatusEnabled: StateFlow<Boolean> = prefs.canvasDebugStatusEnabled
   val speakerEnabled: StateFlow<Boolean> = prefs.speakerEnabled
@@ -150,6 +152,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setPreventSleep(value: Boolean) {
     prefs.setPreventSleep(value)
+  }
+
+  fun setGatewayConnectionMode(value: GatewayConnectionMode) {
+    prefs.setGatewayConnectionMode(value)
   }
 
   fun setManualEnabled(value: Boolean) {

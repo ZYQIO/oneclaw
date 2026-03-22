@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import ai.openclaw.app.auth.OpenAICodexCredential
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
@@ -60,6 +61,9 @@ class SecurePrefs(
   private val _preventSleep = MutableStateFlow(plainPrefs.getBoolean("screen.preventSleep", true))
   val preventSleep: StateFlow<Boolean> = _preventSleep
 
+  private val _gatewayConnectionMode = MutableStateFlow(loadGatewayConnectionMode())
+  val gatewayConnectionMode: StateFlow<GatewayConnectionMode> = _gatewayConnectionMode
+
   private val _manualEnabled =
     MutableStateFlow(plainPrefs.getBoolean("gateway.manual.enabled", false))
   val manualEnabled: StateFlow<Boolean> = _manualEnabled
@@ -108,6 +112,9 @@ class SecurePrefs(
   private val _speakerEnabled = MutableStateFlow(plainPrefs.getBoolean("voice.speakerEnabled", true))
   val speakerEnabled: StateFlow<Boolean> = _speakerEnabled
 
+  private val _hasOpenAICodexCredential = MutableStateFlow(loadOpenAICodexCredential() != null)
+  val hasOpenAICodexCredential: StateFlow<Boolean> = _hasOpenAICodexCredential
+
   fun setLastDiscoveredStableId(value: String) {
     val trimmed = value.trim()
     plainPrefs.edit { putString("gateway.lastDiscoveredStableID", trimmed) }
@@ -138,6 +145,11 @@ class SecurePrefs(
   fun setPreventSleep(value: Boolean) {
     plainPrefs.edit { putBoolean("screen.preventSleep", value) }
     _preventSleep.value = value
+  }
+
+  fun setGatewayConnectionMode(value: GatewayConnectionMode) {
+    plainPrefs.edit { putString("gateway.connection.mode", value.rawValue) }
+    _gatewayConnectionMode.value = value
   }
 
   fun setManualEnabled(value: Boolean) {
@@ -256,6 +268,28 @@ class SecurePrefs(
     securePrefs.edit { remove(key) }
   }
 
+  fun loadOpenAICodexCredential(): OpenAICodexCredential? {
+    val raw = securePrefs.getString("auth.openaiCodex.oauth", null)?.trim().orEmpty()
+    if (raw.isEmpty()) return null
+    return try {
+      json.decodeFromString(OpenAICodexCredential.serializer(), raw)
+    } catch (_: Throwable) {
+      null
+    }
+  }
+
+  fun saveOpenAICodexCredential(value: OpenAICodexCredential) {
+    securePrefs.edit {
+      putString("auth.openaiCodex.oauth", json.encodeToString(OpenAICodexCredential.serializer(), value))
+    }
+    _hasOpenAICodexCredential.value = true
+  }
+
+  fun clearOpenAICodexCredential() {
+    securePrefs.edit { remove("auth.openaiCodex.oauth") }
+    _hasOpenAICodexCredential.value = false
+  }
+
   private fun createSecurePrefs(context: Context, name: String): SharedPreferences {
     return EncryptedSharedPreferences.create(
       context,
@@ -327,6 +361,11 @@ class SecurePrefs(
       plainPrefs.edit { putString(locationModeKey, resolved.rawValue) }
     }
     return resolved
+  }
+
+  private fun loadGatewayConnectionMode(): GatewayConnectionMode {
+    val stored = plainPrefs.getString("gateway.connection.mode", null)
+    return GatewayConnectionMode.fromRawValue(stored)
   }
 
   private fun loadWakeWords(): List<String> {
