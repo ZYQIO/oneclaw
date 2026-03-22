@@ -66,6 +66,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   val remoteAddress by viewModel.remoteAddress.collectAsState()
   val connectionMode by viewModel.gatewayConnectionMode.collectAsState()
   val hasOpenAICodexCredential by viewModel.hasOpenAICodexCredential.collectAsState()
+  val openAICodexAuthUiState by viewModel.openAICodexAuthUiState.collectAsState()
   val manualHost by viewModel.manualHost.collectAsState()
   val manualPort by viewModel.manualPort.collectAsState()
   val manualTls by viewModel.manualTls.collectAsState()
@@ -89,6 +90,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   var manualPortInput by rememberSaveable { mutableStateOf(manualPort.toString()) }
   var manualTlsInput by rememberSaveable { mutableStateOf(manualTls) }
   var passwordInput by rememberSaveable { mutableStateOf("") }
+  var manualAuthorizationInput by rememberSaveable { mutableStateOf("") }
   var validationText by rememberSaveable { mutableStateOf<String?>(null) }
 
   if (pendingTrust != null) {
@@ -196,6 +198,108 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             style = mobileCaption1,
             color = if (hasOpenAICodexCredential) mobileTextSecondary else mobileWarning,
           )
+        }
+      }
+    }
+
+    if (connectionMode == GatewayConnectionMode.LocalHost) {
+      Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = mobileCardSurface,
+        border = BorderStroke(1.dp, mobileBorder),
+      ) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          Text("Codex authentication", style = mobileHeadline, color = mobileText)
+          val authStatusText =
+            when {
+              !openAICodexAuthUiState.errorText.isNullOrBlank() -> openAICodexAuthUiState.errorText!!
+              !openAICodexAuthUiState.statusText.isNullOrBlank() -> openAICodexAuthUiState.statusText!!
+              hasOpenAICodexCredential && !openAICodexAuthUiState.signedInEmail.isNullOrBlank() ->
+                "Signed in as ${openAICodexAuthUiState.signedInEmail}"
+              hasOpenAICodexCredential -> "OpenAI Codex OAuth is stored on this phone."
+              else -> "Sign in once and local-host chat can call GPT through your Codex subscription."
+            }
+          Text(
+            authStatusText,
+            style = mobileCallout,
+            color =
+              when {
+                !openAICodexAuthUiState.errorText.isNullOrBlank() -> mobileWarning
+                hasOpenAICodexCredential -> mobileSuccess
+                else -> mobileTextSecondary
+              },
+          )
+
+          if (openAICodexAuthUiState.manualInputEnabled) {
+            OutlinedTextField(
+              value = manualAuthorizationInput,
+              onValueChange = { manualAuthorizationInput = it },
+              placeholder = {
+                Text(
+                  "Paste redirect URL or authorization code",
+                  style = mobileBody,
+                  color = mobileTextTertiary,
+                )
+              },
+              modifier = Modifier.fillMaxWidth(),
+              minLines = 2,
+              maxLines = 4,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+              textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+              shape = RoundedCornerShape(14.dp),
+              colors = outlinedColors(),
+            )
+          }
+
+          Button(
+            onClick = {
+              validationText = null
+              manualAuthorizationInput = ""
+              viewModel.startOpenAICodexLogin()
+            },
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors =
+              ButtonDefaults.buttonColors(
+                containerColor = mobileAccent,
+                contentColor = Color.White,
+              ),
+          ) {
+            Text(
+              if (hasOpenAICodexCredential) "Reconnect Codex" else "Sign in with Codex",
+              style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
+            )
+          }
+
+          if (openAICodexAuthUiState.manualInputEnabled) {
+            Button(
+              onClick = { viewModel.submitOpenAICodexManualInput(manualAuthorizationInput) },
+              modifier = Modifier.fillMaxWidth().height(44.dp),
+              shape = RoundedCornerShape(12.dp),
+              colors =
+                ButtonDefaults.buttonColors(
+                  containerColor = mobileSurface,
+                  contentColor = mobileText,
+                ),
+              border = BorderStroke(1.dp, mobileBorderStrong),
+            ) {
+              Text("Paste code", style = mobileCaption1.copy(fontWeight = FontWeight.Bold))
+            }
+          }
+
+          if (openAICodexAuthUiState.inProgress) {
+            TextButton(onClick = { viewModel.cancelOpenAICodexLogin() }) {
+              Text("Cancel", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
+            }
+          } else if (hasOpenAICodexCredential) {
+            TextButton(onClick = { viewModel.clearOpenAICodexCredential() }) {
+              Text("Clear auth", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileDanger)
+            }
+          }
         }
       }
     }

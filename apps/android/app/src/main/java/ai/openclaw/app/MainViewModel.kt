@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
+import ai.openclaw.app.auth.OpenAICodexAuthUiState
 import ai.openclaw.app.chat.ChatMessage
 import ai.openclaw.app.chat.ChatPendingToolCall
 import ai.openclaw.app.chat.ChatSessionEntry
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.stateIn
 class MainViewModel(app: Application) : AndroidViewModel(app) {
   private val nodeApp = app as NodeApp
   private val prefs = nodeApp.prefs
+  private val openAICodexAuthManager = nodeApp.openAICodexAuthManager
   private val runtimeRef = MutableStateFlow<NodeRuntime?>(null)
   private var foreground = true
 
@@ -82,6 +84,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val manualTls: StateFlow<Boolean> = prefs.manualTls
   val gatewayToken: StateFlow<String> = prefs.gatewayToken
   val hasOpenAICodexCredential: StateFlow<Boolean> = prefs.hasOpenAICodexCredential
+  val openAICodexAuthUiState: StateFlow<OpenAICodexAuthUiState> = openAICodexAuthManager.uiState
   val onboardingCompleted: StateFlow<Boolean> = prefs.onboardingCompleted
   val canvasDebugStatusEnabled: StateFlow<Boolean> = prefs.canvasDebugStatusEnabled
   val speakerEnabled: StateFlow<Boolean> = prefs.speakerEnabled
@@ -176,6 +179,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setGatewayToken(value: String) {
     prefs.setGatewayToken(value)
+  }
+
+  fun startOpenAICodexLogin() {
+    openAICodexAuthManager.startLogin()
+  }
+
+  fun submitOpenAICodexManualInput(value: String) {
+    openAICodexAuthManager.submitManualInput(value)
+  }
+
+  fun cancelOpenAICodexLogin() {
+    openAICodexAuthManager.cancelLogin()
+  }
+
+  fun clearOpenAICodexCredential() {
+    openAICodexAuthManager.clearCredential()
   }
 
   fun setGatewayBootstrapToken(value: String) {

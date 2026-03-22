@@ -1,8 +1,8 @@
 package ai.openclaw.app.host
 
-import android.util.Base64
 import ai.openclaw.app.SecurePrefs
 import ai.openclaw.app.auth.OpenAICodexCredential
+import ai.openclaw.app.auth.OpenAICodexOAuthApi
 import ai.openclaw.app.chat.ChatMessageContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,7 +12,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -39,11 +38,11 @@ class OpenAICodexResponsesClient(
   private val client: OkHttpClient = OkHttpClient(),
 ) : LocalHostResponsesClient {
   companion object {
-    private const val authorizeClientId = "app_EMoamEEZ73f0CkXaXp7hrann"
-    private const val tokenUrl = "https://auth.openai.com/oauth/token"
     private const val responsesUrl = "https://chatgpt.com/backend-api/codex/responses"
     private const val defaultModelId = "gpt-5.4"
   }
+
+  private val oauthApi = OpenAICodexOAuthApi(json = json, client = client)
 
   override suspend fun streamReply(
     sessionId: String,
@@ -55,11 +54,11 @@ class OpenAICodexResponsesClient(
       var credential = prefs.loadOpenAICodexCredential()
         ?: throw IllegalStateException("OpenAI Codex login required")
       if (credential.expires <= System.currentTimeMillis() + 30_000) {
-        credential = refreshCredential(credential)
+        credential = oauthApi.refreshCredential(credential)
         prefs.saveOpenAICodexCredential(credential)
       }
 
-      val accountId = extractAccountId(credential.access) ?: credential.accountId
+      val accountId = oauthApi.extractAccountId(credential.access) ?: credential.accountId
       if (accountId.isBlank()) {
         throw IllegalStateException("OpenAI Codex credential is missing accountId")
       }
@@ -173,10 +172,13 @@ class OpenAICodexResponsesClient(
         }
 
         val persistedCredential =
-          if (credential.accountId == accountId) {
+          if (credential.accountId == accountId && credential.email == oauthApi.extractEmail(credential.access)) {
             credential
           } else {
-            credential.copy(accountId = accountId)
+            credential.copy(
+              accountId = accountId,
+              email = oauthApi.extractEmail(credential.access) ?: credential.email,
+            )
           }
 
         OpenAICodexAssistantReply(
@@ -317,66 +319,6 @@ class OpenAICodexResponsesClient(
     }.joinToString(separator = "")
   }
 
-  private fun refreshCredential(current: OpenAICodexCredential): OpenAICodexCredential {
-    val formBody =
-      FormBody.Builder()
-        .add("grant_type", "refresh_token")
-        .add("refresh_token", current.refresh)
-        .add("client_id", authorizeClientId)
-        .build()
-    val request =
-      Request.Builder()
-        .url(tokenUrl)
-        .post(formBody)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .build()
-
-    client.newCall(request).execute().use { response ->
-      val body = response.body?.string().orEmpty()
-      if (!response.isSuccessful) {
-        throw IllegalStateException(parseCodexError(response.code, body))
-      }
-      val root = json.parseToJsonElement(body) as? JsonObject
-        ?: throw IllegalStateException("OpenAI Codex refresh returned invalid JSON")
-      val access = root["access_token"].asStringOrNull().orEmpty()
-      val refresh = root["refresh_token"].asStringOrNull().orEmpty()
-      val expiresIn = root["expires_in"].asLongOrNull()
-      if (access.isEmpty() || refresh.isEmpty() || expiresIn == null) {
-        throw IllegalStateException("OpenAI Codex refresh response was missing required fields")
-      }
-      val accountId = extractAccountId(access) ?: current.accountId
-      return OpenAICodexCredential(
-        access = access,
-        refresh = refresh,
-        expires = System.currentTimeMillis() + expiresIn * 1000,
-        accountId = accountId,
-        email = current.email,
-      )
-    }
-  }
-
-  private fun extractAccountId(accessToken: String): String? {
-    val parts = accessToken.split(".")
-    if (parts.size != 3) return null
-    val payload = decodeJwtPayload(parts[1]) ?: return null
-    val auth = payload["https://api.openai.com/auth"].asObjectOrNull() ?: return null
-    return auth["chatgpt_account_id"].asStringOrNull()?.takeIf { it.isNotBlank() }
-  }
-
-  private fun decodeJwtPayload(value: String): JsonObject? {
-    val normalized = when (value.length % 4) {
-      2 -> "$value=="
-      3 -> "$value="
-      else -> value
-    }
-    return try {
-      val decoded = Base64.decode(normalized, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-      json.parseToJsonElement(String(decoded, Charsets.UTF_8)) as? JsonObject
-    } catch (_: Throwable) {
-      null
-    }
-  }
-
   private fun parseCodexError(statusCode: Int, body: String): String {
     if (body.isBlank()) {
       return "OpenAI Codex request failed ($statusCode)"
@@ -402,11 +344,5 @@ private fun kotlinx.serialization.json.JsonElement?.asObjectOrNull(): JsonObject
 private fun kotlinx.serialization.json.JsonElement?.asStringOrNull(): String? =
   when (this) {
     is JsonPrimitive -> content
-    else -> null
-  }
-
-private fun kotlinx.serialization.json.JsonElement?.asLongOrNull(): Long? =
-  when (this) {
-    is JsonPrimitive -> content.toLongOrNull()
     else -> null
   }

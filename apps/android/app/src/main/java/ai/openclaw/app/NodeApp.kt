@@ -2,9 +2,21 @@ package ai.openclaw.app
 
 import android.app.Application
 import android.os.StrictMode
+import ai.openclaw.app.auth.OpenAICodexAuthManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class NodeApp : Application() {
   val prefs: SecurePrefs by lazy { SecurePrefs(this) }
+  private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  val openAICodexAuthManager: OpenAICodexAuthManager by lazy {
+    OpenAICodexAuthManager(
+      appContext = this,
+      prefs = prefs,
+      scope = appScope,
+    )
+  }
 
   @Volatile private var runtimeInstance: NodeRuntime? = null
 
