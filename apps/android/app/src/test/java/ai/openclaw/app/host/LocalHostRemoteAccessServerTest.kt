@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -94,6 +96,53 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("run-123"))
       assertTrue(response.body.contains("\"timedOut\":false"))
       assertTrue(response.body.contains("\"state\":\"final\""))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun status_returnsRemoteAccessAndHostReadinessSnapshot() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        allowAdvancedInvokeCommands = { true },
+        allowWriteInvokeCommands = { true },
+        statusSnapshotProvider = {
+          buildJsonObject {
+            put("codexAuthConfigured", JsonPrimitive(true))
+            put("sessionCount", JsonPrimitive(2))
+            put("activeRunCount", JsonPrimitive(1))
+          }
+        },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/status",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"mode\":\"local-host\""))
+      assertTrue(response.body.contains("\"remoteAccess\""))
+      assertTrue(response.body.contains("\"advancedEnabled\":true"))
+      assertTrue(response.body.contains("\"writeEnabled\":true"))
+      assertTrue(response.body.contains("\"codexAuthConfigured\":true"))
+      assertTrue(response.body.contains("\"sessionCount\":2"))
+      assertTrue(response.body.contains("\"activeRunCount\":1"))
+      assertTrue(response.body.contains("\"sms.send\""))
     } finally {
       server.stop()
       scope.cancel()
@@ -292,6 +341,8 @@ class LocalHostRemoteAccessServerTest {
         )
 
       assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"status\""))
+      assertTrue(response.body.contains("/api/local-host/v1/status"))
       assertTrue(response.body.contains("\"chat-send-wait\""))
       assertTrue(response.body.contains("/api/local-host/v1/events"))
       assertTrue(response.body.contains("<TOKEN>"))

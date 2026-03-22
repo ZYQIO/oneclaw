@@ -167,6 +167,7 @@ class LocalHostRemoteAccessServer(
   private val unregisterEventClientFn: ((clientId: String) -> Unit)? = null,
   private val allowAdvancedInvokeCommands: () -> Boolean = { false },
   private val allowWriteInvokeCommands: () -> Boolean = { false },
+  private val statusSnapshotProvider: (() -> JsonObject)? = null,
 ) {
   companion object {
     private const val apiBasePath = "/api/local-host/v1"
@@ -366,6 +367,7 @@ class LocalHostRemoteAccessServer(
             state.value.listenUrl?.let { put("listenUrl", JsonPrimitive(it)) }
           }.toString(),
       )
+      request.method == "GET" && uri.path == "$apiBasePath/status" -> statusResponse()
       request.method == "GET" && uri.path == "$apiBasePath/examples" -> examplesResponse()
       request.method == "GET" && uri.path == apiBasePath -> jsonResponse(
         statusCode = 200,
@@ -377,6 +379,7 @@ class LocalHostRemoteAccessServer(
               buildJsonArray {
                 add(JsonPrimitive("GET $apiBasePath"))
                 add(JsonPrimitive("GET $apiBasePath/health"))
+                add(JsonPrimitive("GET $apiBasePath/status"))
                 add(JsonPrimitive("GET $apiBasePath/examples"))
                 add(JsonPrimitive("GET $apiBasePath/identity"))
                 add(JsonPrimitive("GET $apiBasePath/config"))
@@ -464,6 +467,41 @@ class LocalHostRemoteAccessServer(
           }.toString(),
       )
     }
+  }
+
+  private fun statusResponse(): HttpResponse {
+    return jsonResponse(
+      statusCode = 200,
+      body =
+        buildJsonObject {
+          put("ok", JsonPrimitive(true))
+          put("mode", JsonPrimitive("local-host"))
+          put("server", JsonPrimitive("OpenClaw Local Host"))
+          state.value.listenUrl?.let { put("listenUrl", JsonPrimitive(it)) }
+          put(
+            "remoteAccess",
+            buildJsonObject {
+              activeConfig?.let { config ->
+                put("port", JsonPrimitive(config.port))
+              }
+              put("advancedEnabled", JsonPrimitive(allowAdvancedInvokeCommands()))
+              put("writeEnabled", JsonPrimitive(allowWriteInvokeCommands()))
+              put("eventCursor", JsonPrimitive(eventBuffer.latestCursor()))
+              put(
+                "allowedInvokeCommands",
+                buildJsonArray {
+                  allowedInvokeCommands().forEach { command ->
+                    add(JsonPrimitive(command))
+                  }
+                },
+              )
+            },
+          )
+          statusSnapshotProvider?.invoke()?.let { snapshot ->
+            put("host", snapshot)
+          }
+        }.toString(),
+    )
   }
 
   private suspend fun eventsResponse(uri: Uri): HttpResponse {
@@ -598,6 +636,19 @@ class LocalHostRemoteAccessServer(
           put(
             "examples",
             buildJsonArray {
+              add(
+                buildJsonObject {
+                  put("name", JsonPrimitive("status"))
+                  put("method", JsonPrimitive("GET"))
+                  put("path", JsonPrimitive("$apiBasePath/status"))
+                  put(
+                    "curl",
+                    JsonPrimitive(
+                      "curl -H 'Authorization: Bearer $tokenPlaceholder' $baseUrl$apiBasePath/status",
+                    ),
+                  )
+                },
+              )
               add(
                 buildJsonObject {
                   put("name", JsonPrimitive("health"))

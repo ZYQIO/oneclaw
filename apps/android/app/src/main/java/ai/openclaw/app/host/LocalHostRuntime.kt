@@ -140,6 +140,48 @@ class LocalHostRuntime(
 
   fun refreshNodeCanvasCapability(): String? = null
 
+  fun statusSnapshot(): JsonObject {
+    val orderedSessions =
+      sessions.values
+        .map(::snapshotSession)
+        .sortedByDescending { it.updatedAtMs }
+
+    return buildJsonObject {
+      put("serverName", JsonPrimitive(serverName))
+      put("remoteAddress", JsonPrimitive(remoteAddress))
+      put("mainSessionKey", JsonPrimitive(mainSessionKey))
+      put("codexAuthConfigured", JsonPrimitive(prefs.hasOpenAICodexCredential.value))
+      put("sessionCount", JsonPrimitive(orderedSessions.size))
+      put("activeRunCount", JsonPrimitive(activeRuns.size))
+      put("clientCount", JsonPrimitive(clients.size))
+      put("talkEnabled", JsonPrimitive(prefs.talkEnabled.value))
+      put("speakerEnabled", JsonPrimitive(prefs.speakerEnabled.value))
+      put(
+        "wakeWords",
+        buildJsonArray {
+          prefs.wakeWords.value.forEach { word ->
+            add(JsonPrimitive(word))
+          }
+        },
+      )
+      put(
+        "sessions",
+        buildJsonArray {
+          orderedSessions.take(5).forEach { session ->
+            add(
+              buildJsonObject {
+                put("key", JsonPrimitive(session.sessionKey))
+                put("updatedAt", JsonPrimitive(session.updatedAtMs))
+                put("messageCount", JsonPrimitive(session.messages.size))
+                put("thinkingLevel", JsonPrimitive(session.thinkingLevel))
+              },
+            )
+          }
+        },
+      )
+    }
+  }
+
   private fun configPayload(): JsonObject {
     return buildJsonObject {
       put(

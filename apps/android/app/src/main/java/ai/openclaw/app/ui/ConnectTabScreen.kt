@@ -111,6 +111,9 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
       val baseUrl = localHostRemoteAccessUrl?.trim().orEmpty().ifEmpty { "http://<phone-ip>:${localHostRemoteAccessPort}" }
       buildString {
         append("curl -H 'Authorization: Bearer <TOKEN>' ")
+        append("$baseUrl/api/local-host/v1/status")
+        append("\n\n")
+        append("curl -H 'Authorization: Bearer <TOKEN>' ")
         append("$baseUrl/api/local-host/v1/health")
         append("\n\n")
         append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
@@ -495,7 +498,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           }
 
           Text(
-            "Use header `Authorization: Bearer <token>` for `/health`, `/events`, `/chat/*`, and `/invoke`.",
+            "Use header `Authorization: Bearer <token>` for `/status`, `/health`, `/events`, `/chat/*`, and `/invoke`.",
+            style = mobileCaption1,
+            color = mobileTextSecondary,
+          )
+          Text(
+            "Probe `/status` first if you want a one-shot readiness snapshot with Codex auth, session counts, and enabled command tiers.",
             style = mobileCaption1,
             color = mobileTextSecondary,
           )

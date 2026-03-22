@@ -215,6 +215,9 @@ class NodeRuntime(
     allowWriteInvokeCommands = {
       prefs.localHostRemoteAccessWriteCommandsEnabled.value
     },
+    statusSnapshotProvider = {
+      localHostRuntime.statusSnapshot()
+    },
   )
 
   private enum class ConnectionBackend {
