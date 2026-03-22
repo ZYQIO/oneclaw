@@ -200,6 +200,15 @@ class NodeRuntime(
     handleInvoke = { command, paramsJson ->
       invokeDispatcher.handleInvoke(command, paramsJson)
     },
+    registerEventClient = { onEvent ->
+      localHostRuntime.registerClient(
+        role = "remote-access-events",
+        onEvent = onEvent,
+      ).clientId
+    },
+    unregisterEventClientFn = { clientId ->
+      localHostRuntime.unregisterClient(clientId)
+    },
   )
 
   private enum class ConnectionBackend {

@@ -399,7 +399,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           )
 
           Text(
-            "Use header `Authorization: Bearer <token>` for `/health`, `/chat/*`, and `/invoke`.",
+            "Use header `Authorization: Bearer <token>` for `/health`, `/events`, `/chat/*`, and `/invoke`.",
             style = mobileCaption1,
             color = mobileTextSecondary,
           )

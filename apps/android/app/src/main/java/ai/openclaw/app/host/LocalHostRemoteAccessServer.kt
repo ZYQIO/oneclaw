@@ -10,7 +10,9 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
 import java.security.MessageDigest
+import java.util.ArrayDeque
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,11 +21,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 
 data class LocalHostRemoteAccessState(
@@ -51,17 +55,106 @@ private data class HttpResponse(
   val extraHeaders: Map<String, String> = emptyMap(),
 )
 
+internal data class BufferedRemoteAccessEvent(
+  val id: Long,
+  val event: String,
+  val payloadJson: String?,
+  val timestampMs: Long,
+)
+
+internal class RemoteAccessEventBuffer(
+  private val maxEvents: Int = 200,
+) {
+  private val lock = Object()
+  private val events = ArrayDeque<BufferedRemoteAccessEvent>()
+  private val nextId = AtomicLong(0)
+
+  fun append(
+    event: String,
+    payloadJson: String?,
+    timestampMs: Long = System.currentTimeMillis(),
+  ): BufferedRemoteAccessEvent {
+    val buffered =
+      BufferedRemoteAccessEvent(
+        id = nextId.incrementAndGet(),
+        event = event,
+        payloadJson = payloadJson,
+        timestampMs = timestampMs,
+      )
+    synchronized(lock) {
+      events.addLast(buffered)
+      while (events.size > maxEvents) {
+        events.removeFirst()
+      }
+      lock.notifyAll()
+    }
+    return buffered
+  }
+
+  fun snapshotAfter(
+    cursor: Long,
+    limit: Int,
+  ): List<BufferedRemoteAccessEvent> {
+    synchronized(lock) {
+      return snapshotAfterLocked(cursor, limit)
+    }
+  }
+
+  fun hasEventsAfter(cursor: Long): Boolean {
+    synchronized(lock) {
+      return events.any { it.id > cursor }
+    }
+  }
+
+  fun clear() {
+    synchronized(lock) {
+      events.clear()
+    }
+  }
+
+  suspend fun awaitAfter(
+    cursor: Long,
+    limit: Int,
+    waitMs: Long,
+  ): List<BufferedRemoteAccessEvent> =
+    withContext(Dispatchers.IO) {
+      synchronized(lock) {
+        var snapshot = snapshotAfterLocked(cursor, limit)
+        if (snapshot.isNotEmpty() || waitMs <= 0) {
+          return@withContext snapshot
+        }
+        lock.wait(waitMs)
+        snapshot = snapshotAfterLocked(cursor, limit)
+        return@withContext snapshot
+      }
+    }
+
+  private fun snapshotAfterLocked(
+    cursor: Long,
+    limit: Int,
+  ): List<BufferedRemoteAccessEvent> {
+    return events.asSequence()
+      .filter { it.id > cursor }
+      .take(limit)
+      .toList()
+  }
+}
+
 class LocalHostRemoteAccessServer(
   private val scope: CoroutineScope,
   private val json: Json,
   private val handleLocalHostRequest: suspend (method: String, paramsJson: String?, timeoutMs: Long) -> String,
   private val handleInvoke: suspend (command: String, paramsJson: String?) -> GatewaySession.InvokeResult,
+  private val registerEventClient: (((event: String, payloadJson: String?) -> Unit) -> String)? = null,
+  private val unregisterEventClientFn: ((clientId: String) -> Unit)? = null,
 ) {
   companion object {
     private const val apiBasePath = "/api/local-host/v1"
     private const val maxHeaderBytes = 16 * 1024
     private const val maxBodyBytes = 12 * 1024 * 1024
     private const val defaultTimeoutMs = 30_000L
+    private const val maxEventWaitMs = 20_000L
+    private const val maxEventsPerResponse = 100
     private val allowedInvokeCommands =
       setOf(
         "device.health",
@@ -78,6 +171,8 @@ class LocalHostRemoteAccessServer(
   @Volatile private var serverSocket: ServerSocket? = null
   @Volatile private var activeConfig: RemoteAccessConfig? = null
   private var acceptJob: Job? = null
+  private var eventClientId: String? = null
+  private val eventBuffer = RemoteAccessEventBuffer()
 
   fun start(
     port: Int,
@@ -106,6 +201,7 @@ class LocalHostRemoteAccessServer(
         }
       serverSocket = socket
       activeConfig = desired
+      ensureEventClientRegistered()
       val listenUrl = detectListenUrl(port)
       _state.value =
         LocalHostRemoteAccessState(
@@ -133,6 +229,8 @@ class LocalHostRemoteAccessServer(
     activeConfig = null
     acceptJob?.cancel()
     acceptJob = null
+    unregisterEventClient()
+    eventBuffer.clear()
     try {
       serverSocket?.close()
     } catch (_: Throwable) {
@@ -240,6 +338,7 @@ class LocalHostRemoteAccessServer(
         method = "sessions.list",
         params = null,
       )
+      request.method == "GET" && uri.path == "$apiBasePath/events" -> eventsResponse(uri)
       request.method == "POST" && uri.path == "$apiBasePath/chat/send" -> forwardToLocalHost(
         method = "chat.send",
         params = requireJsonBody(request),
@@ -258,6 +357,44 @@ class LocalHostRemoteAccessServer(
           }.toString(),
       )
     }
+  }
+
+  private suspend fun eventsResponse(uri: Uri): HttpResponse {
+    val cursor = uri.getQueryParameter("cursor")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+    val limit = uri.getQueryParameter("limit")?.toIntOrNull()?.coerceIn(1, maxEventsPerResponse) ?: 50
+    val waitMs = uri.getQueryParameter("waitMs")?.toLongOrNull()?.coerceIn(0L, maxEventWaitMs) ?: 0L
+    val events = eventBuffer.awaitAfter(cursor = cursor, limit = limit, waitMs = waitMs)
+    val nextCursor = events.lastOrNull()?.id ?: cursor
+    return jsonResponse(
+      statusCode = 200,
+      body =
+        buildJsonObject {
+          put(
+            "events",
+            buildJsonArray {
+              events.forEach { item ->
+                add(
+                  buildJsonObject {
+                    put("id", JsonPrimitive(item.id))
+                    put("event", JsonPrimitive(item.event))
+                    put("timestamp", JsonPrimitive(item.timestampMs))
+                    item.payloadJson?.let { raw ->
+                      val parsedPayload = parseJsonOrNull(raw)
+                      if (parsedPayload != null) {
+                        put("payload", parsedPayload)
+                      } else {
+                        put("payloadJSON", JsonPrimitive(raw))
+                      }
+                    }
+                  },
+                )
+              }
+            },
+          )
+          put("nextCursor", JsonPrimitive(nextCursor))
+          put("hasMore", JsonPrimitive(eventBuffer.hasEventsAfter(nextCursor)))
+        }.toString(),
+    )
   }
 
   private suspend fun forwardToLocalHost(
@@ -476,6 +613,25 @@ class LocalHostRemoteAccessServer(
 
       preferred?.hostAddress?.takeIf { it.isNotBlank() }?.let { "http://$it:$port" }
     }.getOrNull()
+  }
+
+  private fun ensureEventClientRegistered() {
+    if (eventClientId != null) return
+    val registrar = registerEventClient ?: return
+    eventClientId =
+      registrar { event, payloadJson ->
+        eventBuffer.append(event = event, payloadJson = payloadJson)
+      }
+  }
+
+  private fun unregisterEventClient() {
+    val clientId = eventClientId ?: return
+    eventClientId = null
+    try {
+      unregisterEventClientFn?.invoke(clientId)
+    } catch (_: Throwable) {
+      // Ignore listener cleanup failures while shutting down remote access.
+    }
   }
 }
 
