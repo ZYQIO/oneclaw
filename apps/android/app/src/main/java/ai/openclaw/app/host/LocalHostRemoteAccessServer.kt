@@ -2,6 +2,15 @@ package ai.openclaw.app.host
 
 import android.net.Uri
 import ai.openclaw.app.gateway.GatewaySession
+import ai.openclaw.app.protocol.OpenClawCalendarCommand
+import ai.openclaw.app.protocol.OpenClawCallLogCommand
+import ai.openclaw.app.protocol.OpenClawContactsCommand
+import ai.openclaw.app.protocol.OpenClawDeviceCommand
+import ai.openclaw.app.protocol.OpenClawLocationCommand
+import ai.openclaw.app.protocol.OpenClawMotionCommand
+import ai.openclaw.app.protocol.OpenClawNotificationsCommand
+import ai.openclaw.app.protocol.OpenClawPhotosCommand
+import ai.openclaw.app.protocol.OpenClawSystemCommand
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.InetSocketAddress
@@ -162,13 +171,21 @@ class LocalHostRemoteAccessServer(
     private const val defaultTimeoutMs = 30_000L
     private const val maxEventWaitMs = 20_000L
     private const val maxEventsPerResponse = 100
-    private val allowedInvokeCommands =
-      setOf(
-        "device.health",
-        "device.info",
-        "device.permissions",
-        "device.status",
-        "system.notify",
+    private val allowedInvokeCommands: List<String> =
+      listOf(
+        OpenClawCalendarCommand.Events.rawValue,
+        OpenClawCallLogCommand.Search.rawValue,
+        OpenClawContactsCommand.Search.rawValue,
+        OpenClawDeviceCommand.Health.rawValue,
+        OpenClawDeviceCommand.Info.rawValue,
+        OpenClawDeviceCommand.Permissions.rawValue,
+        OpenClawDeviceCommand.Status.rawValue,
+        OpenClawLocationCommand.Get.rawValue,
+        OpenClawMotionCommand.Activity.rawValue,
+        OpenClawMotionCommand.Pedometer.rawValue,
+        OpenClawNotificationsCommand.List.rawValue,
+        OpenClawPhotosCommand.Latest.rawValue,
+        OpenClawSystemCommand.Notify.rawValue,
       )
   }
 
@@ -354,6 +371,7 @@ class LocalHostRemoteAccessServer(
                 add(JsonPrimitive("POST $apiBasePath/chat/send-wait"))
                 add(JsonPrimitive("POST $apiBasePath/chat/abort"))
                 add(JsonPrimitive("GET $apiBasePath/events"))
+                add(JsonPrimitive("GET $apiBasePath/invoke/capabilities"))
                 add(JsonPrimitive("POST $apiBasePath/invoke"))
               },
             )
@@ -405,6 +423,7 @@ class LocalHostRemoteAccessServer(
         params = null,
       )
       request.method == "GET" && uri.path == "$apiBasePath/events" -> eventsResponse(uri)
+      request.method == "GET" && uri.path == "$apiBasePath/invoke/capabilities" -> invokeCapabilitiesResponse()
       request.method == "POST" && uri.path == "$apiBasePath/chat/send-wait" -> sendAndWaitForChat(requireJsonBody(request))
       request.method == "POST" && uri.path == "$apiBasePath/chat/send" -> forwardToLocalHost(
         method = "chat.send",
@@ -499,6 +518,23 @@ class LocalHostRemoteAccessServer(
           if (parsedPayload != null) {
             put("payload", parsedPayload)
           }
+        }.toString(),
+    )
+  }
+
+  private fun invokeCapabilitiesResponse(): HttpResponse {
+    return jsonResponse(
+      statusCode = 200,
+      body =
+        buildJsonObject {
+          put(
+            "commands",
+            buildJsonArray {
+              allowedInvokeCommands.forEach { command ->
+                add(JsonPrimitive(command))
+              }
+            },
+          )
         }.toString(),
     )
   }

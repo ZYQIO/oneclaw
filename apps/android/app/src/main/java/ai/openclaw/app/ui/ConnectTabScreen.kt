@@ -404,7 +404,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             color = mobileTextSecondary,
           )
           Text(
-            "Remote `/invoke` currently allows `device.*` readouts and `system.notify` only.",
+            "Remote `/invoke` currently allows read-only device, location, notifications, contacts, calendar, photos, motion, call-log commands plus `system.notify`.",
             style = mobileCaption1,
             color = mobileTextSecondary,
           )

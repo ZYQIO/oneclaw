@@ -100,6 +100,71 @@ class LocalHostRemoteAccessServerTest {
     }
   }
 
+  @Test
+  fun invokeCapabilities_listsAllowedReadOnlyCommands() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/invoke/capabilities",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"device.status\""))
+      assertTrue(response.body.contains("\"notifications.list\""))
+      assertTrue(response.body.contains("\"location.get\""))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun invoke_rejectsCommandsOutsideRemoteAllowlist() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "POST",
+          path = "/api/local-host/v1/invoke",
+          token = "secret-token",
+          body = """{"command":"camera.snap"}""",
+        )
+
+      assertEquals(403, response.statusCode)
+      assertTrue(response.body.contains("not enabled for remote access"))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
   private fun request(
     port: Int,
     method: String,
