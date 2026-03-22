@@ -73,6 +73,10 @@ class SecurePrefs(
     MutableStateFlow(plainPrefs.getBoolean("localHost.remoteAccess.advancedCommands.enabled", false))
   val localHostRemoteAccessAdvancedCommandsEnabled: StateFlow<Boolean> = _localHostRemoteAccessAdvancedCommandsEnabled
 
+  private val _localHostRemoteAccessWriteCommandsEnabled =
+    MutableStateFlow(plainPrefs.getBoolean("localHost.remoteAccess.writeCommands.enabled", false))
+  val localHostRemoteAccessWriteCommandsEnabled: StateFlow<Boolean> = _localHostRemoteAccessWriteCommandsEnabled
+
   private val _localHostRemoteAccessPort =
     MutableStateFlow(plainPrefs.getInt("localHost.remoteAccess.port", defaultLocalHostRemoteAccessPort))
   val localHostRemoteAccessPort: StateFlow<Int> = _localHostRemoteAccessPort
@@ -177,6 +181,11 @@ class SecurePrefs(
   fun setLocalHostRemoteAccessAdvancedCommandsEnabled(value: Boolean) {
     plainPrefs.edit { putBoolean("localHost.remoteAccess.advancedCommands.enabled", value) }
     _localHostRemoteAccessAdvancedCommandsEnabled.value = value
+  }
+
+  fun setLocalHostRemoteAccessWriteCommandsEnabled(value: Boolean) {
+    plainPrefs.edit { putBoolean("localHost.remoteAccess.writeCommands.enabled", value) }
+    _localHostRemoteAccessWriteCommandsEnabled.value = value
   }
 
   fun setLocalHostRemoteAccessPort(value: Int) {

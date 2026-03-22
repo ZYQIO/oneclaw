@@ -11,6 +11,7 @@ import ai.openclaw.app.protocol.OpenClawLocationCommand
 import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
+import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
@@ -165,6 +166,7 @@ class LocalHostRemoteAccessServer(
   private val registerEventClient: (((event: String, payloadJson: String?) -> Unit) -> String)? = null,
   private val unregisterEventClientFn: ((clientId: String) -> Unit)? = null,
   private val allowAdvancedInvokeCommands: () -> Boolean = { false },
+  private val allowWriteInvokeCommands: () -> Boolean = { false },
 ) {
   companion object {
     private const val apiBasePath = "/api/local-host/v1"
@@ -194,6 +196,13 @@ class LocalHostRemoteAccessServer(
         OpenClawCameraCommand.Clip.rawValue,
         OpenClawCameraCommand.List.rawValue,
         OpenClawCameraCommand.Snap.rawValue,
+      )
+    private val writeAllowedInvokeCommands: List<String> =
+      listOf(
+        OpenClawCalendarCommand.Add.rawValue,
+        OpenClawContactsCommand.Add.rawValue,
+        OpenClawNotificationsCommand.Actions.rawValue,
+        OpenClawSmsCommand.Send.rawValue,
       )
   }
 
@@ -393,6 +402,8 @@ class LocalHostRemoteAccessServer(
                 }
               },
             )
+            put("advancedEnabled", JsonPrimitive(allowAdvancedInvokeCommands()))
+            put("writeEnabled", JsonPrimitive(allowWriteInvokeCommands()))
           }.toString(),
       )
       request.method == "GET" && uri.path == "$apiBasePath/identity" -> forwardToLocalHost(
@@ -545,7 +556,32 @@ class LocalHostRemoteAccessServer(
               }
             },
           )
+          put(
+            "readCommands",
+            buildJsonArray {
+              baseAllowedInvokeCommands.forEach { command ->
+                add(JsonPrimitive(command))
+              }
+            },
+          )
+          put(
+            "advancedCommands",
+            buildJsonArray {
+              advancedAllowedInvokeCommands.forEach { command ->
+                add(JsonPrimitive(command))
+              }
+            },
+          )
+          put(
+            "writeCommands",
+            buildJsonArray {
+              writeAllowedInvokeCommands.forEach { command ->
+                add(JsonPrimitive(command))
+              }
+            },
+          )
           put("advancedEnabled", JsonPrimitive(allowAdvancedInvokeCommands()))
+          put("writeEnabled", JsonPrimitive(allowWriteInvokeCommands()))
         }.toString(),
     )
   }
@@ -624,6 +660,21 @@ class LocalHostRemoteAccessServer(
                       "curl",
                       JsonPrimitive(
                         "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"camera.snap\"}'",
+                      ),
+                    )
+                  },
+                )
+              }
+              if (allowWriteInvokeCommands()) {
+                add(
+                  buildJsonObject {
+                    put("name", JsonPrimitive("invoke-sms-send"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/invoke"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"sms.send\",\"params\":{\"to\":\"+15551234567\",\"body\":\"Check in when you land.\"}}'",
                       ),
                     )
                   },
@@ -915,11 +966,15 @@ class LocalHostRemoteAccessServer(
   }
 
   private fun allowedInvokeCommands(): List<String> {
-    return if (allowAdvancedInvokeCommands()) {
-      baseAllowedInvokeCommands + advancedAllowedInvokeCommands
-    } else {
-      baseAllowedInvokeCommands
+    val commands = mutableListOf<String>()
+    commands.addAll(baseAllowedInvokeCommands)
+    if (allowAdvancedInvokeCommands()) {
+      commands.addAll(advancedAllowedInvokeCommands)
     }
+    if (allowWriteInvokeCommands()) {
+      commands.addAll(writeAllowedInvokeCommands)
+    }
+    return commands
   }
 }
 

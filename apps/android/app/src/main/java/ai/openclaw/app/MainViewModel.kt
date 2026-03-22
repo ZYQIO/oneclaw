@@ -82,6 +82,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val gatewayConnectionMode: StateFlow<GatewayConnectionMode> = prefs.gatewayConnectionMode
   val localHostRemoteAccessEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessEnabled
   val localHostRemoteAccessAdvancedCommandsEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessAdvancedCommandsEnabled
+  val localHostRemoteAccessWriteCommandsEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessWriteCommandsEnabled
   val localHostRemoteAccessPort: StateFlow<Int> = prefs.localHostRemoteAccessPort
   val localHostRemoteAccessToken: StateFlow<String> = prefs.localHostRemoteAccessToken
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
@@ -173,6 +174,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setLocalHostRemoteAccessAdvancedCommandsEnabled(value: Boolean) {
     prefs.setLocalHostRemoteAccessAdvancedCommandsEnabled(value)
+  }
+
+  fun setLocalHostRemoteAccessWriteCommandsEnabled(value: Boolean) {
+    prefs.setLocalHostRemoteAccessWriteCommandsEnabled(value)
   }
 
   fun setLocalHostRemoteAccessPort(value: Int) {

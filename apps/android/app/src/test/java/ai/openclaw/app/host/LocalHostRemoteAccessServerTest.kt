@@ -127,6 +127,7 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"device.status\""))
       assertTrue(response.body.contains("\"notifications.list\""))
       assertTrue(response.body.contains("\"location.get\""))
+      assertTrue(response.body.contains("\"writeEnabled\":false"))
     } finally {
       server.stop()
       scope.cancel()
@@ -200,6 +201,74 @@ class LocalHostRemoteAccessServerTest {
   }
 
   @Test
+  fun invokeCapabilities_includesWriteCommandsWhenWriteModeIsEnabled() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        allowWriteInvokeCommands = { true },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/invoke/capabilities",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"writeEnabled\":true"))
+      assertTrue(response.body.contains("\"sms.send\""))
+      assertTrue(response.body.contains("\"notifications.actions\""))
+      assertTrue(response.body.contains("\"contacts.add\""))
+      assertTrue(response.body.contains("\"calendar.add\""))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun invoke_rejectsWriteCommandsWhenWriteModeIsDisabled() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "POST",
+          path = "/api/local-host/v1/invoke",
+          token = "secret-token",
+          body = """{"command":"sms.send","params":{"to":"+15551234567","body":"hello"}}""",
+        )
+
+      assertEquals(403, response.statusCode)
+      assertTrue(response.body.contains("not enabled for remote access"))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
   fun examples_returnsReadyToUseCurlTemplates() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val port = reservePort()
@@ -226,6 +295,40 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"chat-send-wait\""))
       assertTrue(response.body.contains("/api/local-host/v1/events"))
       assertTrue(response.body.contains("<TOKEN>"))
+      assertTrue(!response.body.contains("\"sms.send\""))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun examples_includeWriteCommandTemplateWhenWriteModeIsEnabled() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        allowWriteInvokeCommands = { true },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/examples",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"invoke-sms-send\""))
+      assertTrue(response.body.contains("\"sms.send\""))
     } finally {
       server.stop()
       scope.cancel()

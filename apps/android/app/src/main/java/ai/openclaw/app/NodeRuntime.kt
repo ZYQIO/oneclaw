@@ -212,6 +212,9 @@ class NodeRuntime(
     allowAdvancedInvokeCommands = {
       prefs.localHostRemoteAccessAdvancedCommandsEnabled.value
     },
+    allowWriteInvokeCommands = {
+      prefs.localHostRemoteAccessWriteCommandsEnabled.value
+    },
   )
 
   private enum class ConnectionBackend {
