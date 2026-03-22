@@ -165,6 +165,40 @@ class LocalHostRemoteAccessServerTest {
     }
   }
 
+  @Test
+  fun invokeCapabilities_includesCameraCommandsWhenAdvancedModeIsEnabled() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        allowAdvancedInvokeCommands = { true },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/invoke/capabilities",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"advancedEnabled\":true"))
+      assertTrue(response.body.contains("\"camera.snap\""))
+      assertTrue(response.body.contains("\"camera.clip\""))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
   private fun request(
     port: Int,
     method: String,

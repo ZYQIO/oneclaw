@@ -99,19 +99,23 @@ class SecurePrefsTest {
     val initialToken = prefs.localHostRemoteAccessToken.value
 
     assertFalse(prefs.localHostRemoteAccessEnabled.value)
+    assertFalse(prefs.localHostRemoteAccessAdvancedCommandsEnabled.value)
     assertEquals(3945, prefs.localHostRemoteAccessPort.value)
     assertTrue(initialToken.startsWith("ocrt_"))
 
     prefs.setLocalHostRemoteAccessEnabled(true)
+    prefs.setLocalHostRemoteAccessAdvancedCommandsEnabled(true)
     prefs.setLocalHostRemoteAccessPort(4123)
     val rotatedToken = prefs.regenerateLocalHostRemoteAccessToken()
 
     assertTrue(prefs.localHostRemoteAccessEnabled.value)
+    assertTrue(prefs.localHostRemoteAccessAdvancedCommandsEnabled.value)
     assertEquals(4123, prefs.localHostRemoteAccessPort.value)
     assertEquals(rotatedToken, prefs.localHostRemoteAccessToken.value)
     assertTrue(rotatedToken.startsWith("ocrt_"))
     assertTrue(rotatedToken != initialToken)
     assertEquals(true, plainPrefs.getBoolean("localHost.remoteAccess.enabled", false))
+    assertEquals(true, plainPrefs.getBoolean("localHost.remoteAccess.advancedCommands.enabled", false))
     assertEquals(4123, plainPrefs.getInt("localHost.remoteAccess.port", 0))
   }
 }

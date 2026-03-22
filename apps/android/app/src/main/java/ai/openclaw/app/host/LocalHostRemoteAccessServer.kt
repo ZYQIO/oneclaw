@@ -3,6 +3,7 @@ package ai.openclaw.app.host
 import android.net.Uri
 import ai.openclaw.app.gateway.GatewaySession
 import ai.openclaw.app.protocol.OpenClawCalendarCommand
+import ai.openclaw.app.protocol.OpenClawCameraCommand
 import ai.openclaw.app.protocol.OpenClawCallLogCommand
 import ai.openclaw.app.protocol.OpenClawContactsCommand
 import ai.openclaw.app.protocol.OpenClawDeviceCommand
@@ -163,6 +164,7 @@ class LocalHostRemoteAccessServer(
   private val handleInvoke: suspend (command: String, paramsJson: String?) -> GatewaySession.InvokeResult,
   private val registerEventClient: (((event: String, payloadJson: String?) -> Unit) -> String)? = null,
   private val unregisterEventClientFn: ((clientId: String) -> Unit)? = null,
+  private val allowAdvancedInvokeCommands: () -> Boolean = { false },
 ) {
   companion object {
     private const val apiBasePath = "/api/local-host/v1"
@@ -171,7 +173,7 @@ class LocalHostRemoteAccessServer(
     private const val defaultTimeoutMs = 30_000L
     private const val maxEventWaitMs = 20_000L
     private const val maxEventsPerResponse = 100
-    private val allowedInvokeCommands: List<String> =
+    private val baseAllowedInvokeCommands: List<String> =
       listOf(
         OpenClawCalendarCommand.Events.rawValue,
         OpenClawCallLogCommand.Search.rawValue,
@@ -186,6 +188,12 @@ class LocalHostRemoteAccessServer(
         OpenClawNotificationsCommand.List.rawValue,
         OpenClawPhotosCommand.Latest.rawValue,
         OpenClawSystemCommand.Notify.rawValue,
+      )
+    private val advancedAllowedInvokeCommands: List<String> =
+      listOf(
+        OpenClawCameraCommand.Clip.rawValue,
+        OpenClawCameraCommand.List.rawValue,
+        OpenClawCameraCommand.Snap.rawValue,
       )
   }
 
@@ -378,7 +386,7 @@ class LocalHostRemoteAccessServer(
             put(
               "allowedInvokeCommands",
               buildJsonArray {
-                allowedInvokeCommands.forEach { command ->
+                allowedInvokeCommands().forEach { command ->
                   add(JsonPrimitive(command))
                 }
               },
@@ -530,11 +538,12 @@ class LocalHostRemoteAccessServer(
           put(
             "commands",
             buildJsonArray {
-              allowedInvokeCommands.forEach { command ->
+              allowedInvokeCommands().forEach { command ->
                 add(JsonPrimitive(command))
               }
             },
           )
+          put("advancedEnabled", JsonPrimitive(allowAdvancedInvokeCommands()))
         }.toString(),
     )
   }
@@ -552,7 +561,7 @@ class LocalHostRemoteAccessServer(
     if (command.isEmpty()) {
       throw HttpRequestException(400, "command is required")
     }
-    if (command !in allowedInvokeCommands) {
+    if (command !in allowedInvokeCommands()) {
       throw HttpRequestException(403, "command is not enabled for remote access")
     }
     val paramsJson =
@@ -816,6 +825,14 @@ class LocalHostRemoteAccessServer(
     val state = payload["state"].asStringOrNull()?.trim().orEmpty()
     if (payloadRunId != runId) return false
     return state == "final" || state == "error" || state == "aborted"
+  }
+
+  private fun allowedInvokeCommands(): List<String> {
+    return if (allowAdvancedInvokeCommands()) {
+      baseAllowedInvokeCommands + advancedAllowedInvokeCommands
+    } else {
+      baseAllowedInvokeCommands
+    }
   }
 }
 

@@ -209,6 +209,9 @@ class NodeRuntime(
     unregisterEventClientFn = { clientId ->
       localHostRuntime.unregisterClient(clientId)
     },
+    allowAdvancedInvokeCommands = {
+      prefs.localHostRemoteAccessAdvancedCommandsEnabled.value
+    },
   )
 
   private enum class ConnectionBackend {

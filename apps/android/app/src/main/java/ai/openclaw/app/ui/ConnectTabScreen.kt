@@ -69,6 +69,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   val hasOpenAICodexCredential by viewModel.hasOpenAICodexCredential.collectAsState()
   val openAICodexAuthUiState by viewModel.openAICodexAuthUiState.collectAsState()
   val localHostRemoteAccessEnabled by viewModel.localHostRemoteAccessEnabled.collectAsState()
+  val localHostRemoteAccessAdvancedCommandsEnabled by viewModel.localHostRemoteAccessAdvancedCommandsEnabled.collectAsState()
   val localHostRemoteAccessPort by viewModel.localHostRemoteAccessPort.collectAsState()
   val localHostRemoteAccessToken by viewModel.localHostRemoteAccessToken.collectAsState()
   val localHostRemoteAccessStatusText by viewModel.localHostRemoteAccessStatusText.collectAsState()
@@ -398,13 +399,44 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             colors = outlinedColors(),
           )
 
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+              Text("Advanced remote commands", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
+              Text(
+                "Allow remote camera commands like `camera.list`, `camera.snap`, and `camera.clip`.",
+                style = mobileCaption1,
+                color = mobileTextSecondary,
+              )
+            }
+            Switch(
+              checked = localHostRemoteAccessAdvancedCommandsEnabled,
+              onCheckedChange = { viewModel.setLocalHostRemoteAccessAdvancedCommandsEnabled(it) },
+              colors =
+                SwitchDefaults.colors(
+                  checkedThumbColor = mobileAccent,
+                  checkedTrackColor = mobileAccentSoft,
+                ),
+            )
+          }
+
           Text(
             "Use header `Authorization: Bearer <token>` for `/health`, `/events`, `/chat/*`, and `/invoke`.",
             style = mobileCaption1,
             color = mobileTextSecondary,
           )
           Text(
-            "Remote `/invoke` currently allows read-only device, location, notifications, contacts, calendar, photos, motion, call-log commands plus `system.notify`.",
+            if (localHostRemoteAccessAdvancedCommandsEnabled) {
+              "Remote `/invoke` allows the read-only control set plus camera commands."
+            } else {
+              "Remote `/invoke` currently allows read-only device, location, notifications, contacts, calendar, photos, motion, call-log commands plus `system.notify`."
+            },
             style = mobileCaption1,
             color = mobileTextSecondary,
           )

@@ -81,6 +81,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val preventSleep: StateFlow<Boolean> = prefs.preventSleep
   val gatewayConnectionMode: StateFlow<GatewayConnectionMode> = prefs.gatewayConnectionMode
   val localHostRemoteAccessEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessEnabled
+  val localHostRemoteAccessAdvancedCommandsEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessAdvancedCommandsEnabled
   val localHostRemoteAccessPort: StateFlow<Int> = prefs.localHostRemoteAccessPort
   val localHostRemoteAccessToken: StateFlow<String> = prefs.localHostRemoteAccessToken
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
@@ -168,6 +169,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setLocalHostRemoteAccessEnabled(value: Boolean) {
     prefs.setLocalHostRemoteAccessEnabled(value)
+  }
+
+  fun setLocalHostRemoteAccessAdvancedCommandsEnabled(value: Boolean) {
+    prefs.setLocalHostRemoteAccessAdvancedCommandsEnabled(value)
   }
 
   fun setLocalHostRemoteAccessPort(value: Int) {
