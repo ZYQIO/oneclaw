@@ -15,8 +15,12 @@ import ai.openclaw.app.gateway.DeviceAuthStore
 import ai.openclaw.app.gateway.DeviceIdentityStore
 import ai.openclaw.app.gateway.GatewayDiscovery
 import ai.openclaw.app.gateway.GatewayEndpoint
+import ai.openclaw.app.gateway.LocalGatewaySession
+import ai.openclaw.app.gateway.MutableGatewayRpcClient
+import ai.openclaw.app.gateway.MutableNodeGatewayRpcClient
 import ai.openclaw.app.gateway.GatewaySession
 import ai.openclaw.app.gateway.probeGatewayTlsFingerprint
+import ai.openclaw.app.host.LocalHostRuntime
 import ai.openclaw.app.node.*
 import ai.openclaw.app.protocol.OpenClawCanvasA2UIAction
 import ai.openclaw.app.voice.MicCaptureManager
@@ -55,6 +59,8 @@ class NodeRuntime(
   val location = LocationCaptureManager(appContext)
   val sms = SmsManager(appContext)
   private val json = Json { ignoreUnknownKeys = true }
+  private val operatorRpcClient = MutableGatewayRpcClient()
+  private val nodeRpcClient = MutableNodeGatewayRpcClient()
 
   private val externalAudioCaptureActive = MutableStateFlow(false)
 
@@ -126,8 +132,8 @@ class NodeRuntime(
   private val a2uiHandler: A2UIHandler = A2UIHandler(
     canvas = canvas,
     json = json,
-    getNodeCanvasHostUrl = { nodeSession.currentCanvasHostUrl() },
-    getOperatorCanvasHostUrl = { operatorSession.currentCanvasHostUrl() },
+    getNodeCanvasHostUrl = { nodeRpcClient.currentCanvasHostUrl() },
+    getOperatorCanvasHostUrl = { operatorRpcClient.currentCanvasHostUrl() },
   )
 
   private val connectionManager: ConnectionManager = ConnectionManager(
@@ -162,7 +168,7 @@ class NodeRuntime(
     locationEnabled = { locationMode.value != LocationMode.Off },
     smsAvailable = { sms.canSendSms() },
     debugBuild = { BuildConfig.DEBUG },
-    refreshNodeCanvasCapability = { nodeSession.refreshNodeCanvasCapability() },
+    refreshNodeCanvasCapability = { nodeRpcClient.refreshNodeCanvasCapability() },
     onCanvasA2uiPush = {
       _canvasA2uiHydrated.value = true
       _canvasRehydratePending.value = false
@@ -172,6 +178,17 @@ class NodeRuntime(
     motionActivityAvailable = { motionHandler.isActivityAvailable() },
     motionPedometerAvailable = { motionHandler.isPedometerAvailable() },
   )
+
+  private val localHostRuntime: LocalHostRuntime = LocalHostRuntime(
+    scope = scope,
+    prefs = prefs,
+    json = json,
+  )
+
+  private enum class ConnectionBackend {
+    Remote,
+    Local,
+  }
 
   data class GatewayTrustPrompt(
     val endpoint: GatewayEndpoint,
@@ -225,6 +242,7 @@ class NodeRuntime(
   private var operatorConnected = false
   private var operatorStatusText: String = "Offline"
   private var nodeStatusText: String = "Offline"
+  @Volatile private var activeConnectionBackend: ConnectionBackend = ConnectionBackend.Remote
 
   private val operatorSession =
     GatewaySession(
@@ -232,38 +250,12 @@ class NodeRuntime(
       identityStore = identityStore,
       deviceAuthStore = deviceAuthStore,
       onConnected = { name, remote, mainSessionKey ->
-        operatorConnected = true
-        operatorStatusText = "Connected"
-        _serverName.value = name
-        _remoteAddress.value = remote
-        _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
-        applyMainSessionKey(mainSessionKey)
-        updateStatus()
-        micCapture.onGatewayConnectionChanged(true)
-        scope.launch {
-          refreshHomeCanvasOverviewIfConnected()
-          if (voiceReplySpeakerLazy.isInitialized()) {
-            voiceReplySpeaker.refreshConfig()
-          }
-        }
+        handleOperatorConnected(ConnectionBackend.Remote, name, remote, mainSessionKey)
       },
       onDisconnected = { message ->
-        operatorConnected = false
-        operatorStatusText = message
-        _serverName.value = null
-        _remoteAddress.value = null
-        _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
-        if (!isCanonicalMainSessionKey(_mainSessionKey.value)) {
-          _mainSessionKey.value = "main"
-        }
-        chat.applyMainSessionKey(resolveMainSessionKey())
-        chat.onDisconnected(message)
-        updateStatus()
-        micCapture.onGatewayConnectionChanged(false)
+        handleOperatorDisconnected(ConnectionBackend.Remote, message)
       },
-      onEvent = { event, payloadJson ->
-        handleGatewayEvent(event, payloadJson)
-      },
+      onEvent = { event, payloadJson -> handleGatewayEvent(event, payloadJson) },
     )
 
   private val nodeSession =
@@ -271,26 +263,8 @@ class NodeRuntime(
       scope = scope,
       identityStore = identityStore,
       deviceAuthStore = deviceAuthStore,
-      onConnected = { _, _, _ ->
-        _nodeConnected.value = true
-        nodeStatusText = "Connected"
-        didAutoRequestCanvasRehydrate = false
-        _canvasA2uiHydrated.value = false
-        _canvasRehydratePending.value = false
-        _canvasRehydrateErrorText.value = null
-        updateStatus()
-        showLocalCanvasOnConnect()
-      },
-      onDisconnected = { message ->
-        _nodeConnected.value = false
-        nodeStatusText = message
-        didAutoRequestCanvasRehydrate = false
-        _canvasA2uiHydrated.value = false
-        _canvasRehydratePending.value = false
-        _canvasRehydrateErrorText.value = null
-        updateStatus()
-        showLocalCanvasOnDisconnect()
-      },
+      onConnected = { _, _, _ -> handleNodeConnected(ConnectionBackend.Remote) },
+      onDisconnected = { message -> handleNodeDisconnected(ConnectionBackend.Remote, message) },
       onEvent = { _, _ -> },
       onInvoke = { req ->
         invokeDispatcher.handleInvoke(req.command, req.paramsJson)
@@ -300,10 +274,36 @@ class NodeRuntime(
       },
     )
 
+  private val localOperatorSession =
+    LocalGatewaySession(
+      scope = scope,
+      runtime = localHostRuntime,
+      role = "operator",
+      onConnected = { name, remote, mainSessionKey ->
+        handleOperatorConnected(ConnectionBackend.Local, name, remote, mainSessionKey)
+      },
+      onDisconnected = { message ->
+        handleOperatorDisconnected(ConnectionBackend.Local, message)
+      },
+      onEvent = { event, payloadJson -> handleGatewayEvent(event, payloadJson) },
+    )
+
+  private val localNodeSession =
+    LocalGatewaySession(
+      scope = scope,
+      runtime = localHostRuntime,
+      role = "node",
+      onConnected = { _, _, _ -> handleNodeConnected(ConnectionBackend.Local) },
+      onDisconnected = { message -> handleNodeDisconnected(ConnectionBackend.Local, message) },
+      onEvent = { _, _ -> },
+    )
+
   init {
+    operatorRpcClient.setDelegate(operatorSession)
+    nodeRpcClient.setDelegate(nodeSession)
     DeviceNotificationListenerService.setNodeEventSink { event, payloadJson ->
       scope.launch {
-        nodeSession.sendNodeEvent(event = event, payloadJson = payloadJson)
+        nodeRpcClient.sendNodeEvent(event = event, payloadJson = payloadJson)
       }
     }
   }
@@ -311,7 +311,7 @@ class NodeRuntime(
   private val chat: ChatController =
     ChatController(
       scope = scope,
-      session = operatorSession,
+      session = operatorRpcClient,
       json = json,
       supportsChatSubscribe = false,
     )
@@ -321,7 +321,7 @@ class NodeRuntime(
     TalkModeManager(
       context = appContext,
       scope = scope,
-      session = operatorSession,
+      session = operatorRpcClient,
       supportsChatSubscribe = false,
       isConnected = { operatorConnected },
     ).also { speaker ->
@@ -348,7 +348,7 @@ class NodeRuntime(
             put("timeoutMs", JsonPrimitive(30_000))
             put("idempotencyKey", JsonPrimitive(idempotencyKey))
           }
-        val response = operatorSession.request("chat.send", params.toString())
+        val response = operatorRpcClient.request("chat.send", params.toString())
         parseChatSendRunId(response) ?: idempotencyKey
       },
       speakAssistantReply = { text ->
@@ -392,10 +392,98 @@ class NodeRuntime(
     TalkModeManager(
       context = appContext,
       scope = scope,
-      session = operatorSession,
+      session = operatorRpcClient,
       supportsChatSubscribe = true,
       isConnected = { operatorConnected },
     )
+  }
+
+  private fun handleOperatorConnected(
+    backend: ConnectionBackend,
+    name: String?,
+    remote: String?,
+    mainSessionKey: String?,
+  ) {
+    if (backend != activeConnectionBackend) return
+    operatorConnected = true
+    operatorStatusText = "Connected"
+    _serverName.value = name
+    _remoteAddress.value = remote
+    _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
+    applyMainSessionKey(mainSessionKey)
+    updateStatus()
+    micCapture.onGatewayConnectionChanged(true)
+    scope.launch {
+      refreshHomeCanvasOverviewIfConnected()
+      if (voiceReplySpeakerLazy.isInitialized()) {
+        voiceReplySpeaker.refreshConfig()
+      }
+    }
+  }
+
+  private fun handleOperatorDisconnected(
+    backend: ConnectionBackend,
+    message: String,
+  ) {
+    if (backend != activeConnectionBackend) return
+    resetOperatorState(message)
+    updateStatus()
+  }
+
+  private fun handleNodeConnected(backend: ConnectionBackend) {
+    if (backend != activeConnectionBackend) return
+    _nodeConnected.value = true
+    nodeStatusText = "Connected"
+    didAutoRequestCanvasRehydrate = false
+    _canvasA2uiHydrated.value = false
+    _canvasRehydratePending.value = false
+    _canvasRehydrateErrorText.value = null
+    updateStatus()
+    showLocalCanvasOnConnect()
+  }
+
+  private fun handleNodeDisconnected(
+    backend: ConnectionBackend,
+    message: String,
+  ) {
+    if (backend != activeConnectionBackend) return
+    resetNodeState(message)
+    updateStatus()
+  }
+
+  private fun resetOperatorState(message: String) {
+    operatorConnected = false
+    operatorStatusText = message
+    _serverName.value = null
+    _remoteAddress.value = null
+    _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
+    if (!isCanonicalMainSessionKey(_mainSessionKey.value)) {
+      _mainSessionKey.value = "main"
+    }
+    chat.applyMainSessionKey(resolveMainSessionKey())
+    chat.onDisconnected(message)
+    micCapture.onGatewayConnectionChanged(false)
+  }
+
+  private fun resetNodeState(message: String) {
+    _nodeConnected.value = false
+    nodeStatusText = message
+    didAutoRequestCanvasRehydrate = false
+    _canvasA2uiHydrated.value = false
+    _canvasRehydratePending.value = false
+    _canvasRehydrateErrorText.value = null
+    showLocalCanvasOnDisconnect()
+  }
+
+  private fun prepareBackendSwitch(
+    backend: ConnectionBackend,
+    operatorMessage: String,
+    nodeMessage: String,
+  ) {
+    activeConnectionBackend = backend
+    resetOperatorState(operatorMessage)
+    resetNodeState(nodeMessage)
+    updateStatus()
   }
 
   private fun applyMainSessionKey(candidate: String?) {
@@ -477,7 +565,7 @@ class NodeRuntime(
           "If existing A2UI state exists, replay it immediately. " +
           "If not, create and render a compact mobile-friendly dashboard in Canvas."
       val sent =
-        nodeSession.sendNodeEvent(
+        nodeRpcClient.sendNodeEvent(
           event = "agent.request",
           payloadJson =
             buildJsonObject {
@@ -566,6 +654,14 @@ class NodeRuntime(
 
     scope.launch(Dispatchers.Default) {
       gateways.collect { list ->
+        if (prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost) {
+          if (didAutoConnect) return@collect
+          if (_isConnected.value) return@collect
+          didAutoConnect = true
+          connectLocalHost()
+          return@collect
+        }
+
         if (list.isNotEmpty()) {
           // Security: don't let an unauthenticated discovery feed continuously steer autoconnect.
           // UX parity with iOS: only set once when unset.
@@ -712,13 +808,24 @@ class NodeRuntime(
   }
 
   fun refreshGatewayConnection() {
+    if (prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost) {
+      connectLocalHost(forceReconnect = true)
+      return
+    }
+    prepareBackendSwitch(
+      backend = ConnectionBackend.Remote,
+      operatorMessage = "Connecting…",
+      nodeMessage = "Connecting…",
+    )
+    operatorRpcClient.setDelegate(operatorSession)
+    nodeRpcClient.setDelegate(nodeSession)
+    localOperatorSession.disconnect()
+    localNodeSession.disconnect()
     val endpoint =
       connectedEndpoint ?: run {
         _statusText.value = "Failed: no cached gateway endpoint"
         return
       }
-    operatorStatusText = "Connecting…"
-    updateStatus()
     val token = prefs.loadGatewayToken()
     val bootstrapToken = prefs.loadGatewayBootstrapToken()
     val password = prefs.loadGatewayPassword()
@@ -744,6 +851,10 @@ class NodeRuntime(
   }
 
   fun connect(endpoint: GatewayEndpoint) {
+    if (prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost) {
+      connectLocalHost()
+      return
+    }
     val tls = connectionManager.resolveTlsParams(endpoint)
     if (tls?.required == true && tls.expectedFingerprint.isNullOrBlank()) {
       // First-time TLS: capture fingerprint, ask user to verify out-of-band, then store and connect.
@@ -758,10 +869,16 @@ class NodeRuntime(
       return
     }
 
+    prepareBackendSwitch(
+      backend = ConnectionBackend.Remote,
+      operatorMessage = "Connecting…",
+      nodeMessage = "Connecting…",
+    )
+    operatorRpcClient.setDelegate(operatorSession)
+    nodeRpcClient.setDelegate(nodeSession)
+    localOperatorSession.disconnect()
+    localNodeSession.disconnect()
     connectedEndpoint = endpoint
-    operatorStatusText = "Connecting…"
-    nodeStatusText = "Connecting…"
-    updateStatus()
     val token = prefs.loadGatewayToken()
     val bootstrapToken = prefs.loadGatewayBootstrapToken()
     val password = prefs.loadGatewayPassword()
@@ -781,6 +898,27 @@ class NodeRuntime(
       connectionManager.buildNodeConnectOptions(),
       tls,
     )
+  }
+
+  private fun connectLocalHost(forceReconnect: Boolean = false) {
+    prepareBackendSwitch(
+      backend = ConnectionBackend.Local,
+      operatorMessage = "Starting local host…",
+      nodeMessage = "Starting local host…",
+    )
+    connectedEndpoint = GatewayEndpoint.manual(host = "127.0.0.1", port = 18789)
+    _pendingGatewayTrust.value = null
+    operatorRpcClient.setDelegate(localOperatorSession)
+    nodeRpcClient.setDelegate(localNodeSession)
+    operatorSession.disconnect()
+    nodeSession.disconnect()
+    if (forceReconnect) {
+      localOperatorSession.reconnect()
+      localNodeSession.reconnect()
+    } else {
+      localOperatorSession.connect()
+      localNodeSession.connect()
+    }
   }
 
   fun acceptGatewayTrustPrompt() {
@@ -803,6 +941,10 @@ class NodeRuntime(
   }
 
   fun connectManual() {
+    if (prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost) {
+      connectLocalHost()
+      return
+    }
     val host = manualHost.value.trim()
     val port = manualPort.value
     if (host.isEmpty() || port <= 0 || port > 65535) {
@@ -815,6 +957,11 @@ class NodeRuntime(
   fun disconnect() {
     connectedEndpoint = null
     _pendingGatewayTrust.value = null
+    if (activeConnectionBackend == ConnectionBackend.Local) {
+      localOperatorSession.disconnect()
+      localNodeSession.disconnect()
+      return
+    }
     operatorSession.disconnect()
     nodeSession.disconnect()
   }
@@ -859,7 +1006,7 @@ class NodeRuntime(
       var error: String? = null
       if (connected) {
         val sent =
-          nodeSession.sendNodeEvent(
+          nodeRpcClient.sendNodeEvent(
             event = "agent.request",
             payloadJson =
               buildJsonObject {
@@ -938,7 +1085,7 @@ class NodeRuntime(
   private suspend fun refreshBrandingFromGateway() {
     if (!_isConnected.value) return
     try {
-      val res = operatorSession.request("config.get", "{}")
+      val res = operatorRpcClient.request("config.get", "{}")
       val root = json.parseToJsonElement(res).asObjectOrNull()
       val config = root?.get("config").asObjectOrNull()
       val ui = config?.get("ui").asObjectOrNull()
@@ -958,7 +1105,7 @@ class NodeRuntime(
   private suspend fun refreshAgentsFromGateway() {
     if (!operatorConnected) return
     try {
-      val res = operatorSession.request("agents.list", "{}")
+      val res = operatorRpcClient.request("agents.list", "{}")
       val root = json.parseToJsonElement(res).asObjectOrNull() ?: return
       val defaultAgentId = root["defaultId"].asStringOrNull()?.trim().orEmpty()
       val mainKey = normalizeMainKey(root["mainKey"].asStringOrNull())

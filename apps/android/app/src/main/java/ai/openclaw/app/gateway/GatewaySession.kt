@@ -88,7 +88,7 @@ class GatewaySession(
   private val onEvent: (event: String, payloadJson: String?) -> Unit,
   private val onInvoke: (suspend (InvokeRequest) -> InvokeResult)? = null,
   private val onTlsFingerprint: ((stableId: String, fingerprint: String) -> Unit)? = null,
-) : GatewayRpcClient {
+) : NodeGatewayRpcClient {
   private companion object {
     // Keep connect timeout above observed gateway unauthorized close on lower-end devices.
     private const val CONNECT_RPC_TIMEOUT_MS = 12_000L
@@ -216,7 +216,7 @@ class GatewaySession(
     throw IllegalStateException("${err?.code ?: "UNAVAILABLE"}: ${err?.message ?: "request failed"}")
   }
 
-  suspend fun refreshNodeCanvasCapability(timeoutMs: Long = 8_000): Boolean {
+  override suspend fun refreshNodeCanvasCapability(timeoutMs: Long): Boolean {
     val conn = currentConnection ?: return false
     val response =
       try {

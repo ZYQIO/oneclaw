@@ -1,0 +1,171 @@
+package ai.openclaw.app.host
+
+import android.content.Context
+import ai.openclaw.app.SecurePrefs
+import ai.openclaw.app.auth.OpenAICodexCredential
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+
+@RunWith(RobolectricTestRunner::class)
+class LocalHostRuntimeTest {
+  private val json = Json { ignoreUnknownKeys = true }
+
+  @Test
+  fun chatSend_streamsAssistantReplyAndPersistsHistory() =
+    runTest {
+      val context = RuntimeEnvironment.getApplication()
+      val prefs = securePrefs(context, name = "openclaw.node.secure.test.localhost.chat")
+      val expectedCredential =
+        OpenAICodexCredential(
+          access = "access-token",
+          refresh = "refresh-token",
+          expires = 123456789L,
+          accountId = "account-123",
+          email = "test@example.com",
+        )
+      val events = mutableListOf<Pair<String, String?>>()
+      val runtime =
+        LocalHostRuntime(
+          scope = this,
+          prefs = prefs,
+          json = json,
+          codexClient =
+            FakeLocalHostResponsesClient { _, messages, thinkingLevel, onTextDelta ->
+              assertEquals("low", thinkingLevel)
+              assertEquals(1, messages.size)
+              assertEquals("user", messages.single().role)
+              onTextDelta("Hello from Codex")
+              OpenAICodexAssistantReply(
+                text = "Hello from Codex",
+                responseId = "resp_123",
+                credential = expectedCredential,
+              )
+            },
+        )
+
+      runtime.registerClient(role = "operator") { event, payloadJson ->
+        events += event to payloadJson
+      }
+
+      val sendResult =
+        parseObject(
+          runtime.request(
+            role = "operator",
+            method = "chat.send",
+            paramsJson = """{"sessionKey":"main","message":"Hi there","thinking":"low","idempotencyKey":"run-1"}""",
+            timeoutMs = 15_000,
+          ),
+        )
+      assertEquals("run-1", sendResult.getValue("runId").jsonPrimitive.content)
+
+      advanceUntilIdle()
+
+      val history =
+        parseObject(
+          runtime.request(
+            role = "operator",
+            method = "chat.history",
+            paramsJson = """{"sessionKey":"main"}""",
+            timeoutMs = 15_000,
+          ),
+        )
+      val messages = history.getValue("messages").jsonArray
+      assertEquals(2, messages.size)
+      assertEquals("user", messages[0].jsonObject.getValue("role").jsonPrimitive.content)
+      assertEquals("assistant", messages[1].jsonObject.getValue("role").jsonPrimitive.content)
+      assertEquals(
+        "Hello from Codex",
+        messages[1].jsonObject.getValue("content").jsonArray.first().jsonObject.getValue("text").jsonPrimitive.content,
+      )
+      assertEquals(expectedCredential, prefs.loadOpenAICodexCredential())
+
+      val chatStates =
+        events
+          .filter { (event, _) -> event == "chat" }
+          .map { (_, payloadJson) -> parseObject(payloadJson!!).getValue("state").jsonPrimitive.content }
+      assertEquals(listOf("delta", "final"), chatStates)
+      assertTrue(events.any { (event, _) -> event == "agent" })
+    }
+
+  @Test
+  fun chatAbort_emitsAbortedOnce() =
+    runTest {
+      val context = RuntimeEnvironment.getApplication()
+      val prefs = securePrefs(context, name = "openclaw.node.secure.test.localhost.abort")
+      val events = mutableListOf<Pair<String, String?>>()
+      val runtime =
+        LocalHostRuntime(
+          scope = this,
+          prefs = prefs,
+          json = json,
+          codexClient =
+            FakeLocalHostResponsesClient { _, _, _, _ ->
+              awaitCancellation()
+            },
+        )
+
+      runtime.registerClient(role = "operator") { event, payloadJson ->
+        events += event to payloadJson
+      }
+
+      runtime.request(
+        role = "operator",
+        method = "chat.send",
+        paramsJson = """{"sessionKey":"main","message":"Hi there","idempotencyKey":"run-abort"}""",
+        timeoutMs = 15_000,
+      )
+      advanceUntilIdle()
+
+      runtime.request(
+        role = "operator",
+        method = "chat.abort",
+        paramsJson = """{"sessionKey":"main","runId":"run-abort"}""",
+        timeoutMs = 15_000,
+      )
+      advanceUntilIdle()
+
+      val abortedEvents =
+        events.filter { (event, payloadJson) ->
+          event == "chat" && parseObject(payloadJson!!).getValue("state").jsonPrimitive.content == "aborted"
+        }
+      assertEquals(1, abortedEvents.size)
+    }
+
+  private fun securePrefs(context: Context, name: String): SecurePrefs {
+    val securePrefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+    securePrefs.edit().clear().commit()
+    return SecurePrefs(context, securePrefsOverride = securePrefs)
+  }
+
+  private fun parseObject(raw: String): JsonObject = json.parseToJsonElement(raw).jsonObject
+}
+
+private class FakeLocalHostResponsesClient(
+  private val block: suspend (
+    sessionId: String,
+    messages: List<LocalHostMessage>,
+    thinkingLevel: String,
+    onTextDelta: suspend (fullText: String) -> Unit,
+  ) -> OpenAICodexAssistantReply,
+) : LocalHostResponsesClient {
+  override suspend fun streamReply(
+    sessionId: String,
+    messages: List<LocalHostMessage>,
+    thinkingLevel: String,
+    onTextDelta: suspend (fullText: String) -> Unit,
+  ): OpenAICodexAssistantReply {
+    return block(sessionId, messages, thinkingLevel, onTextDelta)
+  }
+}

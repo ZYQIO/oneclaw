@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ai.openclaw.app.GatewayConnectionMode
 import ai.openclaw.app.MainViewModel
 import ai.openclaw.app.ui.mobileCardSurface
 
@@ -63,6 +64,8 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   val statusText by viewModel.statusText.collectAsState()
   val isConnected by viewModel.isConnected.collectAsState()
   val remoteAddress by viewModel.remoteAddress.collectAsState()
+  val connectionMode by viewModel.gatewayConnectionMode.collectAsState()
+  val hasOpenAICodexCredential by viewModel.hasOpenAICodexCredential.collectAsState()
   val manualHost by viewModel.manualHost.collectAsState()
   val manualPort by viewModel.manualPort.collectAsState()
   val manualTls by viewModel.manualTls.collectAsState()
@@ -126,15 +129,15 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   }
 
   val activeEndpoint =
-    remember(isConnected, remoteAddress, setupResolvedEndpoint, manualResolvedEndpoint, inputMode) {
+    remember(isConnected, remoteAddress, setupResolvedEndpoint, manualResolvedEndpoint, inputMode, connectionMode) {
       when {
+        connectionMode == GatewayConnectionMode.LocalHost && isConnected && !remoteAddress.isNullOrBlank() -> remoteAddress!!
+        connectionMode == GatewayConnectionMode.LocalHost -> "This phone"
         isConnected && !remoteAddress.isNullOrBlank() -> remoteAddress!!
         inputMode == ConnectInputMode.SetupCode -> setupResolvedEndpoint ?: "Not set"
         else -> manualResolvedEndpoint ?: "Not set"
       }
     }
-
-  val primaryLabel = if (isConnected) "Disconnect Gateway" else "Connect Gateway"
 
   Column(
     modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
@@ -143,10 +146,58 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Text("Gateway Connection", style = mobileTitle1, color = mobileText)
       Text(
-        if (isConnected) "Your gateway is active and ready." else "Connect to your gateway to get started.",
+        when {
+          isConnected && connectionMode == GatewayConnectionMode.LocalHost -> "OpenClaw is running directly on this phone."
+          isConnected -> "Your gateway is active and ready."
+          connectionMode == GatewayConnectionMode.LocalHost -> "Run OpenClaw locally on this phone with Codex-backed chat."
+          else -> "Connect to your gateway to get started."
+        },
         style = mobileCallout,
         color = mobileTextSecondary,
       )
+    }
+
+    Surface(
+      modifier = Modifier.fillMaxWidth(),
+      shape = RoundedCornerShape(14.dp),
+      color = mobileSurface,
+      border = BorderStroke(1.dp, mobileBorder),
+    ) {
+      Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
+        Text("Runtime mode", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          MethodChip(
+            label = "Local Host",
+            active = connectionMode == GatewayConnectionMode.LocalHost,
+            onClick = {
+              viewModel.setGatewayConnectionMode(GatewayConnectionMode.LocalHost)
+              validationText = null
+            },
+          )
+          MethodChip(
+            label = "Remote Gateway",
+            active = connectionMode == GatewayConnectionMode.RemoteGateway,
+            onClick = {
+              viewModel.setGatewayConnectionMode(GatewayConnectionMode.RemoteGateway)
+              validationText = null
+            },
+          )
+        }
+        if (connectionMode == GatewayConnectionMode.LocalHost) {
+          Text(
+            if (hasOpenAICodexCredential) {
+              "Codex auth is present. Starting local host will use your on-device OAuth credential."
+            } else {
+              "Codex auth is still missing. Local host will start, but chat requests will fail until OAuth is added."
+            },
+            style = mobileCaption1,
+            color = if (hasOpenAICodexCredential) mobileTextSecondary else mobileWarning,
+          )
+        }
+      }
     }
 
     // Status cards in a unified card group
@@ -226,6 +277,13 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     } else {
       Button(
         onClick = {
+          if (connectionMode == GatewayConnectionMode.LocalHost) {
+            validationText = null
+            viewModel.setGatewayConnectionMode(GatewayConnectionMode.LocalHost)
+            viewModel.connectManual()
+            return@Button
+          }
+
           if (statusText.contains("operator offline", ignoreCase = true)) {
             validationText = null
             viewModel.refreshGatewayConnection()
@@ -275,7 +333,10 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             contentColor = Color.White,
           ),
       ) {
-        Text("Connect Gateway", style = mobileHeadline.copy(fontWeight = FontWeight.Bold))
+        Text(
+          if (connectionMode == GatewayConnectionMode.LocalHost) "Start Local Host" else "Connect Gateway",
+          style = mobileHeadline.copy(fontWeight = FontWeight.Bold),
+        )
       }
     }
 
@@ -314,158 +375,171 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-          Text("Connection method", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MethodChip(
-              label = "Setup Code",
-              active = inputMode == ConnectInputMode.SetupCode,
-              onClick = { inputMode = ConnectInputMode.SetupCode },
+          if (connectionMode == GatewayConnectionMode.LocalHost) {
+            Text("Local host runs entirely on this phone.", style = mobileCallout, color = mobileTextSecondary)
+            Text(
+              "This mode reuses your Android app as the OpenClaw host. Remote access and native Codex login UI are the next steps.",
+              style = mobileCaption1,
+              color = mobileTextSecondary,
             )
-            MethodChip(
-              label = "Manual",
-              active = inputMode == ConnectInputMode.Manual,
-              onClick = { inputMode = ConnectInputMode.Manual },
-            )
-          }
-
-          Text("Run these on the gateway host:", style = mobileCallout, color = mobileTextSecondary)
-          CommandBlock("openclaw qr --setup-code-only")
-          CommandBlock("openclaw qr --json")
-
-          if (inputMode == ConnectInputMode.SetupCode) {
-            Text("Setup Code", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-            OutlinedTextField(
-              value = setupCode,
-              onValueChange = {
-                setupCode = it
-                validationText = null
-              },
-              placeholder = { Text("Paste setup code", style = mobileBody, color = mobileTextTertiary) },
-              modifier = Modifier.fillMaxWidth(),
-              minLines = 3,
-              maxLines = 5,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-              textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
-              shape = RoundedCornerShape(14.dp),
-              colors = outlinedColors(),
-            )
-            if (!setupResolvedEndpoint.isNullOrBlank()) {
-              EndpointPreview(endpoint = setupResolvedEndpoint)
+            HorizontalDivider(color = mobileBorder)
+            TextButton(onClick = { viewModel.setOnboardingCompleted(false) }) {
+              Text("Run onboarding again", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
             }
           } else {
+            Text("Connection method", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              QuickFillChip(
-                label = "Android Emulator",
-                onClick = {
-                  manualHostInput = "10.0.2.2"
-                  manualPortInput = "18789"
-                  manualTlsInput = false
-                  validationText = null
-                },
+              MethodChip(
+                label = "Setup Code",
+                active = inputMode == ConnectInputMode.SetupCode,
+                onClick = { inputMode = ConnectInputMode.SetupCode },
               )
-              QuickFillChip(
-                label = "Localhost",
-                onClick = {
-                  manualHostInput = "127.0.0.1"
-                  manualPortInput = "18789"
-                  manualTlsInput = false
-                  validationText = null
-                },
+              MethodChip(
+                label = "Manual",
+                active = inputMode == ConnectInputMode.Manual,
+                onClick = { inputMode = ConnectInputMode.Manual },
               )
             }
 
-            Text("Host", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-            OutlinedTextField(
-              value = manualHostInput,
-              onValueChange = {
-                manualHostInput = it
-                validationText = null
-              },
-              placeholder = { Text("10.0.2.2", style = mobileBody, color = mobileTextTertiary) },
-              modifier = Modifier.fillMaxWidth(),
-              singleLine = true,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-              textStyle = mobileBody.copy(color = mobileText),
-              shape = RoundedCornerShape(14.dp),
-              colors = outlinedColors(),
-            )
+            Text("Run these on the gateway host:", style = mobileCallout, color = mobileTextSecondary)
+            CommandBlock("openclaw qr --setup-code-only")
+            CommandBlock("openclaw qr --json")
 
-            Text("Port", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-            OutlinedTextField(
-              value = manualPortInput,
-              onValueChange = {
-                manualPortInput = it
-                validationText = null
-              },
-              placeholder = { Text("18789", style = mobileBody, color = mobileTextTertiary) },
-              modifier = Modifier.fillMaxWidth(),
-              singleLine = true,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-              textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
-              shape = RoundedCornerShape(14.dp),
-              colors = outlinedColors(),
-            )
-
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-              Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Use TLS", style = mobileHeadline, color = mobileText)
-                Text("Switch to secure websocket (`wss`).", style = mobileCallout, color = mobileTextSecondary)
+            if (inputMode == ConnectInputMode.SetupCode) {
+              Text("Setup Code", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              OutlinedTextField(
+                value = setupCode,
+                onValueChange = {
+                  setupCode = it
+                  validationText = null
+                },
+                placeholder = { Text("Paste setup code", style = mobileBody, color = mobileTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 5,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+                shape = RoundedCornerShape(14.dp),
+                colors = outlinedColors(),
+              )
+              if (!setupResolvedEndpoint.isNullOrBlank()) {
+                EndpointPreview(endpoint = setupResolvedEndpoint)
               }
-              Switch(
-                checked = manualTlsInput,
-                onCheckedChange = {
-                  manualTlsInput = it
+            } else {
+              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickFillChip(
+                  label = "Android Emulator",
+                  onClick = {
+                    manualHostInput = "10.0.2.2"
+                    manualPortInput = "18789"
+                    manualTlsInput = false
+                    validationText = null
+                  },
+                )
+                QuickFillChip(
+                  label = "Localhost",
+                  onClick = {
+                    manualHostInput = "127.0.0.1"
+                    manualPortInput = "18789"
+                    manualTlsInput = false
+                    validationText = null
+                  },
+                )
+              }
+
+              Text("Host", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              OutlinedTextField(
+                value = manualHostInput,
+                onValueChange = {
+                  manualHostInput = it
                   validationText = null
                 },
-                colors =
-                  SwitchDefaults.colors(
-                    checkedTrackColor = mobileAccent,
-                    uncheckedTrackColor = mobileBorderStrong,
-                    checkedThumbColor = Color.White,
-                    uncheckedThumbColor = Color.White,
-                  ),
+                placeholder = { Text("10.0.2.2", style = mobileBody, color = mobileTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                textStyle = mobileBody.copy(color = mobileText),
+                shape = RoundedCornerShape(14.dp),
+                colors = outlinedColors(),
               )
+
+              Text("Port", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              OutlinedTextField(
+                value = manualPortInput,
+                onValueChange = {
+                  manualPortInput = it
+                  validationText = null
+                },
+                placeholder = { Text("18789", style = mobileBody, color = mobileTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+                shape = RoundedCornerShape(14.dp),
+                colors = outlinedColors(),
+              )
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                  Text("Use TLS", style = mobileHeadline, color = mobileText)
+                  Text("Switch to secure websocket (`wss`).", style = mobileCallout, color = mobileTextSecondary)
+                }
+                Switch(
+                  checked = manualTlsInput,
+                  onCheckedChange = {
+                    manualTlsInput = it
+                    validationText = null
+                  },
+                  colors =
+                    SwitchDefaults.colors(
+                      checkedTrackColor = mobileAccent,
+                      uncheckedTrackColor = mobileBorderStrong,
+                      checkedThumbColor = Color.White,
+                      uncheckedThumbColor = Color.White,
+                    ),
+                )
+              }
+
+              Text("Token (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              OutlinedTextField(
+                value = gatewayToken,
+                onValueChange = { viewModel.setGatewayToken(it) },
+                placeholder = { Text("token", style = mobileBody, color = mobileTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                textStyle = mobileBody.copy(color = mobileText),
+                shape = RoundedCornerShape(14.dp),
+                colors = outlinedColors(),
+              )
+
+              Text("Password (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              OutlinedTextField(
+                value = passwordInput,
+                onValueChange = { passwordInput = it },
+                placeholder = { Text("password", style = mobileBody, color = mobileTextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                textStyle = mobileBody.copy(color = mobileText),
+                shape = RoundedCornerShape(14.dp),
+                colors = outlinedColors(),
+              )
+
+              if (!manualResolvedEndpoint.isNullOrBlank()) {
+                EndpointPreview(endpoint = manualResolvedEndpoint)
+              }
             }
 
-            Text("Token (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-            OutlinedTextField(
-              value = gatewayToken,
-              onValueChange = { viewModel.setGatewayToken(it) },
-              placeholder = { Text("token", style = mobileBody, color = mobileTextTertiary) },
-              modifier = Modifier.fillMaxWidth(),
-              singleLine = true,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-              textStyle = mobileBody.copy(color = mobileText),
-              shape = RoundedCornerShape(14.dp),
-              colors = outlinedColors(),
-            )
+            HorizontalDivider(color = mobileBorder)
 
-            Text("Password (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-            OutlinedTextField(
-              value = passwordInput,
-              onValueChange = { passwordInput = it },
-              placeholder = { Text("password", style = mobileBody, color = mobileTextTertiary) },
-              modifier = Modifier.fillMaxWidth(),
-              singleLine = true,
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-              textStyle = mobileBody.copy(color = mobileText),
-              shape = RoundedCornerShape(14.dp),
-              colors = outlinedColors(),
-            )
-
-            if (!manualResolvedEndpoint.isNullOrBlank()) {
-              EndpointPreview(endpoint = manualResolvedEndpoint)
+            TextButton(onClick = { viewModel.setOnboardingCompleted(false) }) {
+              Text("Run onboarding again", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
             }
-          }
-
-          HorizontalDivider(color = mobileBorder)
-
-          TextButton(onClick = { viewModel.setOnboardingCompleted(false) }) {
-            Text("Run onboarding again", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
           }
         }
       }
