@@ -218,6 +218,12 @@ class NodeRuntime(
     statusSnapshotProvider = {
       localHostRuntime.statusSnapshot()
     },
+    codexAuthStatusProvider = {
+      localHostRuntime.codexAuthStatusSnapshot()
+    },
+    refreshCodexAuth = {
+      localHostRuntime.refreshCodexAuthSnapshot()
+    },
   )
 
   private enum class ConnectionBackend {

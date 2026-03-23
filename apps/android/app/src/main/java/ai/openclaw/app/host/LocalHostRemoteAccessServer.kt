@@ -168,6 +168,8 @@ class LocalHostRemoteAccessServer(
   private val allowAdvancedInvokeCommands: () -> Boolean = { false },
   private val allowWriteInvokeCommands: () -> Boolean = { false },
   private val statusSnapshotProvider: (() -> JsonObject)? = null,
+  private val codexAuthStatusProvider: (() -> JsonObject)? = null,
+  private val refreshCodexAuth: (suspend () -> JsonObject)? = null,
 ) {
   companion object {
     private const val apiBasePath = "/api/local-host/v1"
@@ -369,6 +371,8 @@ class LocalHostRemoteAccessServer(
       )
       request.method == "GET" && uri.path == "$apiBasePath/status" -> statusResponse()
       request.method == "GET" && uri.path == "$apiBasePath/examples" -> examplesResponse()
+      request.method == "GET" && uri.path == "$apiBasePath/auth/codex/status" -> codexAuthStatusResponse()
+      request.method == "POST" && uri.path == "$apiBasePath/auth/codex/refresh" -> codexAuthRefreshResponse()
       request.method == "GET" && uri.path == apiBasePath -> jsonResponse(
         statusCode = 200,
         body =
@@ -381,6 +385,12 @@ class LocalHostRemoteAccessServer(
                 add(JsonPrimitive("GET $apiBasePath/health"))
                 add(JsonPrimitive("GET $apiBasePath/status"))
                 add(JsonPrimitive("GET $apiBasePath/examples"))
+                if (codexAuthStatusProvider != null) {
+                  add(JsonPrimitive("GET $apiBasePath/auth/codex/status"))
+                }
+                if (refreshCodexAuth != null) {
+                  add(JsonPrimitive("POST $apiBasePath/auth/codex/refresh"))
+                }
                 add(JsonPrimitive("GET $apiBasePath/identity"))
                 add(JsonPrimitive("GET $apiBasePath/config"))
                 add(JsonPrimitive("GET $apiBasePath/agents"))
@@ -581,6 +591,27 @@ class LocalHostRemoteAccessServer(
     )
   }
 
+  private fun codexAuthStatusResponse(): HttpResponse {
+    val provider = codexAuthStatusProvider ?: throw HttpRequestException(404, "Codex auth status is unavailable")
+    return jsonResponse(statusCode = 200, body = provider().toString())
+  }
+
+  private suspend fun codexAuthRefreshResponse(): HttpResponse {
+    val refresh = refreshCodexAuth ?: throw HttpRequestException(404, "Codex auth refresh is unavailable")
+    return try {
+      jsonResponse(statusCode = 200, body = refresh().toString())
+    } catch (err: IllegalStateException) {
+      jsonResponse(
+        statusCode = 400,
+        body =
+          buildJsonObject {
+            put("ok", JsonPrimitive(false))
+            put("error", JsonPrimitive(err.message ?: "OpenAI Codex refresh failed"))
+          }.toString(),
+      )
+    }
+  }
+
   private fun invokeCapabilitiesResponse(): HttpResponse {
     return jsonResponse(
       statusCode = 200,
@@ -636,6 +667,36 @@ class LocalHostRemoteAccessServer(
           put(
             "examples",
             buildJsonArray {
+              if (codexAuthStatusProvider != null) {
+                add(
+                  buildJsonObject {
+                    put("name", JsonPrimitive("auth-codex-status"))
+                    put("method", JsonPrimitive("GET"))
+                    put("path", JsonPrimitive("$apiBasePath/auth/codex/status"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -H 'Authorization: Bearer $tokenPlaceholder' $baseUrl$apiBasePath/auth/codex/status",
+                      ),
+                    )
+                  },
+                )
+              }
+              if (refreshCodexAuth != null) {
+                add(
+                  buildJsonObject {
+                    put("name", JsonPrimitive("auth-codex-refresh"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/auth/codex/refresh"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' $baseUrl$apiBasePath/auth/codex/refresh",
+                      ),
+                    )
+                  },
+                )
+              }
               add(
                 buildJsonObject {
                   put("name", JsonPrimitive("status"))

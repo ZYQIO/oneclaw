@@ -1,6 +1,7 @@
 package ai.openclaw.app.host
 
 import ai.openclaw.app.SecurePrefs
+import ai.openclaw.app.auth.OpenAICodexOAuthApi
 import ai.openclaw.app.chat.ChatMessageContent
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -50,6 +51,11 @@ class LocalHostRuntime(
   private val prefs: SecurePrefs,
   private val json: Json,
   private val codexClient: LocalHostResponsesClient = OpenAICodexResponsesClient(prefs, json),
+  private val codexAuthController: LocalHostCodexAuthController =
+    LocalHostCodexAuthController(
+      prefs = prefs,
+      oauthApi = OpenAICodexOAuthApi(json = json),
+    ),
 ) {
   companion object {
     private const val serverName = "OpenClaw Local Host"
@@ -140,17 +146,23 @@ class LocalHostRuntime(
 
   fun refreshNodeCanvasCapability(): String? = null
 
+  fun codexAuthStatusSnapshot(): JsonObject = codexAuthController.statusSnapshot()
+
+  suspend fun refreshCodexAuthSnapshot(): JsonObject = codexAuthController.refreshSnapshot()
+
   fun statusSnapshot(): JsonObject {
     val orderedSessions =
       sessions.values
         .map(::snapshotSession)
         .sortedByDescending { it.updatedAtMs }
+    val codexAuth = codexAuthStatusSnapshot()
 
     return buildJsonObject {
       put("serverName", JsonPrimitive(serverName))
       put("remoteAddress", JsonPrimitive(remoteAddress))
       put("mainSessionKey", JsonPrimitive(mainSessionKey))
-      put("codexAuthConfigured", JsonPrimitive(prefs.hasOpenAICodexCredential.value))
+      put("codexAuthConfigured", JsonPrimitive(codexAuth["configured"].asBooleanOrNull() == true))
+      put("codexAuth", codexAuth)
       put("sessionCount", JsonPrimitive(orderedSessions.size))
       put("activeRunCount", JsonPrimitive(activeRuns.size))
       put("clientCount", JsonPrimitive(clients.size))

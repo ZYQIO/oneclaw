@@ -20,12 +20,13 @@ As of March 23, 2026, the MVP happy path is working. / 截至 2026 年 3 月 23 
 - 远控 `/invoke` 的只读命令已成功执行。Read-only `/invoke` commands have succeeded remotely.
 - 高风险命令层在关闭时会被明确拒绝。Higher-risk command tiers are clearly rejected when disabled.
 - LAN 冒烟脚本已经成功。The LAN smoke script has succeeded.
+- `auth/codex/status` 和 `auth/codex/refresh` 已在真机验证成功。`auth/codex/status` and `auth/codex/refresh` have both been validated successfully on-device.
+- 权限缺失脚本已经在真机上成功覆盖四类失败。The permission-failure script has already covered four failure cases successfully on-device.
 
 What is still missing / 仍未完成的部分:
 
-- 真实设备上的 Codex refresh 成功证据。Real-device evidence for a successful Codex refresh path.
-- 权限缺失类失败场景的系统记录。Systematic evidence for permission-missing failure paths.
 - 远程默认值和网络暴露说明的最后复核。Final review of remote defaults and network-exposure guidance.
+- 自检里 streaming-text 那一项是否仍然需要真机补证，需要最后判断。We still need a final decision on whether the streaming-text self-check item requires dedicated on-device evidence.
 
 ## Today Work Log / 今日工作日志
 
@@ -39,6 +40,9 @@ What is still missing / 仍未完成的部分:
 - 重新安装 APK 后，远控 `/chat/send-wait` 成功返回 `Android local host is working.`。After reinstalling the APK, remote `/chat/send-wait` returned `Android local host is working.` successfully.
 - 验证了无效 token、关闭的相机层、关闭的写命令层这三类边界。Validated three boundary cases: invalid token, disabled camera tier, and disabled write tier.
 - 运行 `bash apps/android/scripts/local-host-remote-smoke.sh` 成功。Ran `bash apps/android/scripts/local-host-remote-smoke.sh` successfully.
+- 新增 `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostCodexAuthController.kt`，并把 `auth/codex/status`、`auth/codex/refresh` 接入远控面。Added `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostCodexAuthController.kt` and wired `auth/codex/status` plus `auth/codex/refresh` into remote access.
+- 真机调用 `POST /api/local-host/v1/auth/codex/refresh` 成功，`expiresAt` 向前推进，之后 `/chat/send-wait` 仍返回 `Codex refresh still works.`。On-device `POST /api/local-host/v1/auth/codex/refresh` succeeded, `expiresAt` moved forward, and `/chat/send-wait` still returned `Codex refresh still works.` afterward.
+- 新增并运行 `bash apps/android/scripts/local-host-permission-smoke.sh`，覆盖 `contacts.search`、`calendar.events`、`photos.latest`、`system.notify` 的权限缺失错误。Added and ran `bash apps/android/scripts/local-host-permission-smoke.sh`, covering permission-missing errors for `contacts.search`, `calendar.events`, `photos.latest`, and `system.notify`.
 
 ## Verified Commands / 已验证命令
 
@@ -51,6 +55,7 @@ cd apps/android
 ./gradlew --no-daemon --console=plain :app:assembleDebug
 ./gradlew --no-daemon --console=plain :app:testDebugUnitTest \
   --tests ai.openclaw.app.SecurePrefsTest \
+  --tests ai.openclaw.app.host.LocalHostCodexAuthControllerTest \
   --tests ai.openclaw.app.host.LocalHostRuntimeTest \
   --tests ai.openclaw.app.host.LocalHostRemoteAccessServerTest \
   --tests ai.openclaw.app.host.OpenAICodexResponsesClientTest
@@ -70,6 +75,18 @@ Remote status / 远控状态:
 curl -sS \
   -H 'Authorization: Bearer <token-from-connect-tab>' \
   http://<phone-ip>:3945/api/local-host/v1/status
+```
+
+Remote Codex auth / 远控 Codex 授权:
+
+```bash
+curl -sS \
+  -H 'Authorization: Bearer <token-from-connect-tab>' \
+  http://<phone-ip>:3945/api/local-host/v1/auth/codex/status
+
+curl -sS -X POST \
+  -H 'Authorization: Bearer <token-from-connect-tab>' \
+  http://<phone-ip>:3945/api/local-host/v1/auth/codex/refresh
 ```
 
 Remote chat / 远控聊天:
@@ -100,10 +117,20 @@ OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
 bash apps/android/scripts/local-host-remote-smoke.sh
 ```
 
+Permission smoke / 权限冒烟:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL='http://<phone-ip>:3945' \
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+bash apps/android/scripts/local-host-permission-smoke.sh
+```
+
 ## Known Good Code Areas / 当前可信代码区域
 
 - `apps/android/app/src/main/java/ai/openclaw/app/host/OpenAICodexResponsesClient.kt`
+- `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostCodexAuthController.kt`
 - `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostRuntime.kt`
+- `apps/android/app/src/test/java/ai/openclaw/app/host/LocalHostCodexAuthControllerTest.kt`
 - `apps/android/app/src/test/java/ai/openclaw/app/host/OpenAICodexResponsesClientTest.kt`
 - `apps/android/app/src/test/java/ai/openclaw/app/host/LocalHostRuntimeTest.kt`
 - `apps/android/local-host-progress.md`
@@ -113,26 +140,27 @@ bash apps/android/scripts/local-host-remote-smoke.sh
 
 - `./gradlew :app:installDebug` 在这台设备上可能触发 ddmlib `InstallException: -99`，但直接 `adb install -r -d ...apk` 是可行的。`./gradlew :app:installDebug` may hit ddmlib `InstallException: -99` on this device, but direct `adb install -r -d ...apk` works.
 - `pnpm android:local-host:smoke` 依赖当前 shell 能找到 `pnpm`；如果环境里 `pnpm` shim 不可用，直接调用脚本本体即可。`pnpm android:local-host:smoke` depends on a working `pnpm` shim; if `pnpm` is unavailable in the shell, run the script directly instead.
+- 这台 Android 15 设备拒绝 shell 侧 `pm revoke` 和 `appops set`；权限脚本会在权限已被拒绝时直接验证失败路径，只在权限已授予时才尝试临时撤回。This Android 15 device rejects shell-side `pm revoke` and `appops set`; the permission script validates already-denied cases directly and only attempts temporary revocation when a permission starts granted.
 - 不要把真实 token、真实手机 IP、或个人设备标识写进提交。Do not commit real tokens, the real phone IP, or personal device identifiers.
 
 ## Next Tasks / 接下来要做的事
 
 ### P0 / 最高优先级
 
-1. 验证 Codex refresh 成功路径。Validate a successful Codex refresh path.
-2. 记录权限缺失失败场景。Capture permission-missing failure scenarios.
+1. 复核远程访问默认值和 token 轮换说明。Review remote defaults and token-rotation guidance.
+2. 判断 streaming-text 自检项是否仍需真机补证。Decide whether the streaming-text self-check item still needs dedicated real-device evidence.
 
 ### P1 / 次优先级
 
-1. 复核远程访问默认值和 token 轮换说明。Review remote defaults and token-rotation guidance.
-2. 判断 MVP 是否还要开放更多命令。Decide whether the MVP needs any more commands at all.
+1. 判断 MVP 是否还要开放更多命令。Decide whether the MVP needs any more commands at all.
+2. 如需补证，再做一次更强的 expired-auth 验证。If more evidence is needed, run a stronger expired-auth validation.
 
 ## Suggested Next-Session Plan / 下一会话建议推进方式
 
 1. 先读 `apps/android/local-host-progress.md` 的 `Resume Plan`。Start with the `Resume Plan` in `apps/android/local-host-progress.md`.
 2. 先跑一次 `/status` 或冒烟脚本，确认手机仍在 `Local Host`。Run `/status` or the smoke script to confirm the phone is still in `Local Host`.
-3. 优先收掉 refresh 证据，再做权限失败证据。Close the refresh evidence first, then the permission-failure evidence.
-4. 如果两项都完成，再决定是否需要新增功能。Only decide on new feature work after those two evidence gaps are closed.
+3. 优先收尾远程默认值和自检结论，再决定是否需要新增功能。Close out remote defaults and the self-check verdict before deciding on new feature work.
+4. 如果要继续补证，优先看 `apps/android/local-host-self-check.md` 里唯一未勾选的项。If more evidence is needed, start with the only unchecked item in `apps/android/local-host-self-check.md`.
 
 ## Related Docs / 相关文档
 

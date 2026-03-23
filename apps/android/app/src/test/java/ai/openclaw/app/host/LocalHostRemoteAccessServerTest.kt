@@ -117,6 +117,13 @@ class LocalHostRemoteAccessServerTest {
         statusSnapshotProvider = {
           buildJsonObject {
             put("codexAuthConfigured", JsonPrimitive(true))
+            put(
+              "codexAuth",
+              buildJsonObject {
+                put("configured", JsonPrimitive(true))
+                put("refreshRecommended", JsonPrimitive(false))
+              },
+            )
             put("sessionCount", JsonPrimitive(2))
             put("activeRunCount", JsonPrimitive(1))
           }
@@ -140,6 +147,7 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"advancedEnabled\":true"))
       assertTrue(response.body.contains("\"writeEnabled\":true"))
       assertTrue(response.body.contains("\"codexAuthConfigured\":true"))
+      assertTrue(response.body.contains("\"codexAuth\""))
       assertTrue(response.body.contains("\"sessionCount\":2"))
       assertTrue(response.body.contains("\"activeRunCount\":1"))
       assertTrue(response.body.contains("\"sms.send\""))
@@ -327,6 +335,16 @@ class LocalHostRemoteAccessServerTest {
         json = json,
         handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
         handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        codexAuthStatusProvider = {
+          buildJsonObject {
+            put("configured", JsonPrimitive(true))
+          }
+        },
+        refreshCodexAuth = {
+          buildJsonObject {
+            put("refreshed", JsonPrimitive(true))
+          }
+        },
       )
 
     try {
@@ -341,12 +359,133 @@ class LocalHostRemoteAccessServerTest {
         )
 
       assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"auth-codex-status\""))
+      assertTrue(response.body.contains("\"auth-codex-refresh\""))
       assertTrue(response.body.contains("\"status\""))
       assertTrue(response.body.contains("/api/local-host/v1/status"))
       assertTrue(response.body.contains("\"chat-send-wait\""))
       assertTrue(response.body.contains("/api/local-host/v1/events"))
       assertTrue(response.body.contains("<TOKEN>"))
       assertTrue(!response.body.contains("\"sms.send\""))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun codexAuthStatus_returnsSanitizedCredentialMetadata() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        codexAuthStatusProvider = {
+          buildJsonObject {
+            put("provider", JsonPrimitive("openai-codex"))
+            put("configured", JsonPrimitive(true))
+            put("emailHint", JsonPrimitive("p***n@example.com"))
+            put("expiresAt", JsonPrimitive(1234))
+            put("refreshRecommended", JsonPrimitive(false))
+          }
+        },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "GET",
+          path = "/api/local-host/v1/auth/codex/status",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"configured\":true"))
+      assertTrue(response.body.contains("\"emailHint\":\"p***n@example.com\""))
+      assertTrue(response.body.contains("\"refreshRecommended\":false"))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun codexAuthRefresh_returnsStructuredErrorWhenCredentialMissing() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        refreshCodexAuth = {
+          throw IllegalStateException("OpenAI Codex login required")
+        },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "POST",
+          path = "/api/local-host/v1/auth/codex/refresh",
+          token = "secret-token",
+        )
+
+      assertEquals(400, response.statusCode)
+      assertTrue(response.body.contains("\"ok\":false"))
+      assertTrue(response.body.contains("OpenAI Codex login required"))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun codexAuthRefresh_returnsRefreshedMetadata() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        refreshCodexAuth = {
+          buildJsonObject {
+            put("provider", JsonPrimitive("openai-codex"))
+            put("configured", JsonPrimitive(true))
+            put("refreshed", JsonPrimitive(true))
+            put("previousExpiresAt", JsonPrimitive(1000))
+            put("expiresAt", JsonPrimitive(5000))
+          }
+        },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "POST",
+          path = "/api/local-host/v1/auth/codex/refresh",
+          token = "secret-token",
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"refreshed\":true"))
+      assertTrue(response.body.contains("\"previousExpiresAt\":1000"))
+      assertTrue(response.body.contains("\"expiresAt\":5000"))
     } finally {
       server.stop()
       scope.cancel()

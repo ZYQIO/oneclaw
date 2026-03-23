@@ -149,6 +149,34 @@ Optional overrides:
 
 The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`, and `/invoke`, then prints a compact summary.
 
+## Local Host Auth + Permission Validation
+
+Codex auth metadata and refresh can be checked remotely without exposing tokens:
+
+```bash
+curl -H 'Authorization: Bearer <token-from-connect-tab>' \
+  http://<phone-ip>:3945/api/local-host/v1/auth/codex/status
+
+curl -X POST -H 'Authorization: Bearer <token-from-connect-tab>' \
+  http://<phone-ip>:3945/api/local-host/v1/auth/codex/refresh
+```
+
+Permission failure validation script:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL='http://<phone-ip>:3945' \
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:permissions
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1`
+- `OPENCLAW_ANDROID_LOCAL_HOST_PERMISSION_CASES=contacts,calendar,photos,notifications`
+- `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
+
+The permission script verifies permission-dependent `/invoke` failures and preserves the original permission state. On devices that block shell-side runtime revocation, it still validates commands that are already denied.
+
 ### USB-only gateway testing (no LAN dependency)
 
 Use `adb reverse` so Android `localhost:18789` tunnels to your laptop `localhost:18789`.

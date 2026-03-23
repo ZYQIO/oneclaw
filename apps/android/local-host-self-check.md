@@ -31,7 +31,7 @@ Mark each item only with direct evidence. / 每一项都必须基于直接证据
 ### Codex Integration / Codex 集成
 
 - [x] 已保存的 Codex 凭证在 App 重启后仍可用。Stored Codex credential survives app restart.
-- [ ] 凭证会在过期前成功刷新。Credential refresh succeeds before expiry.
+- [x] 凭证会在过期前成功刷新。Credential refresh succeeds before expiry.
 - [x] 缺失 Codex 凭证时，聊天会给出清晰错误。Missing Codex credential produces a clear error for chat.
 - [x] 模型调用所需的 account identifier 会被正确解析。Account identifier is resolved correctly for model calls.
 - [ ] 流式文本更新能进入本机 Host 聊天管线。Streaming text updates reach the local-host chat pipeline.
@@ -83,32 +83,32 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 
 - Missing token behavior / token 缺失行为: `/status` returned `401` with `Missing or invalid bearer token`
 - Disabled write-tier behavior / 写命令层关闭行为: `/invoke` with `sms.send` returned `command is not enabled for remote access`
-- Missing permission behavior / 权限缺失行为:
-- Codex expiry or missing-auth behavior / Codex 过期或缺失行为: clear missing-auth error observed from `/chat/send-wait`
+- Missing permission behavior / 权限缺失行为: `contacts.search` -> `CONTACTS_PERMISSION_REQUIRED`, `calendar.events` -> `CALENDAR_PERMISSION_REQUIRED`, `photos.latest` -> `PHOTOS_PERMISSION_REQUIRED`, `system.notify` -> `NOT_AUTHORIZED: notifications`
+- Codex expiry or missing-auth behavior / Codex 过期或缺失行为: clear missing-auth error observed from `/chat/send-wait`; proactive `POST /auth/codex/refresh` succeeded and advanced `expiresAt`
 
 ### Verdict / 结论
 
 - [ ] Go / 通过
 - [x] No go / 不通过
 
-Reason / 原因: the real-device happy path now works end to end, but refresh-path evidence and permission-failure validation are still missing.
+Reason / 原因: the real-device happy path, refresh path, and permission-failure validation are now covered, but the streaming-text self-check item still lacks dedicated on-device evidence.
 
 ## Next Session Focus / 下一会话重点
 
 Use this as the shortest checklist when resuming work. / 新会话恢复工作时，可直接把这一节当作最短清单。
 
-1. 验证一次 Codex refresh 成功路径。Validate one successful Codex refresh path.
-2. 记录至少三类权限缺失失败场景。Capture at least three permission-missing failure scenarios.
+1. 判断是否需要补“流式文本更新”这一条真机证据。Decide whether the "streaming text updates" evidence still needs a dedicated real-device run.
+2. 复核远程默认值、token 轮换和网络暴露说明。Review remote defaults, token rotation, and network-exposure guidance.
 3. 确认完成后，重新评估 `Go / No go`。After that, re-evaluate the `Go / No go` verdict.
 
 Recommended evidence updates / 建议补充的证据:
 
-- 在本文件的 `Codex Integration` 中勾选 refresh 相关项目。Check the refresh-related items in `Codex Integration`.
-- 在本文件的 `Failures` 中补齐权限缺失记录。Fill the missing permission-failure rows in `Failures`.
+- 在本文件中决定是否把 streaming evidence 作为出货前硬门槛。Decide in this file whether streaming evidence remains a hard ship gate.
+- 在文档里补齐远程默认值和 token 指引。Fill in the remote defaults and token guidance in docs.
 - 在 `apps/android/local-host-progress.md` 追加新的日期日志。Append a new dated log entry to `apps/android/local-host-progress.md`.
 
 Avoid drifting scope / 避免范围漂移:
 
 - 不要先扩更多远程命令。Do not expand the remote command surface first.
 - 不要先改公网暴露方案。Do not redesign public exposure first.
-- 先把未完成证据补全，再决定是否继续加功能。Finish the missing evidence first, then decide whether more features are needed.
+- 先把收尾判断和文档边界写清楚，再决定是否继续加功能。Write down the close-out judgment and doc boundaries before deciding on more features.
