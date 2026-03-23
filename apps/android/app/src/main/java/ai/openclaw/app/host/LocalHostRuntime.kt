@@ -31,7 +31,7 @@ private data class LocalClientRegistration(
   val onEvent: (event: String, payloadJson: String?) -> Unit,
 )
 
-internal data class LocalHostMessage(
+data class LocalHostMessage(
   val role: String,
   val content: List<ChatMessageContent>,
   val timestampMs: Long,

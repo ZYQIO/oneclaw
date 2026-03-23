@@ -18,9 +18,11 @@ class SecurePrefsTest {
   fun loadLocationMode_migratesLegacyAlwaysValue() {
     val context = RuntimeEnvironment.getApplication()
     val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)
+    val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.location", Context.MODE_PRIVATE)
     plainPrefs.edit().clear().putString("location.enabledMode", "always").commit()
+    securePrefs.edit().clear().commit()
 
-    val prefs = SecurePrefs(context)
+    val prefs = SecurePrefs(context, securePrefsOverride = securePrefs)
 
     assertEquals(LocationMode.WhileUsing, prefs.locationMode.value)
     assertEquals("whileUsing", plainPrefs.getString("location.enabledMode", null))
@@ -45,9 +47,11 @@ class SecurePrefsTest {
   fun gatewayConnectionMode_defaultsToRemoteAndPersistsLocalHost() {
     val context = RuntimeEnvironment.getApplication()
     val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)
+    val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.gatewayMode", Context.MODE_PRIVATE)
     plainPrefs.edit().clear().commit()
+    securePrefs.edit().clear().commit()
 
-    val prefs = SecurePrefs(context)
+    val prefs = SecurePrefs(context, securePrefsOverride = securePrefs)
     assertEquals(GatewayConnectionMode.RemoteGateway, prefs.gatewayConnectionMode.value)
 
     prefs.setGatewayConnectionMode(GatewayConnectionMode.LocalHost)

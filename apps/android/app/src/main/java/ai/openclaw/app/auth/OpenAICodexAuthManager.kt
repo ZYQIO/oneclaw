@@ -32,7 +32,7 @@ data class OpenAICodexAuthUiState(
   val signedInEmail: String? = null,
 )
 
-class OpenAICodexAuthManager(
+internal class OpenAICodexAuthManager(
   private val appContext: Context,
   private val prefs: SecurePrefs,
   private val scope: CoroutineScope,

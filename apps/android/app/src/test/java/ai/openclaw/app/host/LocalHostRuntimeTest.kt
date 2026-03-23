@@ -4,6 +4,7 @@ import android.content.Context
 import ai.openclaw.app.SecurePrefs
 import ai.openclaw.app.auth.OpenAICodexCredential
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -19,6 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 class LocalHostRuntimeTest {
   private val json = Json { ignoreUnknownKeys = true }
 

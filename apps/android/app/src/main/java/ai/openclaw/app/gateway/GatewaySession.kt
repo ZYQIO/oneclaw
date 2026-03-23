@@ -202,7 +202,7 @@ class GatewaySession(
     }
   }
 
-  override suspend fun request(method: String, paramsJson: String?, timeoutMs: Long = 15_000): String {
+  override suspend fun request(method: String, paramsJson: String?, timeoutMs: Long): String {
     val conn = currentConnection ?: throw IllegalStateException("not connected")
     val params =
       if (paramsJson.isNullOrBlank()) {

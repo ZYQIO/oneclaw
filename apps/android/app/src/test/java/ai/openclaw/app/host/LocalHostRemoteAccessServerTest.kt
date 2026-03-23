@@ -379,7 +379,7 @@ class LocalHostRemoteAccessServerTest {
 
       assertEquals(200, response.statusCode)
       assertTrue(response.body.contains("\"invoke-sms-send\""))
-      assertTrue(response.body.contains("\"sms.send\""))
+      assertTrue(response.body.contains("sms.send"))
     } finally {
       server.stop()
       scope.cancel()

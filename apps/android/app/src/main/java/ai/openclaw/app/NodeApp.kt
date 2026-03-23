@@ -10,7 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 class NodeApp : Application() {
   val prefs: SecurePrefs by lazy { SecurePrefs(this) }
   private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-  val openAICodexAuthManager: OpenAICodexAuthManager by lazy {
+  internal val openAICodexAuthManager: OpenAICodexAuthManager by lazy {
     OpenAICodexAuthManager(
       appContext = this,
       prefs = prefs,
