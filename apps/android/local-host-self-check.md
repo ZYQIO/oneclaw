@@ -61,10 +61,10 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 
 ### Environment / 环境
 
-- Device / 设备: `PFEM10`
+- Device / 设备: `<android-device>`
 - Android version / Android 版本: `15`
 - Build commit / 构建提交: `post-Codex-validation working tree on March 23, 2026`
-- Network setup / 网络环境: host -> phone over LAN (`http://192.168.21.134:3945`); `adb forward` connected but did not return `/status`
+- Network setup / 网络环境: host -> phone over LAN (`http://<phone-ip>:3945`); `adb forward` connected but did not return `/status`
 
 ### Local Host / 本机 Host
 
@@ -92,3 +92,23 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 - [x] No go / 不通过
 
 Reason / 原因: the real-device happy path now works end to end, but refresh-path evidence and permission-failure validation are still missing.
+
+## Next Session Focus / 下一会话重点
+
+Use this as the shortest checklist when resuming work. / 新会话恢复工作时，可直接把这一节当作最短清单。
+
+1. 验证一次 Codex refresh 成功路径。Validate one successful Codex refresh path.
+2. 记录至少三类权限缺失失败场景。Capture at least three permission-missing failure scenarios.
+3. 确认完成后，重新评估 `Go / No go`。After that, re-evaluate the `Go / No go` verdict.
+
+Recommended evidence updates / 建议补充的证据:
+
+- 在本文件的 `Codex Integration` 中勾选 refresh 相关项目。Check the refresh-related items in `Codex Integration`.
+- 在本文件的 `Failures` 中补齐权限缺失记录。Fill the missing permission-failure rows in `Failures`.
+- 在 `apps/android/local-host-progress.md` 追加新的日期日志。Append a new dated log entry to `apps/android/local-host-progress.md`.
+
+Avoid drifting scope / 避免范围漂移:
+
+- 不要先扩更多远程命令。Do not expand the remote command surface first.
+- 不要先改公网暴露方案。Do not redesign public exposure first.
+- 先把未完成证据补全，再决定是否继续加功能。Finish the missing evidence first, then decide whether more features are needed.

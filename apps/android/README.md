@@ -6,6 +6,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 
 - Progress tracker / 进度跟踪: `apps/android/local-host-progress.md`
 - Self-check gate / 自检门槛: `apps/android/local-host-self-check.md`
+- Session handoff / 接续手册: `apps/android/local-host-handoff.md`
 
 ### Rebuild Checklist
 
