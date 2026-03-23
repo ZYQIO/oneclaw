@@ -58,6 +58,7 @@ The current MVP does not aim to deliver all desktop Gateway features. / 当前 M
 
 ### M4. Validation And Hardening / 验证与加固
 
+- [x] 提供可复用的本机 Host 远控冒烟脚本。Add a reusable local-host remote smoke script.
 - [ ] 在装有 Java 的环境中跑通 Android Gradle 编译和单测。Run Android Gradle compile and unit tests in an environment with Java installed.
 - [ ] 安装到真实 Android 手机并验证主成功路径。Install on a real Android phone and validate the happy path.
 - [ ] 记录 Codex 过期、权限缺失、远程命令层关闭等失败行为。Capture failure behavior for expired Codex auth, missing permissions, and disabled remote tiers.
@@ -73,6 +74,7 @@ Completed implementation highlights / 已完成实现要点:
 - 本机 Host 聊天已接到使用 `gpt-5.4` 的 Codex Responses。Local-host chat is wired to Codex Responses using `gpt-5.4`.
 - 远程访问已经暴露 `/health`、`/status`、`/examples`、`/chat/*`、`/events` 和 `/invoke`。Remote access exposes `/health`, `/status`, `/examples`, `/chat/*`, `/events`, and `/invoke`.
 - 远程 `/invoke` 命令已经分层，高风险能力默认不开放。Remote invoke commands are tiered so risky actions are not enabled by default.
+- 已有可执行的远程冒烟脚本，可直接验证 `/status`、聊天和 `/invoke`。A runnable remote smoke script exists for `/status`, chat, and `/invoke`.
 
 Current gaps / 当前缺口:
 

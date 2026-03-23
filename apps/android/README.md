@@ -118,6 +118,36 @@ pnpm android:run
 
 If `adb devices -l` shows `unauthorized`, re-plug and accept the trust prompt again.
 
+## Local Host Remote Smoke
+
+Use this after the app is already running in `Local Host` mode and remote access is enabled.
+
+USB-friendly flow with `adb forward`:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
+pnpm android:local-host:smoke
+```
+
+Direct LAN flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL='http://<phone-ip>:3945' \
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:smoke
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_MESSAGE=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_INVOKE_COMMAND=device.status`
+- `OPENCLAW_ANDROID_LOCAL_HOST_INVOKE_PARAMS='{"includePermissions":true}'`
+- `OPENCLAW_ANDROID_LOCAL_HOST_WAIT_MS=30000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
+
+The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`, and `/invoke`, then prints a compact summary.
+
 ### USB-only gateway testing (no LAN dependency)
 
 Use `adb reverse` so Android `localhost:18789` tunnels to your laptop `localhost:18789`.
