@@ -155,6 +155,15 @@ bash apps/android/scripts/local-host-permission-smoke.sh
 1. 判断 MVP 是否还要开放更多命令。Decide whether the MVP needs any more commands at all.
 2. 如需补证，再做一次更强的 expired-auth 验证。If more evidence is needed, run a stronger expired-auth validation.
 
+## Tomorrow Checklist / 明日清单
+
+If resuming tomorrow, do these in order. / 如果明天继续，按这个顺序推进。
+
+1. 先跑一次 `/status`，确认手机还在 `Local Host`。Run `/status` first and confirm the phone is still in `Local Host`.
+2. 更新远程访问说明，把默认推荐写清楚。Update the remote-access guidance so the default recommendation is explicit.
+3. 对 `streaming-text` 自检项做结论，不要继续悬空。Make a decision on the `streaming-text` self-check item instead of leaving it open.
+4. 最后判断是否还需要新增远程命令；如果没有强需求，就停止扩范围。Only then decide whether more remote commands are needed; if there is no strong need, stop expanding scope.
+
 ## Suggested Next-Session Plan / 下一会话建议推进方式
 
 1. 先读 `apps/android/local-host-progress.md` 的 `Resume Plan`。Start with the `Resume Plan` in `apps/android/local-host-progress.md`.
