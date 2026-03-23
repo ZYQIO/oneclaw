@@ -3,6 +3,7 @@ package ai.openclaw.app.host
 import android.content.Context
 import ai.openclaw.app.SecurePrefs
 import ai.openclaw.app.auth.OpenAICodexCredential
+import java.util.UUID
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -44,7 +45,8 @@ class LocalHostRuntimeTest {
           prefs = prefs,
           json = json,
           codexClient =
-            FakeLocalHostResponsesClient { _, messages, thinkingLevel, onTextDelta ->
+            FakeLocalHostResponsesClient { sessionId, messages, thinkingLevel, onTextDelta ->
+              UUID.fromString(sessionId)
               assertEquals("low", thinkingLevel)
               assertEquals(1, messages.size)
               assertEquals("user", messages.single().role)
@@ -113,7 +115,8 @@ class LocalHostRuntimeTest {
           prefs = prefs,
           json = json,
           codexClient =
-            FakeLocalHostResponsesClient { _, _, _, _ ->
+            FakeLocalHostResponsesClient { sessionId, _, _, _ ->
+              UUID.fromString(sessionId)
               awaitCancellation()
             },
         )

@@ -13,8 +13,8 @@ Mark each item only with direct evidence. / 每一项都必须基于直接证据
 ### Product Goal / 产品目标
 
 - [x] App 中可以选择并启动 `Local Host` 模式。`Local Host` mode can be selected and started from the app.
-- [ ] Codex 授权可以直接在 App 内完成，不依赖桌面专属步骤。Codex authorization can be connected from the app without desktop-only steps.
-- [ ] 本机 Host 聊天能在真实手机上返回模型响应。Local-host chat returns a model response on a real phone.
+- [x] Codex 授权可以直接在 App 内完成，不依赖桌面专属步骤。Codex authorization can be connected from the app without desktop-only steps.
+- [x] 本机 Host 聊天能在真实手机上返回模型响应。Local-host chat returns a model response on a real phone.
 - [x] 远端客户端可以通过 `/status` 查看可用性快照。A remote client can inspect readiness through `/status`.
 - [x] 远端客户端可以通过 `/chat/send-wait` 发起聊天。A remote client can send chat through `/chat/send-wait`.
 - [x] 远端客户端可以成功执行至少一个 `/invoke` 命令。A remote client can execute at least one `/invoke` command successfully.
@@ -22,18 +22,18 @@ Mark each item only with direct evidence. / 每一项都必须基于直接证据
 ### Safety And Boundaries / 安全与边界
 
 - [x] 远程访问必须要求 bearer token。Remote access requires bearer-token auth.
-- [ ] 不开启高风险层时，只读命令可以单独使用。Read-only commands are available without enabling higher-risk tiers.
-- [ ] 相机命令必须依赖高级命令层。Camera commands require the advanced tier.
-- [ ] 写操作命令必须依赖写命令层。Write-capable commands require the write tier.
-- [ ] 关闭对应命令层时会得到清晰拒绝。Disabled tiers return a clear rejection.
-- [ ] 远程 examples 和 capabilities 与实际启用的命令层一致。Remote examples and capabilities reflect the actual enabled command tiers.
+- [x] 不开启高风险层时，只读命令可以单独使用。Read-only commands are available without enabling higher-risk tiers.
+- [x] 相机命令必须依赖高级命令层。Camera commands require the advanced tier.
+- [x] 写操作命令必须依赖写命令层。Write-capable commands require the write tier.
+- [x] 关闭对应命令层时会得到清晰拒绝。Disabled tiers return a clear rejection.
+- [x] 远程 examples 和 capabilities 与实际启用的命令层一致。Remote examples and capabilities reflect the actual enabled command tiers.
 
 ### Codex Integration / Codex 集成
 
-- [ ] 已保存的 Codex 凭证在 App 重启后仍可用。Stored Codex credential survives app restart.
+- [x] 已保存的 Codex 凭证在 App 重启后仍可用。Stored Codex credential survives app restart.
 - [ ] 凭证会在过期前成功刷新。Credential refresh succeeds before expiry.
 - [x] 缺失 Codex 凭证时，聊天会给出清晰错误。Missing Codex credential produces a clear error for chat.
-- [ ] 模型调用所需的 account identifier 会被正确解析。Account identifier is resolved correctly for model calls.
+- [x] 模型调用所需的 account identifier 会被正确解析。Account identifier is resolved correctly for model calls.
 - [ ] 流式文本更新能进入本机 Host 聊天管线。Streaming text updates reach the local-host chat pipeline.
 
 ### Validation Quality / 验证质量
@@ -41,7 +41,7 @@ Mark each item only with direct evidence. / 每一项都必须基于直接证据
 - [x] 单测覆盖当前远程 API 面。Unit tests cover the current remote API surface.
 - [x] Android 构建能在装有 Java 的环境中通过。Android build passes in a Java-enabled environment.
 - [x] 至少已经有一次真实 Android 设备运行记录。At least one real Android device run has been documented.
-- [ ] 成功路径验证包含真实网络远程控制，而不只是 localhost 假设。Happy-path validation includes networked remote control, not just localhost assumptions.
+- [x] 成功路径验证包含真实网络远程控制，而不只是 localhost 假设。Happy-path validation includes networked remote control, not just localhost assumptions.
 
 ## Self Check Questions / 自检问题
 
@@ -63,25 +63,26 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 
 - Device / 设备: `PFEM10`
 - Android version / Android 版本: `15`
-- Build commit / 构建提交: `local validation working tree on March 23, 2026`
+- Build commit / 构建提交: `post-Codex-validation working tree on March 23, 2026`
 - Network setup / 网络环境: host -> phone over LAN (`http://192.168.21.134:3945`); `adb forward` connected but did not return `/status`
 
 ### Local Host / 本机 Host
 
 - Local Host start result / 本机 Host 启动结果: `Connected`; app entered `Local Host` after onboarding bypass for validation
-- Codex sign-in result / Codex 登录结果: browser flow launched to `auth.openai.com`, but account sign-in not completed yet
-- Local chat result / 本地聊天结果: `/chat/send-wait` returned `OpenAI Codex login required`
+- Codex sign-in result / Codex 登录结果: completed in-app through the browser flow; `/status` reports `codexAuthConfigured=true`
+- Local chat result / 本地聊天结果: `/chat/send-wait` returned `Android local host is working.`
 
 ### Remote Control / 远程控制
 
-- `/status` result / `/status` 结果: `200 OK`, `codexAuthConfigured=false`, remote tiers reflected correctly
-- `/chat/send-wait` result / `/chat/send-wait` 结果: `200 OK` with terminal `state=error`, message `OpenAI Codex login required`
+- `/status` result / `/status` 结果: `200 OK`, `codexAuthConfigured=true`, remote tiers reflected correctly
+- `/chat/send-wait` result / `/chat/send-wait` 结果: `200 OK` with terminal `state=final`, message `Android local host is working.`
 - `/invoke` result / `/invoke` 结果: `device.status` returned battery / thermal / storage / network payload
+- Smoke script result / 冒烟脚本结果: `bash apps/android/scripts/local-host-remote-smoke.sh` succeeded over LAN and returned `Android local host smoke passed.`
 
 ### Failures / 失败场景
 
-- Missing token behavior / token 缺失行为: not yet recorded in this device run
-- Disabled write-tier behavior / 写命令层关闭行为: not yet recorded in this device run
+- Missing token behavior / token 缺失行为: `/status` returned `401` with `Missing or invalid bearer token`
+- Disabled write-tier behavior / 写命令层关闭行为: `/invoke` with `sms.send` returned `command is not enabled for remote access`
 - Missing permission behavior / 权限缺失行为:
 - Codex expiry or missing-auth behavior / Codex 过期或缺失行为: clear missing-auth error observed from `/chat/send-wait`
 
@@ -90,4 +91,4 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 - [ ] Go / 通过
 - [x] No go / 不通过
 
-Reason / 原因: local host and LAN remote control are working on a real phone, but Codex sign-in and a successful GPT-backed chat have not been completed yet.
+Reason / 原因: the real-device happy path now works end to end, but refresh-path evidence and permission-failure validation are still missing.

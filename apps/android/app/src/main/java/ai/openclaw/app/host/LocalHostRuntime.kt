@@ -39,7 +39,7 @@ data class LocalHostMessage(
 
 private data class LocalHostSession(
   val key: String,
-  val sessionId: String = key,
+  val sessionId: String = UUID.randomUUID().toString(),
   val messages: MutableList<LocalHostMessage> = mutableListOf(),
   var thinkingLevel: String = "off",
   var updatedAtMs: Long = System.currentTimeMillis(),
