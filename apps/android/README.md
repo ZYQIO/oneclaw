@@ -2,6 +2,11 @@
 
 Status: **extremely alpha**. The app is actively being rebuilt from the ground up.
 
+### Android Local Host Tracking
+
+- Progress tracker: `apps/android/local-host-progress.md`
+- Self-check gate: `apps/android/local-host-self-check.md`
+
 ### Rebuild Checklist
 
 - [x] New 4-step onboarding flow
