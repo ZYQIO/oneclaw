@@ -206,4 +206,5 @@ If resuming tomorrow, do these in order. / 如果明天继续，按这个顺序�
 
 - `apps/android/local-host-progress.md`
 - `apps/android/local-host-self-check.md`
+- `apps/android/local-host-ui-automation-plan.md`
 - `apps/android/README.md`
