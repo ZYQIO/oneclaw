@@ -27,10 +27,12 @@ data class OpenAICodexAssistantReply(
 
 interface LocalHostResponsesClient {
   suspend fun streamReply(
+    role: String,
     sessionId: String,
     messages: List<LocalHostMessage>,
     thinkingLevel: String,
     onTextDelta: suspend (fullText: String) -> Unit,
+    onToolEvent: suspend (LocalHostToolCallEvent) -> Unit,
   ): OpenAICodexAssistantReply
 }
 
@@ -40,11 +42,13 @@ class OpenAICodexResponsesClient(
   private val client: OkHttpClient = OkHttpClient(),
   private val responsesUrl: String = defaultResponsesUrl,
   private val instructions: String = defaultInstructions,
+  private val toolBridge: LocalHostToolBridge? = null,
 ) : LocalHostResponsesClient {
   companion object {
     private const val defaultResponsesUrl = "https://chatgpt.com/backend-api/codex/responses"
     private const val defaultModelId = "gpt-5.4"
     private const val defaultOriginator = "codex_cli_rs"
+    private const val maxToolTurns = 8
     private val defaultInstructions =
       """
       You are Codex, based on GPT-5. You are running as a coding agent in the Codex CLI on a user's computer.
@@ -126,10 +130,12 @@ class OpenAICodexResponsesClient(
   }
 
   override suspend fun streamReply(
+    role: String,
     sessionId: String,
     messages: List<LocalHostMessage>,
     thinkingLevel: String,
     onTextDelta: suspend (fullText: String) -> Unit,
+    onToolEvent: suspend (LocalHostToolCallEvent) -> Unit,
   ): OpenAICodexAssistantReply =
     withContext(Dispatchers.IO) {
       var credential = prefs.loadOpenAICodexCredential()
@@ -144,194 +150,255 @@ class OpenAICodexResponsesClient(
         throw IllegalStateException("OpenAI Codex credential is missing accountId")
       }
 
-      val requestBody =
-        buildRequestBody(
-          sessionId = sessionId,
-          messages = messages,
-          thinkingLevel = thinkingLevel,
-        ).toString()
-          .toByteArray(Charsets.UTF_8)
-          .toRequestBody("application/json".toMediaType())
+      val tools = toolBridge?.toolsForRole(role).orEmpty()
+      val inputItems = buildConversationInput(messages).toMutableList()
+      var responseId: String? = null
+      var finalText: String? = null
 
-      val request =
-        Request.Builder()
-          .url(responsesUrl)
-          .post(requestBody)
-          .header("Authorization", "Bearer ${credential.access}")
-          .header("chatgpt-account-id", accountId)
-          .header("originator", defaultOriginator)
-          .header("User-Agent", codexUserAgent)
-          .header("OpenAI-Beta", "responses=experimental")
-          .header("accept", "text/event-stream")
-          .header("x-client-request-id", sessionId)
-          .header("session_id", sessionId)
-          .build()
+      var turn = 0
+      while (turn < maxToolTurns) {
+        val result =
+          requestResponseTurn(
+            sessionId = sessionId,
+            accountId = accountId,
+            credential = credential,
+            thinkingLevel = thinkingLevel,
+            inputItems = inputItems,
+            tools = tools,
+            onTextDelta = onTextDelta,
+          )
+        responseId = result.responseId ?: responseId
+        if (result.toolCalls.isEmpty()) {
+          finalText = result.text?.trim()
+          break
+        }
 
-      client.newCall(request).execute().use { response ->
-        if (!response.isSuccessful) {
-          val body = response.body?.string().orEmpty()
-          throw IllegalStateException(
-            parseCodexError(
-              statusCode = response.code,
-              body = body,
-              responseMessage = response.message,
-              requestId = response.header("x-request-id") ?: response.header("request-id"),
-              contentType = response.header("content-type"),
+        if (turn == maxToolTurns - 1) {
+          throw IllegalStateException("OpenAI Codex exceeded the local-host tool turn limit")
+        }
+
+        result.toolCalls.forEach { toolCall ->
+          onToolEvent(
+            LocalHostToolCallEvent(
+              toolCallId = toolCall.callId,
+              name = toolCall.name,
+              args = parseJsonObjectOrNull(toolCall.argumentsJson),
+              phase = "start",
             ),
+          )
+          val executionResult =
+            try {
+              toolBridge?.executeToolCall(
+                role = role,
+                name = toolCall.name,
+                argumentsJson = toolCall.argumentsJson,
+              ) ?: LocalHostToolExecutionResult(
+                outputText = buildToolErrorOutput("UNKNOWN_TOOL", "UNKNOWN_TOOL: ${toolCall.name}"),
+              )
+            } catch (err: Throwable) {
+              LocalHostToolExecutionResult(
+                outputText = buildToolErrorOutput("TOOL_FAILED", err.message ?: "tool execution failed"),
+              )
+            }
+          onToolEvent(
+            LocalHostToolCallEvent(
+              toolCallId = toolCall.callId,
+              name = toolCall.name,
+              args = null,
+              phase = "result",
+            ),
+          )
+          inputItems += buildFunctionCallInput(toolCall)
+          inputItems += buildFunctionCallOutputInput(toolCall.callId, executionResult.outputText)
+          buildToolImageFollowUpInput(executionResult.imageInputs)?.let { inputItems += it }
+        }
+        turn += 1
+      }
+
+      val resolvedText = finalText?.takeIf { it.isNotBlank() }
+        ?: throw IllegalStateException("OpenAI Codex returned no final assistant text")
+      val persistedCredential =
+        if (credential.accountId == accountId && credential.email == oauthApi.extractEmail(credential.access)) {
+          credential
+        } else {
+          credential.copy(
+            accountId = accountId,
+            email = oauthApi.extractEmail(credential.access) ?: credential.email,
           )
         }
 
-        val reader = response.body?.charStream()?.buffered()
-          ?: throw IllegalStateException("OpenAI Codex returned no response body")
-        val eventLines = mutableListOf<String>()
-        val fullText = StringBuilder()
-        var responseId: String? = null
-        var finalText: String? = null
+      OpenAICodexAssistantReply(
+        text = resolvedText,
+        responseId = responseId,
+        credential = persistedCredential,
+      )
+    }
 
-        fun consumeEvent(raw: String) {
-          val trimmed = raw.trim()
-          if (trimmed.isEmpty() || trimmed == "[DONE]") return
-          val root = json.parseToJsonElement(trimmed) as? JsonObject ?: return
-          when (root["type"].asStringOrNull()) {
-            "response.created" -> {
-              responseId = root["response"].asObjectOrNull()?.get("id").asStringOrNull()
-            }
-            "response.output_text.delta" -> {
-              val delta = root["delta"].asStringOrNull().orEmpty()
-              if (delta.isEmpty()) return
-              fullText.append(delta)
-            }
-            "response.output_item.done" -> {
-              val item = root["item"].asObjectOrNull() ?: return
-              if (item["type"].asStringOrNull() != "message") return
-              val content = item["content"] as? JsonArray ?: return
-              val text = extractMessageText(content)
-              if (text.isNotBlank()) {
-                finalText = text
-              }
-            }
-            "response.completed", "response.done", "response.incomplete" -> {
-              responseId = root["response"].asObjectOrNull()?.get("id").asStringOrNull() ?: responseId
-              val response = root["response"].asObjectOrNull() ?: return
-              val output = response["output"] as? JsonArray ?: return
-              val text = extractResponseOutputText(output)
-              if (text.isNotBlank()) {
-                finalText = text
-              }
-            }
-            "response.failed" -> {
-              val error = root["response"].asObjectOrNull()?.get("error").asObjectOrNull()
-              val message = error?.get("message").asStringOrNull() ?: "OpenAI Codex request failed"
-              throw IllegalStateException(message)
-            }
-            "error" -> {
-              val message = root["message"].asStringOrNull() ?: "OpenAI Codex request failed"
-              throw IllegalStateException(message)
-            }
-          }
-        }
+  private suspend fun requestResponseTurn(
+    sessionId: String,
+    accountId: String,
+    credential: OpenAICodexCredential,
+    thinkingLevel: String,
+    inputItems: List<JsonObject>,
+    tools: List<LocalHostFunctionTool>,
+    onTextDelta: suspend (fullText: String) -> Unit,
+  ): CodexResponseTurn {
+    val requestBody =
+      buildRequestBody(
+        sessionId = sessionId,
+        inputItems = inputItems,
+        thinkingLevel = thinkingLevel,
+        tools = tools,
+      ).toString()
+        .toByteArray(Charsets.UTF_8)
+        .toRequestBody("application/json".toMediaType())
 
-        while (true) {
-          val line = reader.readLine() ?: break
-          if (line.isBlank()) {
-            if (eventLines.isNotEmpty()) {
-              val previous = fullText.toString()
-              consumeEvent(eventLines.joinToString(separator = "\n"))
-              if (fullText.toString() != previous) {
-                onTextDelta(fullText.toString())
-              }
-              eventLines.clear()
-            }
-            continue
-          }
-          if (line.startsWith("data:")) {
-            eventLines += line.removePrefix("data:").trim()
-          }
-        }
-        if (eventLines.isNotEmpty()) {
-          val previous = fullText.toString()
-          consumeEvent(eventLines.joinToString(separator = "\n"))
-          if (fullText.toString() != previous) {
-            onTextDelta(fullText.toString())
-          }
-        }
+    val request =
+      Request.Builder()
+        .url(responsesUrl)
+        .post(requestBody)
+        .header("Authorization", "Bearer ${credential.access}")
+        .header("chatgpt-account-id", accountId)
+        .header("originator", defaultOriginator)
+        .header("User-Agent", codexUserAgent)
+        .header("OpenAI-Beta", "responses=experimental")
+        .header("accept", "text/event-stream")
+        .header("x-client-request-id", sessionId)
+        .header("session_id", sessionId)
+        .build()
 
-        val resolvedText = finalText?.takeIf { it.isNotBlank() } ?: fullText.toString().trim()
-        if (resolvedText.isBlank()) {
-          throw IllegalStateException("OpenAI Codex returned an empty response")
-        }
-
-        val persistedCredential =
-          if (credential.accountId == accountId && credential.email == oauthApi.extractEmail(credential.access)) {
-            credential
-          } else {
-            credential.copy(
-              accountId = accountId,
-              email = oauthApi.extractEmail(credential.access) ?: credential.email,
-            )
-          }
-
-        OpenAICodexAssistantReply(
-          text = resolvedText,
-          responseId = responseId,
-          credential = persistedCredential,
+    client.newCall(request).execute().use { response ->
+      if (!response.isSuccessful) {
+        val body = response.body?.string().orEmpty()
+        throw IllegalStateException(
+          parseCodexError(
+            statusCode = response.code,
+            body = body,
+            responseMessage = response.message,
+            requestId = response.header("x-request-id") ?: response.header("request-id"),
+            contentType = response.header("content-type"),
+          ),
         )
       }
+
+      val reader = response.body?.charStream()?.buffered()
+        ?: throw IllegalStateException("OpenAI Codex returned no response body")
+      val eventLines = mutableListOf<String>()
+      val fullText = StringBuilder()
+      val toolCalls = LinkedHashMap<String, CodexFunctionCall>()
+      var responseId: String? = null
+      var finalText: String? = null
+
+      fun consumeEvent(raw: String) {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || trimmed == "[DONE]") return
+        val root = json.parseToJsonElement(trimmed) as? JsonObject ?: return
+        when (root["type"].asStringOrNull()) {
+          "response.created" -> {
+            responseId = root["response"].asObjectOrNull()?.get("id").asStringOrNull()
+          }
+          "response.output_text.delta" -> {
+            val delta = root["delta"].asStringOrNull().orEmpty()
+            if (delta.isNotEmpty()) {
+              fullText.append(delta)
+            }
+          }
+          "response.output_item.done" -> {
+            val item = root["item"].asObjectOrNull() ?: return
+            when (item["type"].asStringOrNull()) {
+              "message" -> {
+                val content = item["content"] as? JsonArray ?: return
+                val text = extractMessageText(content)
+                if (text.isNotBlank()) {
+                  finalText = text
+                }
+              }
+              "function_call" -> {
+                extractFunctionCall(item)?.let { toolCalls[it.callId] = it }
+              }
+            }
+          }
+          "response.completed", "response.done", "response.incomplete" -> {
+            responseId = root["response"].asObjectOrNull()?.get("id").asStringOrNull() ?: responseId
+            val responseBody = root["response"].asObjectOrNull() ?: return
+            val output = responseBody["output"] as? JsonArray ?: return
+            val text = extractResponseOutputText(output)
+            if (text.isNotBlank()) {
+              finalText = text
+            }
+            extractFunctionCalls(output).forEach { toolCall ->
+              toolCalls[toolCall.callId] = toolCall
+            }
+          }
+          "response.failed" -> {
+            val error = root["response"].asObjectOrNull()?.get("error").asObjectOrNull()
+            val message = error?.get("message").asStringOrNull() ?: "OpenAI Codex request failed"
+            throw IllegalStateException(message)
+          }
+          "error" -> {
+            val message = root["message"].asStringOrNull() ?: "OpenAI Codex request failed"
+            throw IllegalStateException(message)
+          }
+        }
+      }
+
+      while (true) {
+        val line = reader.readLine() ?: break
+        if (line.isBlank()) {
+          if (eventLines.isNotEmpty()) {
+            val previous = fullText.toString()
+            consumeEvent(eventLines.joinToString(separator = "\n"))
+            if (fullText.toString() != previous) {
+              onTextDelta(fullText.toString())
+            }
+            eventLines.clear()
+          }
+          continue
+        }
+        if (line.startsWith("data:")) {
+          eventLines += line.removePrefix("data:").trim()
+        }
+      }
+      if (eventLines.isNotEmpty()) {
+        val previous = fullText.toString()
+        consumeEvent(eventLines.joinToString(separator = "\n"))
+        if (fullText.toString() != previous) {
+          onTextDelta(fullText.toString())
+        }
+      }
+
+      val resolvedText = finalText?.takeIf { it.isNotBlank() } ?: fullText.toString().trim()
+      return CodexResponseTurn(
+        responseId = responseId,
+        text = resolvedText.ifEmpty { null },
+        toolCalls = toolCalls.values.toList(),
+      )
     }
+  }
 
   private fun buildRequestBody(
     sessionId: String,
-    messages: List<LocalHostMessage>,
+    inputItems: List<JsonObject>,
     thinkingLevel: String,
+    tools: List<LocalHostFunctionTool>,
   ): JsonObject {
     return buildJsonObject {
       put("model", JsonPrimitive(defaultModelId))
       put("store", JsonPrimitive(false))
       put("stream", JsonPrimitive(true))
       put("instructions", JsonPrimitive(instructions))
-      put("input", buildJsonArray {
-        messages.forEachIndexed { index, message ->
-          when (message.role) {
-            "user" ->
-              add(
-                buildJsonObject {
-                  put("type", JsonPrimitive("message"))
-                  put("role", JsonPrimitive("user"))
-                  put("content", buildUserContent(message.content))
-                },
-              )
-            "assistant" ->
-              add(
-                buildJsonObject {
-                  put("type", JsonPrimitive("message"))
-                  put("role", JsonPrimitive("assistant"))
-                  put(
-                    "content",
-                    buildJsonArray {
-                      val text =
-                        message.content
-                          .filter { it.type == "text" }
-                          .joinToString(separator = "\n") { it.text.orEmpty() }
-                          .trim()
-                      if (text.isNotEmpty()) {
-                        add(
-                          buildJsonObject {
-                            put("type", JsonPrimitive("output_text"))
-                            put("text", JsonPrimitive(text))
-                            put("annotations", JsonArray(emptyList()))
-                          },
-                        )
-                      }
-                    },
-                  )
-                  put("status", JsonPrimitive("completed"))
-                  put("id", JsonPrimitive("msg_$index"))
-                },
-              )
-          }
-        }
-      })
-      put("tools", JsonArray(emptyList()))
+      put(
+        "input",
+        buildJsonArray {
+          inputItems.forEach { add(it) }
+        },
+      )
+      put(
+        "tools",
+        buildJsonArray {
+          tools.forEach { add(it.asJsonObject()) }
+        },
+      )
       put("tool_choice", JsonPrimitive("auto"))
       put("parallel_tool_calls", JsonPrimitive(false))
       val reasoning = normalizeThinkingEffort(thinkingLevel)
@@ -353,6 +420,162 @@ class OpenAICodexResponsesClient(
       }
     }
   }
+
+  private fun buildConversationInput(messages: List<LocalHostMessage>): List<JsonObject> {
+    return messages.mapIndexedNotNull { index, message ->
+      when (message.role) {
+        "user" ->
+          buildJsonObject {
+            put("type", JsonPrimitive("message"))
+            put("role", JsonPrimitive("user"))
+            put("content", buildUserContent(message.content))
+          }
+        "assistant" ->
+          buildJsonObject {
+            put("type", JsonPrimitive("message"))
+            put("role", JsonPrimitive("assistant"))
+            put(
+              "content",
+              buildJsonArray {
+                val text =
+                  message.content
+                    .filter { it.type == "text" }
+                    .joinToString(separator = "\n") { it.text.orEmpty() }
+                    .trim()
+                if (text.isNotEmpty()) {
+                  add(
+                    buildJsonObject {
+                      put("type", JsonPrimitive("output_text"))
+                      put("text", JsonPrimitive(text))
+                      put("annotations", JsonArray(emptyList()))
+                    },
+                  )
+                }
+              },
+            )
+            put("status", JsonPrimitive("completed"))
+            put("id", JsonPrimitive("msg_$index"))
+          }
+        else -> null
+      }
+    }
+  }
+
+  private fun buildFunctionCallInput(toolCall: CodexFunctionCall): JsonObject {
+    return buildJsonObject {
+      put("type", JsonPrimitive("function_call"))
+      // Replaying function_call.id can be rejected when OpenAI hides the paired reasoning item.
+      put("call_id", JsonPrimitive(toolCall.callId))
+      put("name", JsonPrimitive(toolCall.name))
+      put("arguments", JsonPrimitive(toolCall.argumentsJson))
+    }
+  }
+
+  private fun buildFunctionCallOutputInput(
+    callId: String,
+    output: String,
+  ): JsonObject =
+    buildJsonObject {
+      put("type", JsonPrimitive("function_call_output"))
+      put("call_id", JsonPrimitive(callId))
+      put("output", JsonPrimitive(output))
+    }
+
+  private fun buildToolImageFollowUpInput(
+    imageInputs: List<LocalHostToolImageInput>,
+  ): JsonObject? {
+    if (imageInputs.isEmpty()) return null
+    return buildJsonObject {
+      put("type", JsonPrimitive("message"))
+      put("role", JsonPrimitive("user"))
+      put(
+        "content",
+        buildJsonArray {
+          add(
+            buildJsonObject {
+              put("type", JsonPrimitive("input_text"))
+              put(
+                "text",
+                JsonPrimitive(
+                  if (imageInputs.size == 1) {
+                    "Attached image from the phone tool result."
+                  } else {
+                    "Attached images from the phone tool result."
+                  },
+                ),
+              )
+            },
+          )
+          imageInputs.forEach { image ->
+            add(
+              buildJsonObject {
+                put("type", JsonPrimitive("input_image"))
+                put("detail", JsonPrimitive("auto"))
+                put("image_url", JsonPrimitive("data:${image.mimeType};base64,${image.base64}"))
+              },
+            )
+          }
+        },
+      )
+    }
+  }
+
+  private fun buildToolErrorOutput(
+    code: String,
+    message: String,
+  ): String =
+    buildJsonObject {
+      put("ok", JsonPrimitive(false))
+      put(
+        "error",
+        buildJsonObject {
+          put("code", JsonPrimitive(code))
+          put("message", JsonPrimitive(message))
+        },
+      )
+    }.toString()
+
+  private fun extractFunctionCalls(output: JsonArray): List<CodexFunctionCall> {
+    return output.mapNotNull { extractFunctionCall(it as? JsonObject ?: return@mapNotNull null) }
+  }
+
+  private fun extractFunctionCall(item: JsonObject): CodexFunctionCall? {
+    if (item["type"].asStringOrNull() != "function_call") {
+      return null
+    }
+    val callId = item["call_id"].asStringOrNull()?.trim().orEmpty()
+    val name = item["name"].asStringOrNull()?.trim().orEmpty()
+    if (callId.isEmpty() || name.isEmpty()) {
+      return null
+    }
+    return CodexFunctionCall(
+      callId = callId,
+      itemId = item["id"].asStringOrNull()?.trim()?.takeIf { it.isNotEmpty() },
+      name = name,
+      argumentsJson = item["arguments"].asStringOrNull()?.trim().orEmpty().ifEmpty { "{}" },
+    )
+  }
+
+  private fun parseJsonObjectOrNull(raw: String): JsonObject? {
+    return try {
+      json.parseToJsonElement(raw).asObjectOrNull()
+    } catch (_: Throwable) {
+      null
+    }
+  }
+
+  private data class CodexFunctionCall(
+    val callId: String,
+    val itemId: String?,
+    val name: String,
+    val argumentsJson: String,
+  )
+
+  private data class CodexResponseTurn(
+    val responseId: String?,
+    val text: String?,
+    val toolCalls: List<CodexFunctionCall>,
+  )
 
   private fun buildUserContent(content: List<ChatMessageContent>): JsonArray {
     return buildJsonArray {

@@ -85,6 +85,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val localHostRemoteAccessWriteCommandsEnabled: StateFlow<Boolean> = prefs.localHostRemoteAccessWriteCommandsEnabled
   val localHostRemoteAccessPort: StateFlow<Int> = prefs.localHostRemoteAccessPort
   val localHostRemoteAccessToken: StateFlow<String> = prefs.localHostRemoteAccessToken
+  val localHostDedicatedDeploymentEnabled: StateFlow<Boolean> = prefs.localHostDedicatedDeploymentEnabled
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
@@ -166,6 +167,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setGatewayConnectionMode(value: GatewayConnectionMode) {
     prefs.setGatewayConnectionMode(value)
+    LocalHostDedicatedDeploymentManager.reconcileKeepAlive(getApplication())
   }
 
   fun setLocalHostRemoteAccessEnabled(value: Boolean) {
@@ -186,6 +188,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun regenerateLocalHostRemoteAccessToken() {
     prefs.regenerateLocalHostRemoteAccessToken()
+  }
+
+  fun setLocalHostDedicatedDeploymentEnabled(value: Boolean) {
+    prefs.setLocalHostDedicatedDeploymentEnabled(value)
+    LocalHostDedicatedDeploymentManager.reconcileKeepAlive(getApplication())
   }
 
   fun setManualEnabled(value: Boolean) {
@@ -233,10 +240,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   }
 
   fun setOnboardingCompleted(value: Boolean) {
+    prefs.setOnboardingCompleted(value)
     if (value) {
       ensureRuntime()
     }
-    prefs.setOnboardingCompleted(value)
+    LocalHostDedicatedDeploymentManager.reconcileKeepAlive(getApplication())
   }
 
   fun setCanvasDebugStatusEnabled(value: Boolean) {

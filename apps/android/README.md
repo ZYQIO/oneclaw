@@ -8,6 +8,26 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - Self-check gate / 自检门槛: `apps/android/local-host-self-check.md`
 - Session handoff / 接续手册: `apps/android/local-host-handoff.md`
 
+### Local Host Scope Today / 当前 Local Host 范围
+
+- `Local Host` currently provides on-device Codex-backed chat, a curated Android command surface, an app-private on-device workspace for text files with search/edit/copy/move support, and a dedicated idle-phone deployment mode that can keep the host service alive across app relaunches, package upgrades, and reboots.
+- It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
+- If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
+
+### Dedicated Host Deployment / 专用 Host 部署
+
+- Use this mode when an idle Android phone should behave like a small always-on OpenClaw host.
+- When enabled in `Connect -> Local Host`, the app keeps the foreground service alive, restores it after reboot or app updates, and attempts to auto-heal the Local Host connection if it drops.
+- The Local Host screen now also surfaces Android battery-optimization state and links to the battery-exemption flow, because that exemption materially improves dedicated-host restart behavior on real phones.
+- Remote `device.status` now includes `backgroundExecution.batteryOptimizationIgnored`, so a remote operator can tell whether the phone is in a better keepalive posture.
+- Remote `/status` now also includes a `host.deployment` block with dedicated-host readiness fields such as `dedicatedEnabled`, `keepAliveEligible`, and `batteryOptimizationIgnored`.
+- Real-device validation now confirms the battery-exemption CTA can flip both Android's `deviceidle` whitelist state and remote `/status.host.deployment.batteryOptimizationIgnored=true`.
+- If Android removes the foreground service task while dedicated mode is enabled, OpenClaw now schedules a short recovery alarm so the local host can come back instead of waiting only for a manual reopen or reboot.
+- Dedicated mode now also keeps a low-frequency watchdog alarm armed, so long-idle phones have another path to restart the foreground service even when the short recovery path was never triggered.
+- On the validated OPPO / ColorOS phone, swiping the OpenClaw card away from Recents still force-stops the package and clears alarms even after the battery exemption is granted, so dedicated deployments on that device family should keep the app locked in Recents and avoid swipe-to-clear.
+- The Local Host UI and readiness snapshot now surface this OEM background-policy risk so the idle-phone deployment story is explicit instead of implicit.
+- This is a keepalive layer for the current Android-native host. It is not yet the full desktop shell/browser/plugin runtime embedded in the APK.
+
 ### Rebuild Checklist
 
 - [x] New 4-step onboarding flow

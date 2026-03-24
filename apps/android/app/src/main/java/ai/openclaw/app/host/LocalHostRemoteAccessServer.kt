@@ -2,17 +2,6 @@ package ai.openclaw.app.host
 
 import android.net.Uri
 import ai.openclaw.app.gateway.GatewaySession
-import ai.openclaw.app.protocol.OpenClawCalendarCommand
-import ai.openclaw.app.protocol.OpenClawCameraCommand
-import ai.openclaw.app.protocol.OpenClawCallLogCommand
-import ai.openclaw.app.protocol.OpenClawContactsCommand
-import ai.openclaw.app.protocol.OpenClawDeviceCommand
-import ai.openclaw.app.protocol.OpenClawLocationCommand
-import ai.openclaw.app.protocol.OpenClawMotionCommand
-import ai.openclaw.app.protocol.OpenClawNotificationsCommand
-import ai.openclaw.app.protocol.OpenClawPhotosCommand
-import ai.openclaw.app.protocol.OpenClawSmsCommand
-import ai.openclaw.app.protocol.OpenClawSystemCommand
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
 import java.net.InetSocketAddress
@@ -178,35 +167,6 @@ class LocalHostRemoteAccessServer(
     private const val defaultTimeoutMs = 30_000L
     private const val maxEventWaitMs = 20_000L
     private const val maxEventsPerResponse = 100
-    private val baseAllowedInvokeCommands: List<String> =
-      listOf(
-        OpenClawCalendarCommand.Events.rawValue,
-        OpenClawCallLogCommand.Search.rawValue,
-        OpenClawContactsCommand.Search.rawValue,
-        OpenClawDeviceCommand.Health.rawValue,
-        OpenClawDeviceCommand.Info.rawValue,
-        OpenClawDeviceCommand.Permissions.rawValue,
-        OpenClawDeviceCommand.Status.rawValue,
-        OpenClawLocationCommand.Get.rawValue,
-        OpenClawMotionCommand.Activity.rawValue,
-        OpenClawMotionCommand.Pedometer.rawValue,
-        OpenClawNotificationsCommand.List.rawValue,
-        OpenClawPhotosCommand.Latest.rawValue,
-        OpenClawSystemCommand.Notify.rawValue,
-      )
-    private val advancedAllowedInvokeCommands: List<String> =
-      listOf(
-        OpenClawCameraCommand.Clip.rawValue,
-        OpenClawCameraCommand.List.rawValue,
-        OpenClawCameraCommand.Snap.rawValue,
-      )
-    private val writeAllowedInvokeCommands: List<String> =
-      listOf(
-        OpenClawCalendarCommand.Add.rawValue,
-        OpenClawContactsCommand.Add.rawValue,
-        OpenClawNotificationsCommand.Actions.rawValue,
-        OpenClawSmsCommand.Send.rawValue,
-      )
   }
 
   private val _state = MutableStateFlow(LocalHostRemoteAccessState())
@@ -628,7 +588,7 @@ class LocalHostRemoteAccessServer(
           put(
             "readCommands",
             buildJsonArray {
-              baseAllowedInvokeCommands.forEach { command ->
+              LocalHostCommandPolicy.baseRemoteCommands.forEach { command ->
                 add(JsonPrimitive(command))
               }
             },
@@ -636,7 +596,7 @@ class LocalHostRemoteAccessServer(
           put(
             "advancedCommands",
             buildJsonArray {
-              advancedAllowedInvokeCommands.forEach { command ->
+              LocalHostCommandPolicy.advancedRemoteCommands.forEach { command ->
                 add(JsonPrimitive(command))
               }
             },
@@ -644,7 +604,7 @@ class LocalHostRemoteAccessServer(
           put(
             "writeCommands",
             buildJsonArray {
-              writeAllowedInvokeCommands.forEach { command ->
+              LocalHostCommandPolicy.writeRemoteCommands.forEach { command ->
                 add(JsonPrimitive(command))
               }
             },
@@ -1078,15 +1038,10 @@ class LocalHostRemoteAccessServer(
   }
 
   private fun allowedInvokeCommands(): List<String> {
-    val commands = mutableListOf<String>()
-    commands.addAll(baseAllowedInvokeCommands)
-    if (allowAdvancedInvokeCommands()) {
-      commands.addAll(advancedAllowedInvokeCommands)
-    }
-    if (allowWriteInvokeCommands()) {
-      commands.addAll(writeAllowedInvokeCommands)
-    }
-    return commands
+    return LocalHostCommandPolicy.allowedRemoteCommands(
+      allowAdvanced = allowAdvancedInvokeCommands(),
+      allowWrite = allowWriteInvokeCommands(),
+    ).toList()
   }
 }
 

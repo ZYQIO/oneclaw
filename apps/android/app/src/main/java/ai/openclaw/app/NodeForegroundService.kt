@@ -9,26 +9,37 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
+import ai.openclaw.app.node.Quad
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class NodeForegroundService : Service() {
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private var notificationJob: Job? = null
+  private var keepAliveJob: Job? = null
   private var didStartForeground = false
 
   override fun onCreate() {
     super.onCreate()
+    cancelDedicatedHostServiceRecovery(applicationContext)
+    LocalHostDedicatedDeploymentManager.scheduleWatchdogIfNeeded(applicationContext)
     ensureChannel()
     val initial = buildNotification(title = "OpenClaw Node", text = "Starting…")
     startForegroundWithTypes(notification = initial)
 
-    val runtime = (application as NodeApp).peekRuntime()
+    val app = application as NodeApp
+    val runtime =
+      when {
+        app.prefs.onboardingCompleted.value -> app.ensureRuntime()
+        else -> app.peekRuntime()
+      }
     if (runtime == null) {
       stopSelf()
       return
@@ -58,6 +69,31 @@ class NodeForegroundService : Service() {
           )
         }
       }
+    keepAliveJob =
+      scope.launch {
+        combine(
+          app.prefs.localHostDedicatedDeploymentEnabled,
+          app.prefs.onboardingCompleted,
+          app.prefs.gatewayConnectionMode,
+          runtime.isConnected,
+        ) { dedicatedEnabled, onboardingCompleted, connectionMode, connected ->
+          Quad(dedicatedEnabled, onboardingCompleted, connectionMode, connected)
+        }.collectLatest { (dedicatedEnabled, onboardingCompleted, connectionMode, connected) ->
+          if (!dedicatedEnabled || !onboardingCompleted || connectionMode != GatewayConnectionMode.LocalHost || connected) {
+            return@collectLatest
+          }
+          delay(dedicatedReconnectDelayMs)
+          if (
+            app.prefs.localHostDedicatedDeploymentEnabled.value &&
+            app.prefs.onboardingCompleted.value &&
+            app.prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost &&
+            !runtime.isConnected.value
+          ) {
+            runtime.setForeground(false)
+            runtime.refreshGatewayConnection()
+          }
+        }
+      }
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -68,14 +104,22 @@ class NodeForegroundService : Service() {
         return START_NOT_STICKY
       }
     }
+    LocalHostDedicatedDeploymentManager.scheduleWatchdogIfNeeded(applicationContext)
     // Keep running; connection is managed by NodeRuntime (auto-reconnect + manual).
     return START_STICKY
   }
 
   override fun onDestroy() {
     notificationJob?.cancel()
+    keepAliveJob?.cancel()
     scope.cancel()
+    LocalHostDedicatedDeploymentManager.scheduleServiceRecoveryIfNeeded(applicationContext)
     super.onDestroy()
+  }
+
+  override fun onTaskRemoved(rootIntent: Intent?) {
+    LocalHostDedicatedDeploymentManager.scheduleServiceRecoveryIfNeeded(applicationContext)
+    super.onTaskRemoved(rootIntent)
   }
 
   override fun onBind(intent: Intent?) = null
@@ -144,6 +188,7 @@ class NodeForegroundService : Service() {
   companion object {
     private const val CHANNEL_ID = "connection"
     private const val NOTIFICATION_ID = 1
+    private const val dedicatedReconnectDelayMs = 3_000L
 
     private const val ACTION_STOP = "ai.openclaw.app.action.STOP"
 

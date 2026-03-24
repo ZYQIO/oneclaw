@@ -20,8 +20,12 @@ import ai.openclaw.app.gateway.MutableGatewayRpcClient
 import ai.openclaw.app.gateway.MutableNodeGatewayRpcClient
 import ai.openclaw.app.gateway.GatewaySession
 import ai.openclaw.app.gateway.probeGatewayTlsFingerprint
+import ai.openclaw.app.host.CompositeLocalHostToolBridge
+import ai.openclaw.app.host.LocalHostNodesToolBridge
 import ai.openclaw.app.host.LocalHostRemoteAccessServer
 import ai.openclaw.app.host.LocalHostRuntime
+import ai.openclaw.app.host.LocalHostWorkspaceToolBridge
+import ai.openclaw.app.host.OpenAICodexResponsesClient
 import ai.openclaw.app.node.*
 import ai.openclaw.app.protocol.OpenClawCanvasA2UIAction
 import ai.openclaw.app.voice.MicCaptureManager
@@ -45,6 +49,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
@@ -180,10 +185,47 @@ class NodeRuntime(
     motionPedometerAvailable = { motionHandler.isPedometerAvailable() },
   )
 
+  private val localHostNodesToolBridge: LocalHostNodesToolBridge = LocalHostNodesToolBridge(
+    json = json,
+    invoke = { command, paramsJson ->
+      invokeDispatcher.handleInvoke(command, paramsJson)
+    },
+    allowAdvancedRemoteCommands = {
+      prefs.localHostRemoteAccessAdvancedCommandsEnabled.value
+    },
+    allowWriteRemoteCommands = {
+      prefs.localHostRemoteAccessWriteCommandsEnabled.value
+    },
+  )
+
+  private val localHostWorkspaceToolBridge: LocalHostWorkspaceToolBridge = LocalHostWorkspaceToolBridge(
+    json = json,
+    workspaceRoot = File(appContext.filesDir, "openclaw/local-host-workspace"),
+    allowWriteRemoteActions = {
+      prefs.localHostRemoteAccessWriteCommandsEnabled.value
+    },
+  )
+
+  private val localHostCompositeToolBridge: CompositeLocalHostToolBridge = CompositeLocalHostToolBridge(
+    listOf(
+      localHostNodesToolBridge,
+      localHostWorkspaceToolBridge,
+    ),
+  )
+
   private val localHostRuntime: LocalHostRuntime = LocalHostRuntime(
     scope = scope,
     prefs = prefs,
     json = json,
+    deploymentStatusProvider = {
+      dedicatedHostDeploymentStatusSnapshot(appContext, prefs)
+    },
+    codexClient =
+      OpenAICodexResponsesClient(
+        prefs = prefs,
+        json = json,
+        toolBridge = localHostCompositeToolBridge,
+      ),
   )
 
   private val localHostRemoteAccessServer: LocalHostRemoteAccessServer = LocalHostRemoteAccessServer(
@@ -286,7 +328,7 @@ class NodeRuntime(
   private val _seamColorArgb = MutableStateFlow(DEFAULT_SEAM_COLOR_ARGB)
   val seamColorArgb: StateFlow<Long> = _seamColorArgb.asStateFlow()
 
-  private val _isForeground = MutableStateFlow(true)
+  private val _isForeground = MutableStateFlow(false)
   val isForeground: StateFlow<Boolean> = _isForeground.asStateFlow()
 
   private var gatewayDefaultAgentId: String? = null

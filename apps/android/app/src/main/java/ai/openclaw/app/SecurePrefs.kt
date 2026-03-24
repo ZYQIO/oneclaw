@@ -23,10 +23,13 @@ class SecurePrefs(
   companion object {
     val defaultWakeWords: List<String> = listOf("openclaw", "claude")
     private const val defaultLocalHostRemoteAccessPort = 3945
-    private const val displayNameKey = "node.displayName"
-    private const val locationModeKey = "location.enabledMode"
-    private const val voiceWakeModeKey = "voiceWake.mode"
-    private const val plainPrefsName = "openclaw.node"
+    internal const val displayNameKey = "node.displayName"
+    internal const val locationModeKey = "location.enabledMode"
+    internal const val voiceWakeModeKey = "voiceWake.mode"
+    internal const val plainPrefsName = "openclaw.node"
+    internal const val gatewayConnectionModeKey = "gateway.connection.mode"
+    internal const val onboardingCompletedKey = "onboarding.completed"
+    internal const val localHostDedicatedDeploymentEnabledKey = "localHost.dedicatedDeployment.enabled"
     private const val securePrefsName = "openclaw.node.secure"
   }
 
@@ -85,6 +88,10 @@ class SecurePrefs(
     MutableStateFlow(loadOrCreateLocalHostRemoteAccessToken())
   val localHostRemoteAccessToken: StateFlow<String> = _localHostRemoteAccessToken
 
+  private val _localHostDedicatedDeploymentEnabled =
+    MutableStateFlow(plainPrefs.getBoolean(localHostDedicatedDeploymentEnabledKey, false))
+  val localHostDedicatedDeploymentEnabled: StateFlow<Boolean> = _localHostDedicatedDeploymentEnabled
+
   private val _manualEnabled =
     MutableStateFlow(plainPrefs.getBoolean("gateway.manual.enabled", false))
   val manualEnabled: StateFlow<Boolean> = _manualEnabled
@@ -108,7 +115,7 @@ class SecurePrefs(
   val gatewayBootstrapToken: StateFlow<String> = _gatewayBootstrapToken
 
   private val _onboardingCompleted =
-    MutableStateFlow(plainPrefs.getBoolean("onboarding.completed", false))
+    MutableStateFlow(plainPrefs.getBoolean(onboardingCompletedKey, false))
   val onboardingCompleted: StateFlow<Boolean> = _onboardingCompleted
 
   private val _lastDiscoveredStableId =
@@ -169,7 +176,7 @@ class SecurePrefs(
   }
 
   fun setGatewayConnectionMode(value: GatewayConnectionMode) {
-    plainPrefs.edit { putString("gateway.connection.mode", value.rawValue) }
+    plainPrefs.edit { putString(gatewayConnectionModeKey, value.rawValue) }
     _gatewayConnectionMode.value = value
   }
 
@@ -198,6 +205,11 @@ class SecurePrefs(
     securePrefs.edit { putString("localHost.remoteAccess.token", token) }
     _localHostRemoteAccessToken.value = token
     return token
+  }
+
+  fun setLocalHostDedicatedDeploymentEnabled(value: Boolean) {
+    plainPrefs.edit { putBoolean(localHostDedicatedDeploymentEnabledKey, value) }
+    _localHostDedicatedDeploymentEnabled.value = value
   }
 
   fun setManualEnabled(value: Boolean) {
@@ -236,7 +248,7 @@ class SecurePrefs(
   }
 
   fun setOnboardingCompleted(value: Boolean) {
-    plainPrefs.edit { putBoolean("onboarding.completed", value) }
+    plainPrefs.edit { putBoolean(onboardingCompletedKey, value) }
     _onboardingCompleted.value = value
   }
 
@@ -412,7 +424,7 @@ class SecurePrefs(
   }
 
   private fun loadGatewayConnectionMode(): GatewayConnectionMode {
-    val stored = plainPrefs.getString("gateway.connection.mode", null)
+    val stored = plainPrefs.getString(gatewayConnectionModeKey, null)
     return GatewayConnectionMode.fromRawValue(stored)
   }
 

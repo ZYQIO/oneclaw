@@ -46,6 +46,7 @@ class DeviceHandlerTest {
     val storage = payload.getValue("storage").jsonObject
     val thermal = payload.getValue("thermal").jsonObject
     val network = payload.getValue("network").jsonObject
+    val backgroundExecution = payload.getValue("backgroundExecution").jsonObject
 
     val state = battery.getValue("state").jsonPrimitive.content
     assertTrue(state in setOf("unknown", "unplugged", "charging", "full"))
@@ -69,6 +70,15 @@ class DeviceHandlerTest {
     assertTrue(networkStatus in setOf("satisfied", "unsatisfied", "requiresConnection"))
     val interfaces = network.getValue("interfaces").jsonArray.map { it.jsonPrimitive.content }
     assertTrue(interfaces.all { it in setOf("wifi", "cellular", "wired", "other") })
+    assertTrue(backgroundExecution.getValue("manufacturer").jsonPrimitive.content.isNotBlank())
+    backgroundExecution.getValue("batteryOptimizationIgnored").jsonPrimitive.boolean
+    backgroundExecution.getValue("backgroundRestricted").jsonPrimitive.boolean
+    assertTrue(
+      backgroundExecution.getValue("appStandbyBucket").jsonPrimitive.content in
+        setOf("active", "working_set", "frequent", "rare", "restricted", "unknown"),
+    )
+    backgroundExecution.getValue("recentsSwipeForceStopRisk").jsonPrimitive.boolean
+    backgroundExecution.getValue("taskLockRecommended").jsonPrimitive.boolean
 
     assertTrue(payload.getValue("uptimeSeconds").jsonPrimitive.double >= 0.0)
   }

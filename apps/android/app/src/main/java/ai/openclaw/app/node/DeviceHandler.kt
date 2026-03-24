@@ -2,6 +2,7 @@ package ai.openclaw.app.node
 
 import android.Manifest
 import android.app.ActivityManager
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -16,6 +17,9 @@ import android.os.StatFs
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import ai.openclaw.app.BuildConfig
+import ai.openclaw.app.dedicatedHostManufacturerLabel
+import ai.openclaw.app.dedicatedHostRecentsSwipeForceStopRisk
+import ai.openclaw.app.isDedicatedHostBatteryOptimizationIgnored
 import ai.openclaw.app.gateway.GatewaySession
 import java.util.Locale
 import kotlinx.serialization.json.JsonPrimitive
@@ -60,6 +64,10 @@ class DeviceHandler(
     val activeNetwork = connectivity?.activeNetwork
     val caps = activeNetwork?.let { connectivity.getNetworkCapabilities(it) }
     val uptimeSeconds = SystemClock.elapsedRealtime() / 1_000.0
+    val batteryOptimizationIgnored = isDedicatedHostBatteryOptimizationIgnored(appContext)
+    val activityManager = appContext.getSystemService(ActivityManager::class.java)
+    val usageStatsManager = appContext.getSystemService(UsageStatsManager::class.java)
+    val recentsSwipeForceStopRisk = dedicatedHostRecentsSwipeForceStopRisk()
 
     return buildJsonObject {
       put(
@@ -101,6 +109,17 @@ class DeviceHandler(
             ),
           )
           put("interfaces", networkInterfacesJson(caps))
+        },
+      )
+      put(
+        "backgroundExecution",
+        buildJsonObject {
+          put("manufacturer", JsonPrimitive(dedicatedHostManufacturerLabel()))
+          put("batteryOptimizationIgnored", JsonPrimitive(batteryOptimizationIgnored))
+          put("backgroundRestricted", JsonPrimitive(activityManager?.isBackgroundRestricted == true))
+          put("appStandbyBucket", JsonPrimitive(mapStandbyBucket(usageStatsManager?.appStandbyBucket)))
+          put("recentsSwipeForceStopRisk", JsonPrimitive(recentsSwipeForceStopRisk))
+          put("taskLockRecommended", JsonPrimitive(recentsSwipeForceStopRisk))
         },
       )
       put("uptimeSeconds", JsonPrimitive(uptimeSeconds))
@@ -357,6 +376,17 @@ class DeviceHandler(
       caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) -> "satisfied"
       caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) -> "requiresConnection"
       else -> "unsatisfied"
+    }
+  }
+
+  private fun mapStandbyBucket(bucket: Int?): String {
+    return when (bucket) {
+      UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "active"
+      UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "working_set"
+      UsageStatsManager.STANDBY_BUCKET_FREQUENT -> "frequent"
+      UsageStatsManager.STANDBY_BUCKET_RARE -> "rare"
+      UsageStatsManager.STANDBY_BUCKET_RESTRICTED -> "restricted"
+      else -> "unknown"
     }
   }
 

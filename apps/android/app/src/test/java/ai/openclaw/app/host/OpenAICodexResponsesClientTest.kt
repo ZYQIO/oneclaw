@@ -67,6 +67,7 @@ class OpenAICodexResponsesClientTest {
 
         val reply =
           client.streamReply(
+            role = "operator",
             sessionId = "session-123",
             messages =
               listOf(
@@ -78,6 +79,7 @@ class OpenAICodexResponsesClientTest {
               ),
             thinkingLevel = "off",
             onTextDelta = {},
+            onToolEvent = {},
           )
 
         assertEquals("Android local host is working.", reply.text)
@@ -150,6 +152,7 @@ class OpenAICodexResponsesClientTest {
 
         try {
           client.streamReply(
+            role = "operator",
             sessionId = "session-123",
             messages =
               listOf(
@@ -161,6 +164,7 @@ class OpenAICodexResponsesClientTest {
               ),
             thinkingLevel = "off",
             onTextDelta = {},
+            onToolEvent = {},
           )
           fail("Expected streamReply to throw on a 400 response")
         } catch (error: IllegalStateException) {
@@ -169,6 +173,249 @@ class OpenAICodexResponsesClientTest {
           assertTrue(error.message.orEmpty().contains("errorCode=instructions_required"))
           assertTrue(error.message.orEmpty().contains("requestId=req_123"))
         }
+      } finally {
+        server.shutdown()
+      }
+    }
+
+  @Test
+  fun streamReply_executesToolCallsBeforeReturningFinalText() =
+    runTest {
+      val server = MockWebServer()
+      server.enqueue(
+        MockResponse()
+          .setResponseCode(200)
+          .addHeader("Content-Type", "text/event-stream")
+          .setBody(
+            """
+            data: {"type":"response.output_item.done","item":{"type":"function_call","id":"fc_nodes_1","call_id":"call_nodes_1","name":"nodes","arguments":"{\"action\":\"device_status\"}"}}
+
+            data: {"type":"response.completed","response":{"id":"resp_tool_1","output":[{"type":"function_call","id":"fc_nodes_1","call_id":"call_nodes_1","name":"nodes","arguments":"{\"action\":\"device_status\"}"}]}}
+
+            """.trimIndent(),
+          ),
+      )
+      server.enqueue(
+        MockResponse()
+          .setResponseCode(200)
+          .addHeader("Content-Type", "text/event-stream")
+          .setBody(
+            """
+            data: {"type":"response.output_text.delta","delta":"Battery is healthy."}
+
+            data: {"type":"response.completed","response":{"id":"resp_tool_2","output":[{"type":"message","content":[{"type":"output_text","text":"Battery is healthy."}]}]}}
+
+            """.trimIndent(),
+          ),
+      )
+      server.start()
+
+      try {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = securePrefs(context, name = "openclaw.node.secure.test.codex.responses.tools")
+        prefs.saveOpenAICodexCredential(
+          OpenAICodexCredential(
+            access = fakeJwt(accountId = "acct_123", email = "person@example.com"),
+            refresh = "refresh-token",
+            expires = System.currentTimeMillis() + 60_000,
+            accountId = "acct_123",
+            email = "person@example.com",
+          ),
+        )
+
+        val toolEvents = mutableListOf<LocalHostToolCallEvent>()
+        val client =
+          OpenAICodexResponsesClient(
+            prefs = prefs,
+            json = json,
+            client = OkHttpClient(),
+            responsesUrl = server.url("/backend-api/codex/responses").toString(),
+            toolBridge =
+              object : LocalHostToolBridge {
+                override fun toolsForRole(role: String): List<LocalHostFunctionTool> {
+                  assertEquals("operator", role)
+                  return listOf(
+                    LocalHostFunctionTool(
+                      name = "nodes",
+                      description = "Test nodes tool",
+                      parameters = json.parseToJsonElement("""{"type":"object"}""").jsonObject,
+                    ),
+                  )
+                }
+
+                override suspend fun executeToolCall(
+                  role: String,
+                  name: String,
+                  argumentsJson: String,
+                ): LocalHostToolExecutionResult {
+                  assertEquals("operator", role)
+                  assertEquals("nodes", name)
+                  assertEquals("""{"action":"device_status"}""", argumentsJson)
+                  return LocalHostToolExecutionResult(
+                    outputText = """{"ok":true,"battery":0.85}""",
+                  )
+                }
+              },
+          )
+
+        val reply =
+          client.streamReply(
+            role = "operator",
+            sessionId = "session-tool-123",
+            messages =
+              listOf(
+                LocalHostMessage(
+                  role = "user",
+                  content = listOf(ChatMessageContent(type = "text", text = "Check battery status.")),
+                  timestampMs = 1L,
+                ),
+              ),
+            thinkingLevel = "off",
+            onTextDelta = {},
+            onToolEvent = { toolEvents += it },
+          )
+
+        assertEquals("Battery is healthy.", reply.text)
+        assertEquals(listOf("start", "result"), toolEvents.map { it.phase })
+        assertEquals("nodes", toolEvents.first().name)
+        assertEquals("device_status", toolEvents.first().args?.get("action")?.jsonPrimitive?.content)
+
+        val firstRequest = server.takeRequest()
+        val firstPayload = json.parseToJsonElement(firstRequest.body.readUtf8()).jsonObject
+        assertEquals(1, firstPayload.getValue("tools").jsonArray.size)
+
+        val secondRequest = server.takeRequest()
+        val secondPayload = json.parseToJsonElement(secondRequest.body.readUtf8()).jsonObject
+        val inputItems = secondPayload.getValue("input").jsonArray
+        val inputTypes = inputItems.map { it.jsonObject.getValue("type").jsonPrimitive.content }
+        assertTrue(inputTypes.contains("function_call"))
+        assertTrue(inputTypes.contains("function_call_output"))
+        val toolOutput =
+          inputItems
+            .first { it.jsonObject.getValue("type").jsonPrimitive.content == "function_call_output" }
+            .jsonObject
+            .getValue("output")
+            .jsonPrimitive
+            .content
+        assertEquals("""{"ok":true,"battery":0.85}""", toolOutput)
+      } finally {
+        server.shutdown()
+      }
+    }
+
+  @Test
+  fun streamReply_replaysToolImagesAsInputImages() =
+    runTest {
+      val server = MockWebServer()
+      server.enqueue(
+        MockResponse()
+          .setResponseCode(200)
+          .addHeader("Content-Type", "text/event-stream")
+          .setBody(
+            """
+            data: {"type":"response.completed","response":{"id":"resp_image_1","output":[{"type":"function_call","call_id":"call_cam_1","name":"nodes","arguments":"{\"action\":\"camera_snap\"}"}]}}
+
+            """.trimIndent(),
+          ),
+      )
+      server.enqueue(
+        MockResponse()
+          .setResponseCode(200)
+          .addHeader("Content-Type", "text/event-stream")
+          .setBody(
+            """
+            data: {"type":"response.completed","response":{"id":"resp_image_2","output":[{"type":"message","content":[{"type":"output_text","text":"I can see the photo."}]}]}}
+
+            """.trimIndent(),
+          ),
+      )
+      server.start()
+
+      try {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = securePrefs(context, name = "openclaw.node.secure.test.codex.responses.images")
+        prefs.saveOpenAICodexCredential(
+          OpenAICodexCredential(
+            access = fakeJwt(accountId = "acct_123", email = "person@example.com"),
+            refresh = "refresh-token",
+            expires = System.currentTimeMillis() + 60_000,
+            accountId = "acct_123",
+            email = "person@example.com",
+          ),
+        )
+
+        val client =
+          OpenAICodexResponsesClient(
+            prefs = prefs,
+            json = json,
+            client = OkHttpClient(),
+            responsesUrl = server.url("/backend-api/codex/responses").toString(),
+            toolBridge =
+              object : LocalHostToolBridge {
+                override fun toolsForRole(role: String): List<LocalHostFunctionTool> {
+                  return listOf(
+                    LocalHostFunctionTool(
+                      name = "nodes",
+                      description = "Test nodes tool",
+                      parameters = json.parseToJsonElement("""{"type":"object"}""").jsonObject,
+                    ),
+                  )
+                }
+
+                override suspend fun executeToolCall(
+                  role: String,
+                  name: String,
+                  argumentsJson: String,
+                ): LocalHostToolExecutionResult {
+                  return LocalHostToolExecutionResult(
+                    outputText = """{"ok":true,"imageCount":1}""",
+                    imageInputs =
+                      listOf(
+                        LocalHostToolImageInput(
+                          mimeType = "image/jpeg",
+                          base64 = "ZmFrZS1pbWFnZQ==",
+                        ),
+                      ),
+                  )
+                }
+              },
+          )
+
+        val reply =
+          client.streamReply(
+            role = "operator",
+            sessionId = "session-image-123",
+            messages =
+              listOf(
+                LocalHostMessage(
+                  role = "user",
+                  content = listOf(ChatMessageContent(type = "text", text = "Take a look.")),
+                  timestampMs = 1L,
+                ),
+              ),
+            thinkingLevel = "off",
+            onTextDelta = {},
+            onToolEvent = {},
+          )
+
+        assertEquals("I can see the photo.", reply.text)
+        server.takeRequest()
+        val secondRequest = server.takeRequest()
+        val secondPayload = json.parseToJsonElement(secondRequest.body.readUtf8()).jsonObject
+        val imageMessage =
+          secondPayload
+            .getValue("input")
+            .jsonArray
+            .last()
+            .jsonObject
+        assertEquals("message", imageMessage.getValue("type").jsonPrimitive.content)
+        assertEquals("user", imageMessage.getValue("role").jsonPrimitive.content)
+        val content = imageMessage.getValue("content").jsonArray
+        assertEquals("input_text", content[0].jsonObject.getValue("type").jsonPrimitive.content)
+        assertEquals("input_image", content[1].jsonObject.getValue("type").jsonPrimitive.content)
+        assertTrue(
+          content[1].jsonObject.getValue("image_url").jsonPrimitive.content.startsWith("data:image/jpeg;base64,"),
+        )
       } finally {
         server.shutdown()
       }

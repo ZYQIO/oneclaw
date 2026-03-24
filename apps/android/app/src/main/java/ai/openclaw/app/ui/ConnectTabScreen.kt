@@ -1,5 +1,7 @@
 package ai.openclaw.app.ui
 
+import android.content.Context
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -46,13 +48,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ai.openclaw.app.GatewayConnectionMode
 import ai.openclaw.app.MainViewModel
+import ai.openclaw.app.dedicatedHostBackgroundPolicyNote
+import ai.openclaw.app.isDedicatedHostBatteryOptimizationIgnored
+import ai.openclaw.app.openDedicatedHostAppSettings
+import ai.openclaw.app.requestDedicatedHostBatteryOptimizationExemption
 import ai.openclaw.app.ui.mobileCardSurface
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 private enum class ConnectInputMode {
   SetupCode,
@@ -61,6 +71,8 @@ private enum class ConnectInputMode {
 
 @Composable
 fun ConnectTabScreen(viewModel: MainViewModel) {
+  val context = LocalContext.current
+  val lifecycleOwner = LocalLifecycleOwner.current
   val statusText by viewModel.statusText.collectAsState()
   val isConnected by viewModel.isConnected.collectAsState()
   val remoteAddress by viewModel.remoteAddress.collectAsState()
@@ -74,6 +86,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   val localHostRemoteAccessToken by viewModel.localHostRemoteAccessToken.collectAsState()
   val localHostRemoteAccessStatusText by viewModel.localHostRemoteAccessStatusText.collectAsState()
   val localHostRemoteAccessUrl by viewModel.localHostRemoteAccessUrl.collectAsState()
+  val localHostDedicatedDeploymentEnabled by viewModel.localHostDedicatedDeploymentEnabled.collectAsState()
   val manualHost by viewModel.manualHost.collectAsState()
   val manualPort by viewModel.manualPort.collectAsState()
   val manualTls by viewModel.manualTls.collectAsState()
@@ -100,6 +113,20 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   var passwordInput by rememberSaveable { mutableStateOf("") }
   var manualAuthorizationInput by rememberSaveable { mutableStateOf("") }
   var validationText by rememberSaveable { mutableStateOf<String?>(null) }
+  var batteryOptimizationIgnored by remember(context) { mutableStateOf(isDedicatedHostBatteryOptimizationIgnored(context)) }
+  val backgroundPolicyNote = remember { dedicatedHostBackgroundPolicyNote() }
+  DisposableEffect(context, lifecycleOwner) {
+    val observer =
+      LifecycleEventObserver { _, event ->
+        if (event == Lifecycle.Event.ON_RESUME) {
+          batteryOptimizationIgnored = isDedicatedHostBatteryOptimizationIgnored(context)
+        }
+      }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose {
+      lifecycleOwner.lifecycle.removeObserver(observer)
+    }
+  }
   val remoteAccessExamples =
     remember(
       localHostRemoteAccessUrl,
@@ -202,7 +229,8 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         when {
           isConnected && connectionMode == GatewayConnectionMode.LocalHost -> "OpenClaw is running directly on this phone."
           isConnected -> "Your gateway is active and ready."
-          connectionMode == GatewayConnectionMode.LocalHost -> "Run OpenClaw locally on this phone with Codex-backed chat."
+          connectionMode == GatewayConnectionMode.LocalHost ->
+            "Run OpenClaw locally on this phone with Codex-backed chat and a limited on-device command set."
           else -> "Connect to your gateway to get started."
         },
         style = mobileCallout,
@@ -248,6 +276,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             },
             style = mobileCaption1,
             color = if (hasOpenAICodexCredential) mobileTextSecondary else mobileWarning,
+          )
+          Text(
+            "Current scope is local chat plus selected Android device commands. It does not yet match the full desktop gateway tool/runtime surface.",
+            style = mobileCaption1,
+            color = mobileTextSecondary,
           )
         }
       }
@@ -375,9 +408,142 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+              Text("Dedicated host deployment", style = mobileHeadline, color = mobileText)
+              Text(
+                "Keep this idle phone in always-on host mode. OpenClaw will keep a foreground service up, restart after reboot or app updates, and auto-heal Local Host if it drops.",
+                style = mobileCallout,
+                color = mobileTextSecondary,
+              )
+            }
+            Switch(
+              checked = localHostDedicatedDeploymentEnabled,
+              onCheckedChange = { viewModel.setLocalHostDedicatedDeploymentEnabled(it) },
+              colors =
+                SwitchDefaults.colors(
+                  checkedThumbColor = mobileAccent,
+                  checkedTrackColor = mobileAccentSoft,
+                ),
+            )
+          }
+
+          Text(
+            if (localHostDedicatedDeploymentEnabled) {
+              "Dedicated deployment is on. Disable it before expecting Local Host to stay offline after a disconnect."
+            } else {
+              "Dedicated deployment is off. Local Host only stays up while the app/session keeps it alive."
+            },
+            style = mobileCaption1,
+            color = if (localHostDedicatedDeploymentEnabled) mobileSuccess else mobileTextSecondary,
+          )
+
+          AnimatedVisibility(visible = localHostDedicatedDeploymentEnabled) {
+            Column(
+              modifier = Modifier.fillMaxWidth(),
+              verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+              HorizontalDivider(color = mobileBorder)
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+              ) {
+                Column(
+                  modifier = Modifier.weight(1f),
+                  verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                  Text("Battery optimization", style = mobileHeadline, color = mobileText)
+                  Text(
+                    if (batteryOptimizationIgnored) {
+                      "Unrestricted battery mode is active for OpenClaw. Android is less likely to delay dedicated-host recovery."
+                    } else {
+                      "Android battery optimization is still active. On idle phones, that can delay dedicated-host restarts after long idle periods."
+                    },
+                    style = mobileCallout,
+                    color = mobileTextSecondary,
+                  )
+                }
+                Button(
+                  onClick = {
+                    requestDedicatedHostBatteryOptimizationExemption(context)
+                    batteryOptimizationIgnored = isDedicatedHostBatteryOptimizationIgnored(context)
+                  },
+                  shape = RoundedCornerShape(12.dp),
+                  colors = settingsPrimaryButtonColors(),
+                  contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                  Text(
+                    if (batteryOptimizationIgnored) "Review" else "Allow background",
+                    style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
+                  )
+                }
+              }
+
+              Text(
+                if (batteryOptimizationIgnored) {
+                  "Remote `device.status` now reports `backgroundExecution.batteryOptimizationIgnored=true` for this phone."
+                } else {
+                  "For trusted idle-phone deployments, Android's own docs treat battery-optimization exemption as one of the ways foreground-service restarts are less restricted."
+                },
+                style = mobileCaption1,
+                color = if (batteryOptimizationIgnored) mobileSuccess else mobileWarning,
+              )
+
+              backgroundPolicyNote?.let { note ->
+                HorizontalDivider(color = mobileBorder)
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                  Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                  ) {
+                    Text("Background policy", style = mobileHeadline, color = mobileText)
+                    Text(
+                      note,
+                      style = mobileCallout,
+                      color = mobileTextSecondary,
+                    )
+                  }
+                  Button(
+                    onClick = { openDedicatedHostAppSettings(context) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = settingsPrimaryButtonColors(),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                  ) {
+                    Text(
+                      "App settings",
+                      style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
+                    )
+                  }
+                }
+
+                Text(
+                  if (batteryOptimizationIgnored) {
+                    "Battery optimization is already exempted here, but that still does not protect OpenClaw from OEM task cleaners after a Recents swipe."
+                  } else {
+                    "Battery optimization exemption helps with idle recovery, but this phone may still force-stop OpenClaw if you swipe its Recents card away."
+                  },
+                  style = mobileCaption1,
+                  color = mobileWarning,
+                )
+              }
+            }
+          }
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
               Text("Remote access", style = mobileHeadline, color = mobileText)
               Text(
-                "Expose local-host chat and a small remote-control API on trusted networks or Tailscale.",
+                "Expose local-host chat and selected Android device commands on trusted networks or Tailscale.",
                 style = mobileCallout,
                 color = mobileTextSecondary,
               )
@@ -918,6 +1084,15 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     }
   }
 }
+
+@Composable
+private fun settingsPrimaryButtonColors() =
+  ButtonDefaults.buttonColors(
+    containerColor = mobileAccent,
+    contentColor = Color.White,
+    disabledContainerColor = mobileAccent.copy(alpha = 0.45f),
+    disabledContentColor = Color.White.copy(alpha = 0.9f),
+  )
 
 @Composable
 private fun MethodChip(label: String, active: Boolean, onClick: () -> Unit) {

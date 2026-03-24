@@ -61,6 +61,23 @@ class SecurePrefsTest {
   }
 
   @Test
+  fun localHostDedicatedDeployment_defaultsOffAndPersists() {
+    val context = RuntimeEnvironment.getApplication()
+    val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)
+    val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.dedicated", Context.MODE_PRIVATE)
+    plainPrefs.edit().clear().commit()
+    securePrefs.edit().clear().commit()
+
+    val prefs = SecurePrefs(context, securePrefsOverride = securePrefs)
+    assertFalse(prefs.localHostDedicatedDeploymentEnabled.value)
+
+    prefs.setLocalHostDedicatedDeploymentEnabled(true)
+
+    assertTrue(prefs.localHostDedicatedDeploymentEnabled.value)
+    assertTrue(plainPrefs.getBoolean(SecurePrefs.localHostDedicatedDeploymentEnabledKey, false))
+  }
+
+  @Test
   fun openAICodexCredential_roundTripsThroughSecurePrefs() {
     val context = RuntimeEnvironment.getApplication()
     val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.codex", Context.MODE_PRIVATE)

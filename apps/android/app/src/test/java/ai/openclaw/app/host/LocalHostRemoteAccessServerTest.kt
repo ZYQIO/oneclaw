@@ -126,6 +126,15 @@ class LocalHostRemoteAccessServerTest {
             )
             put("sessionCount", JsonPrimitive(2))
             put("activeRunCount", JsonPrimitive(1))
+            put(
+              "deployment",
+              buildJsonObject {
+                put("dedicatedEnabled", JsonPrimitive(true))
+                put("batteryOptimizationIgnored", JsonPrimitive(false))
+                put("recentsSwipeForceStopRisk", JsonPrimitive(true))
+                put("taskLockRecommended", JsonPrimitive(true))
+              },
+            )
           }
         },
       )
@@ -150,6 +159,9 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"codexAuth\""))
       assertTrue(response.body.contains("\"sessionCount\":2"))
       assertTrue(response.body.contains("\"activeRunCount\":1"))
+      assertTrue(response.body.contains("\"deployment\""))
+      assertTrue(response.body.contains("\"dedicatedEnabled\":true"))
+      assertTrue(response.body.contains("\"taskLockRecommended\":true"))
       assertTrue(response.body.contains("\"sms.send\""))
     } finally {
       server.stop()

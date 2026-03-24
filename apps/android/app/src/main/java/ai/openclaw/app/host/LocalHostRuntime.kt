@@ -51,6 +51,7 @@ class LocalHostRuntime(
   private val prefs: SecurePrefs,
   private val json: Json,
   private val codexClient: LocalHostResponsesClient = OpenAICodexResponsesClient(prefs, json),
+  private val deploymentStatusProvider: (() -> JsonObject)? = null,
   private val codexAuthController: LocalHostCodexAuthController =
     LocalHostCodexAuthController(
       prefs = prefs,
@@ -101,7 +102,7 @@ class LocalHostRuntime(
       "agents.list" -> agentsPayload().toString()
       "sessions.list" -> sessionsPayload().toString()
       "chat.history" -> chatHistoryPayload(params).toString()
-      "chat.send" -> chatSend(params).toString()
+      "chat.send" -> chatSend(role = role, params = params).toString()
       "chat.abort" -> chatAbort(params).toString()
       "talk.config" -> talkConfigPayload().toString()
       "voicewake.get" -> voiceWakePayload().toString()
@@ -131,6 +132,7 @@ class LocalHostRuntime(
         val runId = payload["key"].asStringOrNull()?.trim()?.takeIf { it.isNotEmpty() } ?: UUID.randomUUID().toString()
         if (message.isEmpty()) return false
         startChatRun(
+          role = role,
           sessionKey = sessionKey,
           message = message,
           thinking = thinking,
@@ -168,6 +170,7 @@ class LocalHostRuntime(
       put("clientCount", JsonPrimitive(clients.size))
       put("talkEnabled", JsonPrimitive(prefs.talkEnabled.value))
       put("speakerEnabled", JsonPrimitive(prefs.speakerEnabled.value))
+      deploymentStatusProvider?.invoke()?.let { put("deployment", it) }
       put(
         "wakeWords",
         buildJsonArray {
@@ -294,7 +297,10 @@ class LocalHostRuntime(
     }
   }
 
-  private fun chatSend(params: JsonObject): JsonObject {
+  private fun chatSend(
+    role: String,
+    params: JsonObject,
+  ): JsonObject {
     val sessionKey = params["sessionKey"].asStringOrNull()?.trim().orEmpty().ifEmpty { mainSessionKey }
     val message = params["message"].asStringOrNull()?.trim().orEmpty()
     val runId = params["idempotencyKey"].asStringOrNull()?.trim().orEmpty().ifEmpty { UUID.randomUUID().toString() }
@@ -304,6 +310,7 @@ class LocalHostRuntime(
       throw IllegalStateException("INVALID_REQUEST: message or attachment required")
     }
     startChatRun(
+      role = role,
       sessionKey = sessionKey,
       message = message,
       thinking = thinking,
@@ -392,6 +399,7 @@ class LocalHostRuntime(
   }
 
   private fun startChatRun(
+    role: String,
     sessionKey: String,
     message: String,
     thinking: String,
@@ -420,12 +428,17 @@ class LocalHostRuntime(
         try {
           val reply =
             codexClient.streamReply(
+              role = role,
               sessionId = session.sessionId,
               messages = requestMessages,
               thinkingLevel = thinking,
               onTextDelta = { fullText ->
                 if (!emitEvents) return@streamReply
                 emitAssistantText(runId = runId, sessionKey = sessionKey, text = fullText)
+              },
+              onToolEvent = { toolEvent ->
+                if (!emitEvents) return@streamReply
+                emitToolEvent(runId = runId, sessionKey = sessionKey, toolEvent = toolEvent)
               },
             )
           val assistantMessage =
@@ -550,6 +563,32 @@ class LocalHostRuntime(
                 },
               )
               put("timestamp", JsonPrimitive(timestamp))
+            },
+          )
+        },
+    )
+  }
+
+  private fun emitToolEvent(
+    runId: String,
+    sessionKey: String,
+    toolEvent: LocalHostToolCallEvent,
+  ) {
+    emitEvent(
+      event = "agent",
+      payload =
+        buildJsonObject {
+          put("runId", JsonPrimitive(runId))
+          put("stream", JsonPrimitive("tool"))
+          put("ts", JsonPrimitive(System.currentTimeMillis()))
+          put("sessionKey", JsonPrimitive(sessionKey))
+          put(
+            "data",
+            buildJsonObject {
+              put("phase", JsonPrimitive(toolEvent.phase))
+              put("name", JsonPrimitive(toolEvent.name))
+              put("toolCallId", JsonPrimitive(toolEvent.toolCallId))
+              toolEvent.args?.let { put("args", it) }
             },
           )
         },

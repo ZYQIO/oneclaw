@@ -10,6 +10,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -45,7 +48,8 @@ class LocalHostRuntimeTest {
           prefs = prefs,
           json = json,
           codexClient =
-            FakeLocalHostResponsesClient { sessionId, messages, thinkingLevel, onTextDelta ->
+            FakeLocalHostResponsesClient { role, sessionId, messages, thinkingLevel, onTextDelta, _ ->
+              assertEquals("operator", role)
               UUID.fromString(sessionId)
               assertEquals("low", thinkingLevel)
               assertEquals(1, messages.size)
@@ -115,7 +119,8 @@ class LocalHostRuntimeTest {
           prefs = prefs,
           json = json,
           codexClient =
-            FakeLocalHostResponsesClient { sessionId, _, _, _ ->
+            FakeLocalHostResponsesClient { role, sessionId, _, _, _, _ ->
+              assertEquals("operator", role)
               UUID.fromString(sessionId)
               awaitCancellation()
             },
@@ -148,6 +153,108 @@ class LocalHostRuntimeTest {
       assertEquals(1, abortedEvents.size)
     }
 
+  @Test
+  fun chatSend_emitsToolLifecycleEvents() =
+    runTest {
+      val context = RuntimeEnvironment.getApplication()
+      val prefs = securePrefs(context, name = "openclaw.node.secure.test.localhost.tools")
+      val events = mutableListOf<Pair<String, String?>>()
+      val runtime =
+        LocalHostRuntime(
+          scope = this,
+          prefs = prefs,
+          json = json,
+          codexClient =
+            FakeLocalHostResponsesClient { role, sessionId, _, _, onTextDelta, onToolEvent ->
+              assertEquals("operator", role)
+              UUID.fromString(sessionId)
+              onToolEvent(
+                LocalHostToolCallEvent(
+                  toolCallId = "call_nodes_1",
+                  name = "nodes",
+                  args = parseObject("""{"action":"device_status"}"""),
+                  phase = "start",
+                ),
+              )
+              onToolEvent(
+                LocalHostToolCallEvent(
+                  toolCallId = "call_nodes_1",
+                  name = "nodes",
+                  args = null,
+                  phase = "result",
+                ),
+              )
+              onTextDelta("Tool-backed reply")
+              OpenAICodexAssistantReply(
+                text = "Tool-backed reply",
+                responseId = "resp_tool_123",
+                credential =
+                  OpenAICodexCredential(
+                    access = "access-token",
+                    refresh = "refresh-token",
+                    expires = 123456789L,
+                    accountId = "account-123",
+                    email = "test@example.com",
+                  ),
+              )
+            },
+        )
+
+      runtime.registerClient(role = "operator") { event, payloadJson ->
+        events += event to payloadJson
+      }
+
+      runtime.request(
+        role = "operator",
+        method = "chat.send",
+        paramsJson = """{"sessionKey":"main","message":"Check device","idempotencyKey":"run-tool"}""",
+        timeoutMs = 15_000,
+      )
+      advanceUntilIdle()
+
+      val toolEvents =
+        events.filter { (event, payloadJson) ->
+          event == "agent" && parseObject(payloadJson!!).getValue("stream").jsonPrimitive.content == "tool"
+        }
+      assertEquals(listOf("start", "result"), toolEvents.map { (_, payloadJson) ->
+        parseObject(payloadJson!!).getValue("data").jsonObject.getValue("phase").jsonPrimitive.content
+      })
+      val firstToolArgs =
+        parseObject(toolEvents.first().second!!)
+          .getValue("data")
+          .jsonObject
+          .getValue("args")
+          .jsonObject
+      assertEquals("device_status", firstToolArgs.getValue("action").jsonPrimitive.content)
+    }
+
+  @Test
+  fun statusSnapshot_includesDeploymentStatusWhenProvided() =
+    runTest {
+      val context = RuntimeEnvironment.getApplication()
+      val prefs = securePrefs(context, name = "openclaw.node.secure.test.localhost.status")
+      val runtime =
+        LocalHostRuntime(
+          scope = this,
+          prefs = prefs,
+          json = json,
+          deploymentStatusProvider = {
+            buildJsonObject {
+              put("dedicatedEnabled", JsonPrimitive(true))
+              put("batteryOptimizationIgnored", JsonPrimitive(false))
+            }
+          },
+          codexClient = FakeLocalHostResponsesClient { _, _, _, _, _, _ ->
+            error("status snapshot should not call codex client")
+          },
+        )
+
+      val snapshot = runtime.statusSnapshot()
+      val deployment = snapshot.getValue("deployment").jsonObject
+      assertEquals(true, deployment.getValue("dedicatedEnabled").jsonPrimitive.boolean)
+      assertEquals(false, deployment.getValue("batteryOptimizationIgnored").jsonPrimitive.boolean)
+    }
+
   private fun securePrefs(context: Context, name: String): SecurePrefs {
     val securePrefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
     securePrefs.edit().clear().commit()
@@ -159,18 +266,22 @@ class LocalHostRuntimeTest {
 
 private class FakeLocalHostResponsesClient(
   private val block: suspend (
+    role: String,
     sessionId: String,
     messages: List<LocalHostMessage>,
     thinkingLevel: String,
     onTextDelta: suspend (fullText: String) -> Unit,
+    onToolEvent: suspend (LocalHostToolCallEvent) -> Unit,
   ) -> OpenAICodexAssistantReply,
 ) : LocalHostResponsesClient {
   override suspend fun streamReply(
+    role: String,
     sessionId: String,
     messages: List<LocalHostMessage>,
     thinkingLevel: String,
     onTextDelta: suspend (fullText: String) -> Unit,
+    onToolEvent: suspend (LocalHostToolCallEvent) -> Unit,
   ): OpenAICodexAssistantReply {
-    return block(sessionId, messages, thinkingLevel, onTextDelta)
+    return block(role, sessionId, messages, thinkingLevel, onTextDelta, onToolEvent)
   }
 }

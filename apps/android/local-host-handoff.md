@@ -22,11 +22,26 @@ As of March 23, 2026, the MVP happy path is working. / 截至 2026 年 3 月 23 
 - LAN 冒烟脚本已经成功。The LAN smoke script has succeeded.
 - `auth/codex/status` 和 `auth/codex/refresh` 已在真机验证成功。`auth/codex/status` and `auth/codex/refresh` have both been validated successfully on-device.
 - 权限缺失脚本已经在真机上成功覆盖四类失败。The permission-failure script has already covered four failure cases successfully on-device.
+- `Dedicated host deployment` 形态已经接进 app：支持 idle-phone 场景下的前台服务保活、开机恢复、升级后恢复，以及本机 Host 掉线后的自愈重连。A `Dedicated host deployment` mode is now wired into the app: it supports idle-phone keepalive with foreground service persistence, restore after reboot, restore after app updates, and self-heal reconnect when Local Host drops.
+- dedicated 模式现在还会把 Android 电池优化状态直接展示出来，并提供跳转到电池豁免请求的入口；远端 `device.status` 也能看到 `backgroundExecution.batteryOptimizationIgnored`。Dedicated mode now also shows Android battery-optimization state directly and links to the battery-exemption flow; remote `device.status` can also see `backgroundExecution.batteryOptimizationIgnored`.
+- 电池优化豁免链路已经在真机上重新验证通过：系统弹窗可成功授予豁免，随后 `deviceidle whitelist` 和远端 `/status.host.deployment.batteryOptimizationIgnored` 都会翻成 `true`。The battery-optimization exemption path has now been revalidated on-device: the system confirmation dialog can grant the exemption successfully, and `deviceidle whitelist` plus remote `/status.host.deployment.batteryOptimizationIgnored` both flip to `true` afterward.
+- 远端 `/status` 现在会带 `host.deployment` readiness 信息，而且 dedicated 模式下如果前台服务被任务移除或销毁，会排短延迟恢复闹钟。Remote `/status` now carries `host.deployment` readiness info, and in dedicated mode a short recovery alarm is scheduled if the foreground service is task-removed or destroyed.
+- dedicated 模式现在还会维持一个低频 watchdog 闹钟，作为长时间闲置时的额外恢复路径。Dedicated mode now also maintains a low-frequency watchdog alarm as an extra recovery path during long idle periods.
+- 但在当前接入的 OPPO / ColorOS V15 真机上，`Recents` 里把 `OpenClaw Node` 卡片划掉会触发系统 `Force stopping ai.openclaw.app ... o-stop(40)`，并把闹钟一起清空；这说明 dedicated 部署在该机型上必须避免 swipe-to-clear，并建议把卡片锁在最近任务里。But on the connected OPPO / ColorOS V15 device, swiping the `OpenClaw Node` card away from Recents triggers a system `Force stopping ai.openclaw.app ... o-stop(40)` and clears alarms as well; this means dedicated deployment on that device must avoid swipe-to-clear and should keep the card locked in Recents.
 
 What is still missing / 仍未完成的部分:
 
 - 远程默认值和网络暴露说明的最后复核。Final review of remote defaults and network-exposure guidance.
 - 自检里 streaming-text 那一项是否仍然需要真机补证，需要最后判断。We still need a final decision on whether the streaming-text self-check item requires dedicated on-device evidence.
+
+Important scope note / 重要范围说明:
+
+- Android `Local Host` 现在不是“把桌面 Gateway/CLI 全量搬进手机”。Android `Local Host` is not yet "the full desktop Gateway/CLI moved into the phone."
+- 当前聊天路径虽然仍不是“桌面 CLI 全量搬运”，但已经开始注册手机本地工具面。The current chat path is still not "the full desktop CLI moved over," but it has started to register an on-phone local tool surface.
+- 手机上的可操作能力现在主要来自两块：精选 Android 原生命令，以及 app-private 本地 workspace；后者现在已经支持搜索、替换、复制、移动等文本工作区操作，但它仍然不是完整 shell / browser / plugin runtime。Most actionable capability on the phone now comes from two areas: curated Android native commands and an app-private local workspace; the workspace now supports search, replace, copy, and move style text-workspace operations, but it is still not a full shell / browser / plugin runtime.
+- 对于“闲置手机常驻部署”，当前已经有一层 Android 原生 keepalive 架构，但它仍然是移动端受限模型，不等于桌面 OpenClaw 可以无限后台运行的完整运行时。For "idle phone always-on deployment", there is now an Android-native keepalive layer, but it is still a mobile-constrained model rather than the full desktop OpenClaw runtime running without limits in the background.
+- 远程 `chat/send-wait` 会以 `remote-operator` 角色运行，所以 workspace 写能力也已经接到现有 write gate；不开写权限时，远端只能读 / 列 / 搜 / 查 stat。Remote `chat/send-wait` runs as `remote-operator`, so workspace writes now share the existing write gate; without write mode enabled, remote sessions are limited to read/list/search/stat actions.
+- 所以“接上 GPT 但很多桌面功能不能用”目前属于产品范围限制，不是单纯授权异常。So "GPT is connected but many desktop features do not work" is currently a product-scope limitation, not just an auth problem.
 
 ## Today Work Log / 今日工作日志
 
@@ -43,6 +58,21 @@ What is still missing / 仍未完成的部分:
 - 新增 `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostCodexAuthController.kt`，并把 `auth/codex/status`、`auth/codex/refresh` 接入远控面。Added `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostCodexAuthController.kt` and wired `auth/codex/status` plus `auth/codex/refresh` into remote access.
 - 真机调用 `POST /api/local-host/v1/auth/codex/refresh` 成功，`expiresAt` 向前推进，之后 `/chat/send-wait` 仍返回 `Codex refresh still works.`。On-device `POST /api/local-host/v1/auth/codex/refresh` succeeded, `expiresAt` moved forward, and `/chat/send-wait` still returned `Codex refresh still works.` afterward.
 - 新增并运行 `bash apps/android/scripts/local-host-permission-smoke.sh`，覆盖 `contacts.search`、`calendar.events`、`photos.latest`、`system.notify` 的权限缺失错误。Added and ran `bash apps/android/scripts/local-host-permission-smoke.sh`, covering permission-missing errors for `contacts.search`, `calendar.events`, `photos.latest`, and `system.notify`.
+- 继续把手机本地能力往“离开电脑也能独立工作”推进：`workspace` 新增搜索、替换、复制、移动能力，并复用 write gate 收紧远程聊天下的写操作。Continued pushing the phone-side capability toward "independent away from a computer": `workspace` now supports search, replace, copy, and move actions, and reuses the write gate to keep remote chat writes constrained.
+- 在当前机器上补齐 Android SDK 并成功运行定向 `Local Host` 单测集。Installed the Android SDK on the current machine and successfully ran the targeted `Local Host` unit-test suite.
+
+### March 24, 2026 / 2026 年 3 月 24 日
+
+- 把 `Dedicated host deployment` 开关和说明接进 `apps/android/app/src/main/java/ai/openclaw/app/ui/ConnectTabScreen.kt`。Wired the `Dedicated host deployment` switch and explanatory copy into `apps/android/app/src/main/java/ai/openclaw/app/ui/ConnectTabScreen.kt`.
+- 新增 `apps/android/app/src/main/java/ai/openclaw/app/LocalHostDedicatedDeploymentManager.kt` 和 `apps/android/app/src/main/java/ai/openclaw/app/LocalHostBootReceiver.kt`，接上开机 / 解锁 / 升级后恢复。Added `apps/android/app/src/main/java/ai/openclaw/app/LocalHostDedicatedDeploymentManager.kt` and `apps/android/app/src/main/java/ai/openclaw/app/LocalHostBootReceiver.kt` to restore the host after boot, unlock, or app upgrades.
+- `apps/android/app/src/main/java/ai/openclaw/app/NodeForegroundService.kt` 现在会在 dedicated 模式下观察本机 Host 掉线并自愈重连。`apps/android/app/src/main/java/ai/openclaw/app/NodeForegroundService.kt` now watches for local-host disconnects in dedicated mode and self-heals by reconnecting.
+- 新增 dedicated-mode 回归测试，并再次运行定向 Android 单测集，结果 `BUILD SUCCESSFUL`。Added dedicated-mode regression tests and reran the targeted Android unit-test suite with a `BUILD SUCCESSFUL` result.
+- 新增 `apps/android/app/src/main/java/ai/openclaw/app/DedicatedHostSupport.kt`，并把电池优化豁免状态接进 `apps/android/app/src/main/java/ai/openclaw/app/ui/ConnectTabScreen.kt` 与 `apps/android/app/src/main/java/ai/openclaw/app/node/DeviceHandler.kt`。Added `apps/android/app/src/main/java/ai/openclaw/app/DedicatedHostSupport.kt` and wired battery-optimization exemption state into `apps/android/app/src/main/java/ai/openclaw/app/ui/ConnectTabScreen.kt` plus `apps/android/app/src/main/java/ai/openclaw/app/node/DeviceHandler.kt`.
+- `apps/android/app/src/main/java/ai/openclaw/app/NodeForegroundService.kt` 现在还会在 task removed / destroy 时为 dedicated 模式排恢复闹钟，`apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostRuntime.kt` 会把 deployment readiness 带进远控 `/status`。`apps/android/app/src/main/java/ai/openclaw/app/NodeForegroundService.kt` now also schedules a recovery alarm for dedicated mode on task-removed / destroy, and `apps/android/app/src/main/java/ai/openclaw/app/host/LocalHostRuntime.kt` now includes deployment readiness in remote `/status`.
+- `apps/android/app/src/main/java/ai/openclaw/app/NodeForegroundService.kt` 现在还会在服务启动时重新武装 watchdog，`apps/android/app/src/main/java/ai/openclaw/app/DedicatedHostSupport.kt` 则把 watchdog 状态带进 deployment readiness。`apps/android/app/src/main/java/ai/openclaw/app/NodeForegroundService.kt` now also rearms the watchdog on service starts, while `apps/android/app/src/main/java/ai/openclaw/app/DedicatedHostSupport.kt` feeds watchdog state into deployment readiness.
+- 再次在真机上打通电池优化豁免弹窗，确认 `deviceidle whitelist` 和远端 `/status.host.deployment.batteryOptimizationIgnored` 同步翻为 `true`。Revalidated the battery-optimization confirmation dialog on-device and confirmed both `deviceidle whitelist` and remote `/status.host.deployment.batteryOptimizationIgnored` flip to `true`.
+- 在同一台 OPPO / ColorOS 设备上重复做了 `Recents` 划卡测试，确认即便已经电池豁免，划掉 `OpenClaw Node` 仍会把包置为 `stopped=true`、清空前台服务和 dedicated 闹钟。Repeated the Recents swipe-away test on the same OPPO / ColorOS device and confirmed that even with the battery exemption granted, swiping away `OpenClaw Node` still sets the package to `stopped=true` and clears both the foreground service and the dedicated alarms.
+- 因此把 OEM 背景策略风险正式接入 `apps/android/app/src/main/java/ai/openclaw/app/DedicatedHostSupport.kt`、`apps/android/app/src/main/java/ai/openclaw/app/node/DeviceHandler.kt`、`apps/android/app/src/main/java/ai/openclaw/app/ui/ConnectTabScreen.kt`，让 UI 和远端 readiness 都明确提示“不要划掉卡片”。As a result, the OEM background-policy risk is now wired into `apps/android/app/src/main/java/ai/openclaw/app/DedicatedHostSupport.kt`, `apps/android/app/src/main/java/ai/openclaw/app/node/DeviceHandler.kt`, and `apps/android/app/src/main/java/ai/openclaw/app/ui/ConnectTabScreen.kt` so both the UI and remote readiness now explicitly warn "do not swipe the card away."
 
 ## Verified Commands / 已验证命令
 
@@ -141,6 +171,7 @@ bash apps/android/scripts/local-host-permission-smoke.sh
 - `./gradlew :app:installDebug` 在这台设备上可能触发 ddmlib `InstallException: -99`，但直接 `adb install -r -d ...apk` 是可行的。`./gradlew :app:installDebug` may hit ddmlib `InstallException: -99` on this device, but direct `adb install -r -d ...apk` works.
 - `pnpm android:local-host:smoke` 依赖当前 shell 能找到 `pnpm`；如果环境里 `pnpm` shim 不可用，直接调用脚本本体即可。`pnpm android:local-host:smoke` depends on a working `pnpm` shim; if `pnpm` is unavailable in the shell, run the script directly instead.
 - 这台 Android 15 设备拒绝 shell 侧 `pm revoke` 和 `appops set`；权限脚本会在权限已被拒绝时直接验证失败路径，只在权限已授予时才尝试临时撤回。This Android 15 device rejects shell-side `pm revoke` and `appops set`; the permission script validates already-denied cases directly and only attempts temporary revocation when a permission starts granted.
+- 这台 OPPO / ColorOS V15 设备会把 `Recents` 划卡当成系统级 `force stop`，并清空 app 闹钟；对 dedicated 部署来说，这比普通后台回收更激进。This OPPO / ColorOS V15 device treats a Recents swipe-away as a system-level `force stop` and clears the app's alarms; for dedicated deployment this is more aggressive than ordinary background eviction.
 - 不要把真实 token、真实手机 IP、或个人设备标识写进提交。Do not commit real tokens, the real phone IP, or personal device identifiers.
 
 ## Next Tasks / 接下来要做的事
