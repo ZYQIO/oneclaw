@@ -117,11 +117,20 @@ class LocalHostRemoteAccessServerTest {
         statusSnapshotProvider = {
           buildJsonObject {
             put("codexAuthConfigured", JsonPrimitive(true))
+            put("uiAutomationAvailable", JsonPrimitive(true))
             put(
               "codexAuth",
               buildJsonObject {
                 put("configured", JsonPrimitive(true))
                 put("refreshRecommended", JsonPrimitive(false))
+              },
+            )
+            put(
+              "uiAutomation",
+              buildJsonObject {
+                put("enabled", JsonPrimitive(true))
+                put("serviceConnected", JsonPrimitive(true))
+                put("available", JsonPrimitive(true))
               },
             )
             put("sessionCount", JsonPrimitive(2))
@@ -157,6 +166,8 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"writeEnabled\":true"))
       assertTrue(response.body.contains("\"codexAuthConfigured\":true"))
       assertTrue(response.body.contains("\"codexAuth\""))
+      assertTrue(response.body.contains("\"uiAutomationAvailable\":true"))
+      assertTrue(response.body.contains("\"uiAutomation\""))
       assertTrue(response.body.contains("\"sessionCount\":2"))
       assertTrue(response.body.contains("\"activeRunCount\":1"))
       assertTrue(response.body.contains("\"deployment\""))

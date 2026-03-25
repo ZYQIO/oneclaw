@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
+import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
+import ai.openclaw.app.accessibility.localHostUiAutomationStatusSnapshot
 import ai.openclaw.app.auth.OpenAICodexAuthUiState
 import ai.openclaw.app.chat.ChatMessage
 import ai.openclaw.app.chat.ChatPendingToolCall
@@ -28,6 +30,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   private val prefs = nodeApp.prefs
   private val openAICodexAuthManager = nodeApp.openAICodexAuthManager
   private val runtimeRef = MutableStateFlow<NodeRuntime?>(null)
+  private val _localHostUiAutomationStatus = MutableStateFlow(localHostUiAutomationStatusSnapshot(app))
   private var foreground = true
 
   private fun ensureRuntime(): NodeRuntime {
@@ -69,6 +72,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val mainSessionKey: StateFlow<String> = runtimeState(initial = "main") { it.mainSessionKey }
   val localHostRemoteAccessStatusText: StateFlow<String> = runtimeState(initial = "Remote access is off.") { it.localHostRemoteAccessStatusText }
   val localHostRemoteAccessUrl: StateFlow<String?> = runtimeState(initial = null) { it.localHostRemoteAccessUrl }
+  val localHostUiAutomationStatus: StateFlow<LocalHostUiAutomationStatus> = _localHostUiAutomationStatus
 
   val cameraHud: StateFlow<CameraHudState?> = runtimeState(initial = null) { it.cameraHud }
   val cameraFlashToken: StateFlow<Long> = runtimeState(initial = 0L) { it.cameraFlashToken }
@@ -188,6 +192,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun regenerateLocalHostRemoteAccessToken() {
     prefs.regenerateLocalHostRemoteAccessToken()
+  }
+
+  fun refreshLocalHostUiAutomationStatus() {
+    _localHostUiAutomationStatus.value = localHostUiAutomationStatusSnapshot(getApplication())
   }
 
   fun setLocalHostDedicatedDeploymentEnabled(value: Boolean) {

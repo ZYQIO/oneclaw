@@ -14,6 +14,7 @@ import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
+import ai.openclaw.app.protocol.OpenClawUiCommand
 
 data class NodeRuntimeFlags(
   val cameraEnabled: Boolean,
@@ -124,6 +125,9 @@ object InvokeCommandRegistry {
       ),
       InvokeCommandSpec(
         name = OpenClawSystemCommand.Notify.rawValue,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawUiCommand.State.rawValue,
       ),
       InvokeCommandSpec(
         name = OpenClawCameraCommand.List.rawValue,

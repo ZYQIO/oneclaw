@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import ai.openclaw.app.BuildConfig
 import ai.openclaw.app.SecurePrefs
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -83,7 +84,7 @@ internal class OpenAICodexAuthManager(
         manualInputEnabled = true,
         statusText =
           if (server.isBound) {
-            "Browser opened. Finish sign-in there. If the callback stalls, paste the redirect URL or code below."
+            "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below."
           } else {
             "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below."
           },
@@ -218,6 +219,18 @@ internal class OpenAICodexAuthManager(
       activeLogin = null
     }
   }
+}
+
+internal const val openAICodexAppCallbackScheme = "openclaw"
+internal const val openAICodexAppCallbackHost = "auth"
+internal const val openAICodexAppCallbackPath = "/callback"
+internal const val openAICodexAppCallbackUri =
+  "$openAICodexAppCallbackScheme://$openAICodexAppCallbackHost$openAICodexAppCallbackPath"
+
+internal fun buildOpenAICodexAppReturnUri(
+  packageName: String = BuildConfig.APPLICATION_ID,
+): String {
+  return "intent://$openAICodexAppCallbackHost$openAICodexAppCallbackPath#Intent;scheme=$openAICodexAppCallbackScheme;package=$packageName;end"
 }
 
 internal data class ParsedAuthorizationInput(
@@ -376,14 +389,15 @@ internal class OpenAICodexLoopbackServer private constructor(
   }
 }
 
-private fun oauthSuccessHtml(message: String): String =
+internal fun oauthSuccessHtml(message: String): String =
   renderOauthHtml(
     title = "Authentication successful",
     heading = "Authentication successful",
     message = message,
+    returnToAppUrl = buildOpenAICodexAppReturnUri(),
   )
 
-private fun oauthErrorHtml(
+internal fun oauthErrorHtml(
   message: String,
   details: String? = null,
 ): String =
@@ -392,18 +406,22 @@ private fun oauthErrorHtml(
     heading = "Authentication failed",
     message = message,
     details = details,
+    returnToAppUrl = buildOpenAICodexAppReturnUri(),
   )
 
-private fun renderOauthHtml(
+internal fun renderOauthHtml(
   title: String,
   heading: String,
   message: String,
   details: String? = null,
+  returnToAppUrl: String? = null,
 ): String {
   val safeTitle = escapeHtml(title)
   val safeHeading = escapeHtml(heading)
   val safeMessage = escapeHtml(message)
   val safeDetails = details?.let(::escapeHtml)
+  val safeReturnToAppUrl = returnToAppUrl?.let(::escapeHtml)
+  val safeReturnToAppJs = returnToAppUrl?.let(::escapeJsString)
   return """
     <!doctype html>
     <html lang="en">
@@ -428,6 +446,20 @@ private fun renderOauthHtml(
         main { max-width: 520px; }
         h1 { margin-bottom: 10px; font-size: 28px; }
         p { margin: 0; color: #a1a1aa; line-height: 1.7; }
+        .hint { margin-top: 14px; }
+        .actions { margin-top: 22px; }
+        .button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 44px;
+          padding: 0 18px;
+          border-radius: 999px;
+          background: #fafafa;
+          color: #09090b;
+          font-weight: 700;
+          text-decoration: none;
+        }
         .details {
           margin-top: 16px;
           color: #a1a1aa;
@@ -442,6 +474,21 @@ private fun renderOauthHtml(
         <h1>$safeHeading</h1>
         <p>$safeMessage</p>
         ${safeDetails?.let { "<div class=\"details\">$it</div>" }.orEmpty()}
+        ${
+          if (safeReturnToAppUrl != null && safeReturnToAppJs != null) {
+            """
+              <p class="hint">OpenClaw should reopen automatically. If nothing happens, tap the button below.</p>
+              <p class="actions"><a class="button" href="$safeReturnToAppUrl">Return to OpenClaw</a></p>
+              <script>
+                window.setTimeout(function () {
+                  window.location.href = '$safeReturnToAppJs';
+                }, 200);
+              </script>
+            """.trimIndent()
+          } else {
+            ""
+          }
+        }
       </main>
     </body>
     </html>
@@ -455,4 +502,14 @@ private fun escapeHtml(value: String): String {
     .replace(">", "&gt;")
     .replace("\"", "&quot;")
     .replace("'", "&#39;")
+}
+
+private fun escapeJsString(value: String): String {
+  return value
+    .replace("\\", "\\\\")
+    .replace("'", "\\'")
+    .replace("\n", "\\n")
+    .replace("\r", "\\r")
+    .replace("\u2028", "\\u2028")
+    .replace("\u2029", "\\u2029")
 }

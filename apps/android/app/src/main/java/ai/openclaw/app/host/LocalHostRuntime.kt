@@ -52,6 +52,7 @@ class LocalHostRuntime(
   private val json: Json,
   private val codexClient: LocalHostResponsesClient = OpenAICodexResponsesClient(prefs, json),
   private val deploymentStatusProvider: (() -> JsonObject)? = null,
+  private val uiAutomationStatusProvider: (() -> JsonObject)? = null,
   private val codexAuthController: LocalHostCodexAuthController =
     LocalHostCodexAuthController(
       prefs = prefs,
@@ -158,6 +159,7 @@ class LocalHostRuntime(
         .map(::snapshotSession)
         .sortedByDescending { it.updatedAtMs }
     val codexAuth = codexAuthStatusSnapshot()
+    val uiAutomation = uiAutomationStatusProvider?.invoke()
 
     return buildJsonObject {
       put("serverName", JsonPrimitive(serverName))
@@ -165,6 +167,8 @@ class LocalHostRuntime(
       put("mainSessionKey", JsonPrimitive(mainSessionKey))
       put("codexAuthConfigured", JsonPrimitive(codexAuth["configured"].asBooleanOrNull() == true))
       put("codexAuth", codexAuth)
+      put("uiAutomationAvailable", JsonPrimitive(uiAutomation?.get("available").asBooleanOrNull() == true))
+      uiAutomation?.let { put("uiAutomation", it) }
       put("sessionCount", JsonPrimitive(orderedSessions.size))
       put("activeRunCount", JsonPrimitive(activeRuns.size))
       put("clientCount", JsonPrimitive(clients.size))

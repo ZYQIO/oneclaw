@@ -12,6 +12,7 @@ import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
+import ai.openclaw.app.protocol.OpenClawUiCommand
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,6 +48,7 @@ class InvokeCommandRegistryTest {
       OpenClawNotificationsCommand.List.rawValue,
       OpenClawNotificationsCommand.Actions.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
+      OpenClawUiCommand.State.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,
       OpenClawContactsCommand.Search.rawValue,
       OpenClawContactsCommand.Add.rawValue,

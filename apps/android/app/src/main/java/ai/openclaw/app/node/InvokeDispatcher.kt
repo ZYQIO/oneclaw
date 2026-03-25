@@ -13,6 +13,7 @@ import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
+import ai.openclaw.app.protocol.OpenClawUiCommand
 
 class InvokeDispatcher(
   private val canvas: CanvasController,
@@ -21,6 +22,7 @@ class InvokeDispatcher(
   private val deviceHandler: DeviceHandler,
   private val notificationsHandler: NotificationsHandler,
   private val systemHandler: SystemHandler,
+  private val uiAutomationHandler: UiAutomationHandler,
   private val photosHandler: PhotosHandler,
   private val contactsHandler: ContactsHandler,
   private val calendarHandler: CalendarHandler,
@@ -142,6 +144,9 @@ class InvokeDispatcher(
 
       // System command
       OpenClawSystemCommand.Notify.rawValue -> systemHandler.handleSystemNotify(paramsJson)
+
+      // UI automation command
+      OpenClawUiCommand.State.rawValue -> uiAutomationHandler.handleUiState(paramsJson)
 
       // Photos command
       ai.openclaw.app.protocol.OpenClawPhotosCommand.Latest.rawValue -> photosHandler.handlePhotosLatest(

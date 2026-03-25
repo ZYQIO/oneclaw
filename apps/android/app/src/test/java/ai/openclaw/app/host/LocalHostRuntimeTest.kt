@@ -244,6 +244,13 @@ class LocalHostRuntimeTest {
               put("batteryOptimizationIgnored", JsonPrimitive(false))
             }
           },
+          uiAutomationStatusProvider = {
+            buildJsonObject {
+              put("enabled", JsonPrimitive(true))
+              put("serviceConnected", JsonPrimitive(true))
+              put("available", JsonPrimitive(true))
+            }
+          },
           codexClient = FakeLocalHostResponsesClient { _, _, _, _, _, _ ->
             error("status snapshot should not call codex client")
           },
@@ -251,8 +258,12 @@ class LocalHostRuntimeTest {
 
       val snapshot = runtime.statusSnapshot()
       val deployment = snapshot.getValue("deployment").jsonObject
+      val uiAutomation = snapshot.getValue("uiAutomation").jsonObject
       assertEquals(true, deployment.getValue("dedicatedEnabled").jsonPrimitive.boolean)
       assertEquals(false, deployment.getValue("batteryOptimizationIgnored").jsonPrimitive.boolean)
+      assertEquals(true, snapshot.getValue("uiAutomationAvailable").jsonPrimitive.boolean)
+      assertEquals(true, uiAutomation.getValue("enabled").jsonPrimitive.boolean)
+      assertEquals(true, uiAutomation.getValue("serviceConnected").jsonPrimitive.boolean)
     }
 
   private fun securePrefs(context: Context, name: String): SecurePrefs {

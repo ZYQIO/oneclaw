@@ -11,6 +11,7 @@ import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
+import ai.openclaw.app.protocol.OpenClawUiCommand
 
 internal object LocalHostCommandPolicy {
   val readOnlyWorkspaceActions: List<String> =
@@ -47,6 +48,7 @@ internal object LocalHostCommandPolicy {
       OpenClawNotificationsCommand.List.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
+      OpenClawUiCommand.State.rawValue,
     )
 
   val advancedRemoteCommands: List<String> =

@@ -147,3 +147,12 @@ enum class OpenClawCallLogCommand(val rawValue: String) {
     const val NamespacePrefix: String = "callLog."
   }
 }
+
+enum class OpenClawUiCommand(val rawValue: String) {
+  State("ui.state"),
+  ;
+
+  companion object {
+    const val NamespacePrefix: String = "ui."
+  }
+}

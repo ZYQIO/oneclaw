@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ai.openclaw.app.GatewayConnectionMode
 import ai.openclaw.app.MainViewModel
+import ai.openclaw.app.accessibility.openLocalHostUiAutomationSettings
 import ai.openclaw.app.dedicatedHostBackgroundPolicyNote
 import ai.openclaw.app.isDedicatedHostBatteryOptimizationIgnored
 import ai.openclaw.app.openDedicatedHostAppSettings
@@ -86,6 +87,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   val localHostRemoteAccessToken by viewModel.localHostRemoteAccessToken.collectAsState()
   val localHostRemoteAccessStatusText by viewModel.localHostRemoteAccessStatusText.collectAsState()
   val localHostRemoteAccessUrl by viewModel.localHostRemoteAccessUrl.collectAsState()
+  val localHostUiAutomationStatus by viewModel.localHostUiAutomationStatus.collectAsState()
   val localHostDedicatedDeploymentEnabled by viewModel.localHostDedicatedDeploymentEnabled.collectAsState()
   val manualHost by viewModel.manualHost.collectAsState()
   val manualPort by viewModel.manualPort.collectAsState()
@@ -116,10 +118,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   var batteryOptimizationIgnored by remember(context) { mutableStateOf(isDedicatedHostBatteryOptimizationIgnored(context)) }
   val backgroundPolicyNote = remember { dedicatedHostBackgroundPolicyNote() }
   DisposableEffect(context, lifecycleOwner) {
+    viewModel.refreshLocalHostUiAutomationStatus()
     val observer =
       LifecycleEventObserver { _, event ->
         if (event == Lifecycle.Event.ON_RESUME) {
           batteryOptimizationIgnored = isDedicatedHostBatteryOptimizationIgnored(context)
+          viewModel.refreshLocalHostUiAutomationStatus()
         }
       }
     lifecycleOwner.lifecycle.addObserver(observer)
@@ -287,6 +291,68 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     }
 
     if (connectionMode == GatewayConnectionMode.LocalHost) {
+      Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = mobileCardSurface,
+        border = BorderStroke(1.dp, mobileBorder),
+      ) {
+        Column(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+              Text("UI automation", style = mobileHeadline, color = mobileText)
+              Text(
+                "Prepare on-device accessibility access for future `ui.state`, `ui.tap`, and bounded cross-app control.",
+                style = mobileCallout,
+                color = mobileTextSecondary,
+              )
+            }
+            Button(
+              onClick = { openLocalHostUiAutomationSettings(context) },
+              shape = RoundedCornerShape(12.dp),
+              colors = settingsPrimaryButtonColors(),
+              contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+              Text(
+                if (localHostUiAutomationStatus.enabled) "Review access" else "Enable",
+                style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
+              )
+            }
+          }
+
+          Text(
+            localHostUiAutomationStatus.statusText,
+            style = mobileCallout,
+            color =
+              when {
+                localHostUiAutomationStatus.available -> mobileSuccess
+                localHostUiAutomationStatus.enabled -> mobileWarning
+                else -> mobileTextSecondary
+              },
+          )
+          Text(
+            localHostUiAutomationStatus.detailText,
+            style = mobileCaption1,
+            color = mobileTextSecondary,
+          )
+          Text(
+            "Once enabled, local-host `/status` will report `uiAutomationAvailable` and a detailed `uiAutomation` readiness object.",
+            style = mobileCaption1,
+            color = mobileTextSecondary,
+          )
+        }
+      }
+
       Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -668,7 +734,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             color = mobileTextSecondary,
           )
           Text(
-            "Probe `/status` first if you want a one-shot readiness snapshot with Codex auth, session counts, and enabled command tiers.",
+            "Probe `/status` first if you want a one-shot readiness snapshot with Codex auth, session counts, enabled command tiers, and UI automation readiness.",
             style = mobileCaption1,
             color = mobileTextSecondary,
           )

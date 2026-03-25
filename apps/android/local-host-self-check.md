@@ -34,7 +34,10 @@ Mark each item only with direct evidence. / 每一项都必须基于直接证据
 - [x] 凭证会在过期前成功刷新。Credential refresh succeeds before expiry.
 - [x] 缺失 Codex 凭证时，聊天会给出清晰错误。Missing Codex credential produces a clear error for chat.
 - [x] 模型调用所需的 account identifier 会被正确解析。Account identifier is resolved correctly for model calls.
-- [ ] 流式文本更新能进入本机 Host 聊天管线。Streaming text updates reach the local-host chat pipeline.
+- [x] 流式文本更新能进入本机 Host 聊天管线。Streaming text updates reach the local-host chat pipeline.
+
+Code-level confidence note / 代码级确认:
+`OpenAICodexResponsesClient` streams `response.output_text.delta`, `LocalHostRuntime` re-emits assistant delta as both `event:"agent"` and `state:"delta"` chat payloads, `ChatController` maps those into `streamingAssistantText`, and `ChatMessageListCard` renders the streaming bubble. On March 25, 2026, after restoring egress through a trusted LAN proxy and topping up Codex usage, `pnpm android:local-host:streaming` completed successfully with `deltaCount=68` and `terminalState=final`, so the remaining work is no longer proving the streaming path itself. / `OpenAICodexResponsesClient` 已会流式处理 `response.output_text.delta`，`LocalHostRuntime` 会把 assistant delta 同时重发成 `event:"agent"` 和 `state:"delta"` 的聊天事件，`ChatController` 会把它们映射到 `streamingAssistantText`，`ChatMessageListCard` 也会渲染流式气泡。2026 年 3 月 25 日，在通过可信 LAN 代理恢复外网出口并补充 Codex 额度后，`pnpm android:local-host:streaming` 已成功完成，记录到 `deltaCount=68` 和 `terminalState=final`，因此后续工作已不再是证明 streaming 路径本身。
 
 ### Validation Quality / 验证质量
 
@@ -64,13 +67,14 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 - Device / 设备: `<android-device>`
 - Android version / Android 版本: `15`
 - Build commit / 构建提交: `post-Codex-validation working tree on March 23, 2026`
-- Network setup / 网络环境: host -> phone over LAN (`http://<phone-ip>:3945`); `adb forward` connected but did not return `/status`
+- Network setup / 网络环境: host -> phone over LAN (`http://<phone-ip>:3945`); `adb forward` connected but did not return `/status`; direct phone egress to `chatgpt.com` timed out on the current network, so the successful streaming proof used a trusted LAN proxy path through the host
 
 ### Local Host / 本机 Host
 
 - Local Host start result / 本机 Host 启动结果: `Connected`; app entered `Local Host` after onboarding bypass for validation
 - Codex sign-in result / Codex 登录结果: completed in-app through the browser flow; `/status` reports `codexAuthConfigured=true`
 - Local chat result / 本地聊天结果: `/chat/send-wait` returned `Android local host is working.`
+- Streaming text result / 流式文本结果: on March 25, 2026, a long-prompt run first showed repeated `chat state=delta` events and eventually reached `state=final` in raw `/events`; a follow-up `pnpm android:local-host:streaming` run with a shorter prompt then passed directly with `deltaCount=68` and `terminalState=final`
 
 ### Remote Control / 远程控制
 
@@ -85,30 +89,33 @@ Fill this out during validation runs. / 在执行验证时填写本节。
 - Disabled write-tier behavior / 写命令层关闭行为: `/invoke` with `sms.send` returned `command is not enabled for remote access`
 - Missing permission behavior / 权限缺失行为: `contacts.search` -> `CONTACTS_PERMISSION_REQUIRED`, `calendar.events` -> `CALENDAR_PERMISSION_REQUIRED`, `photos.latest` -> `PHOTOS_PERMISSION_REQUIRED`, `system.notify` -> `NOT_AUTHORIZED: notifications`
 - Codex expiry or missing-auth behavior / Codex 过期或缺失行为: clear missing-auth error observed from `/chat/send-wait`; proactive `POST /auth/codex/refresh` succeeded and advanced `expiresAt`
+- Codex usage-limit behavior / Codex 额度耗尽行为: an earlier March 25, 2026 streaming retry reached the service through a trusted LAN proxy, then `/events` returned `The usage limit has been reached | errorType=usage_limit_reached` before any `state=delta`; after usage was topped up, the same validation path succeeded
 
 ### Verdict / 结论
 
-- [ ] Go / 通过
-- [x] No go / 不通过
+- [x] Go / 通过
+- [ ] No go / 不通过
 
-Reason / 原因: the real-device happy path, refresh path, and permission-failure validation are now covered, but the streaming-text self-check item still lacks dedicated on-device evidence.
+Reason / 原因: every exit criterion in this file now has direct evidence, including a real-device `delta -> final` streaming capture.
+Reason addendum / 补充说明: a deliberately forced "signed in but truly expired token" repro is still optional hardening, but it is no longer treated as an MVP blocker because missing-auth errors, proactive refresh, and `auth/codex/status` already give a clear recovery path. / 补充说明：刻意构造“已登录但真过期 token”的复现仍可作为可选加固，但它已不再视为 MVP blocker，因为缺失授权错误、主动 refresh 与 `auth/codex/status` 已经提供了清晰恢复路径。
 
 ## Next Session Focus / 下一会话重点
 
 Use this as the shortest checklist when resuming work. / 新会话恢复工作时，可直接把这一节当作最短清单。
 
-1. 判断是否需要补“流式文本更新”这一条真机证据。Decide whether the "streaming text updates" evidence still needs a dedicated real-device run.
-2. 复核远程默认值、token 轮换和网络暴露说明。Review remote defaults, token rotation, and network-exposure guidance.
-3. 确认完成后，重新评估 `Go / No go`。After that, re-evaluate the `Go / No go` verdict.
+1. 决定先做 setup/packaging polish，还是切到 UI 自动化下一阶段。Decide whether setup/packaging polish or the next UI-automation phase comes next.
+2. 如果还想继续加固，再决定是否值得补一个 debug-only expired-auth 验证入口。If more hardening is still wanted, decide whether a debug-only expired-auth validation path is worth adding.
+3. 保持文档对当前 `Go` 结论一致。Keep the docs aligned on the current `Go` verdict.
 
 Recommended evidence updates / 建议补充的证据:
 
-- 在本文件中决定是否把 streaming evidence 作为出货前硬门槛。Decide in this file whether streaming evidence remains a hard ship gate.
-- 在文档里补齐远程默认值和 token 指引。Fill in the remote defaults and token guidance in docs.
+- 在本文件中保留 streaming 已通过的直接证据，并把 `usage_limit_reached` 继续记成 account-quota 边界，而不是实现回归。Keep the direct evidence that streaming has now passed in this file, and continue recording `usage_limit_reached` as an account-quota boundary rather than an implementation regression.
+- 把 `apps/android/README.md` 继续作为远程默认值和 token 指引的基线文档。Keep `apps/android/README.md` as the baseline doc for remote defaults and token guidance.
 - 在 `apps/android/local-host-progress.md` 追加新的日期日志。Append a new dated log entry to `apps/android/local-host-progress.md`.
+- 如果需要将来重新验证 streaming，优先跑 `pnpm android:local-host:streaming`；它会要求同一条 run 在 `final` 前至少出现一次 `chat state=delta`，并保存原始事件与 summary JSON。若结果再次是 `usage_limit_reached`，不要继续当成 Android bug 排查。If streaming needs to be revalidated in the future, prefer running `pnpm android:local-host:streaming`; it requires the same run to emit at least one `chat state=delta` before `final`, and it saves raw events plus a summary JSON. If the result is `usage_limit_reached` again, do not keep treating it as an Android bug hunt.
 
 Avoid drifting scope / 避免范围漂移:
 
-- 不要先扩更多远程命令。Do not expand the remote command surface first.
+- 不要先扩更多远程命令；当前 MVP 命令面已经视为冻结。Do not expand the remote command surface first; the current MVP command surface is now considered frozen.
 - 不要先改公网暴露方案。Do not redesign public exposure first.
 - 先把收尾判断和文档边界写清楚，再决定是否继续加功能。Write down the close-out judgment and doc boundaries before deciding on more features.

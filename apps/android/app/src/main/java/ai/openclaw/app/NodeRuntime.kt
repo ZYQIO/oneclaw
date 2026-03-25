@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
+import ai.openclaw.app.accessibility.localHostUiAutomationActiveWindowSnapshot
+import ai.openclaw.app.accessibility.localHostUiAutomationStatusSnapshot
 import ai.openclaw.app.chat.ChatController
 import ai.openclaw.app.chat.ChatMessage
 import ai.openclaw.app.chat.ChatPendingToolCall
@@ -111,6 +113,11 @@ class NodeRuntime(
     appContext = appContext,
   )
 
+  private val uiAutomationHandler: UiAutomationHandler = UiAutomationHandler(
+    readinessSnapshot = { localHostUiAutomationStatusSnapshot(appContext) },
+    activeWindowSnapshot = { localHostUiAutomationActiveWindowSnapshot() },
+  )
+
   private val photosHandler: PhotosHandler = PhotosHandler(
     appContext = appContext,
   )
@@ -161,6 +168,7 @@ class NodeRuntime(
     deviceHandler = deviceHandler,
     notificationsHandler = notificationsHandler,
     systemHandler = systemHandler,
+    uiAutomationHandler = uiAutomationHandler,
     photosHandler = photosHandler,
     contactsHandler = contactsHandler,
     calendarHandler = calendarHandler,
@@ -219,6 +227,9 @@ class NodeRuntime(
     json = json,
     deploymentStatusProvider = {
       dedicatedHostDeploymentStatusSnapshot(appContext, prefs)
+    },
+    uiAutomationStatusProvider = {
+      localHostUiAutomationStatusSnapshot(appContext).toJson()
     },
     codexClient =
       OpenAICodexResponsesClient(

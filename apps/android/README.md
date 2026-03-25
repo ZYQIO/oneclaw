@@ -169,6 +169,40 @@ Optional overrides:
 
 The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`, and `/invoke`, then prints a compact summary.
 
+## Local Host Streaming Validation
+
+Use this when you want direct evidence that streaming deltas arrive before the final assistant message.
+
+USB-friendly flow with `adb forward`:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
+pnpm android:local-host:streaming
+```
+
+Direct LAN flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL='http://<phone-ip>:3945' \
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:streaming
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_MESSAGE=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_WAIT_MS=30000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_EVENT_WAIT_MS=4000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_THINKING=low`
+- `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
+
+The streaming smoke script calls `/chat/send`, polls `/events`, and fails unless it sees at least one `chat state=delta` event before the terminal `final` event. It writes raw event payloads and a compact summary into the artifact directory it prints at the end.
+
+- The underlying model request still goes to `https://chatgpt.com/backend-api/codex/responses`, so streaming validation needs a real network path from the phone or its trusted proxy/VPN to that endpoint.
+- If direct phone egress is blocked on the current network, retry through a trusted LAN proxy or VPN path before treating the result as an Android regression.
+- If the raw `/events` payload returns `errorType=usage_limit_reached`, treat that as a Codex account-quota blocker rather than evidence that the streaming pipeline itself regressed.
+
 ## Local Host Auth + Permission Validation
 
 Codex auth metadata and refresh can be checked remotely without exposing tokens:
@@ -180,6 +214,18 @@ curl -H 'Authorization: Bearer <token-from-connect-tab>' \
 curl -X POST -H 'Authorization: Bearer <token-from-connect-tab>' \
   http://<phone-ip>:3945/api/local-host/v1/auth/codex/refresh
 ```
+
+## Local Host Remote Access Defaults
+
+- Remote access is off by default. Turn it on from `Connect -> Local Host` only when you need a trusted client to reach the phone.
+- Prefer `LAN` or a trusted tunnel such as `adb forward`, Tailscale, or another private VPN path. Do not expose `http://<phone-ip>:3945` directly to the public internet or through a broad port-forward.
+- Start with `/status` before using `/chat/*` or `/invoke`; it gives a one-shot readiness snapshot with Codex auth state, deployment readiness, and enabled remote-command tiers.
+- The Connect tab shows the current bearer token. Use `Regenerate token` after sharing it, after a validation session, or any time a client or device should lose access.
+- `POST /auth/codex/refresh` refreshes Codex model auth. It does not rotate the remote-access bearer token; rotate that separately from the Connect tab when access should be revoked.
+- Leave the default read-control surface in place for routine checks. Enable `Advanced remote commands` only when you need camera actions, and enable `Write remote commands` only for trusted clients that truly need `sms.send`, `contacts.add`, `calendar.add`, or `notifications.actions`.
+- For the current MVP, treat that read-control set plus the optional camera/write tiers as the intended remote surface. Broader cross-app automation belongs to the separate UI-automation phase, not to this MVP close-out.
+- For dedicated idle-phone deployments, keep advanced and write tiers off unless the operator is actively using them, and avoid swipe-to-clear on OEMs that turn Recents removal into a package `force stop`.
+- If you want a direct streaming-proof artifact for the self-check, run `pnpm android:local-host:streaming` and keep the generated event log plus summary JSON.
 
 Permission failure validation script:
 
