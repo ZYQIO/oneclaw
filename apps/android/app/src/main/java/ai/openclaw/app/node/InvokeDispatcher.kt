@@ -14,6 +14,7 @@ import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
 import ai.openclaw.app.protocol.OpenClawUiCommand
+import ai.openclaw.app.node.toJsonString
 
 class InvokeDispatcher(
   private val canvas: CanvasController,
@@ -148,6 +149,8 @@ class InvokeDispatcher(
       // UI automation command
       OpenClawUiCommand.State.rawValue -> uiAutomationHandler.handleUiState(paramsJson)
       OpenClawUiCommand.WaitForText.rawValue -> uiAutomationHandler.handleWaitForText(paramsJson)
+      OpenClawUiCommand.Back.rawValue -> uiAutomationHandler.handleBack(paramsJson)
+      OpenClawUiCommand.Home.rawValue -> uiAutomationHandler.handleHome(paramsJson)
 
       // Photos command
       ai.openclaw.app.protocol.OpenClawPhotosCommand.Latest.rawValue -> photosHandler.handlePhotosLatest(

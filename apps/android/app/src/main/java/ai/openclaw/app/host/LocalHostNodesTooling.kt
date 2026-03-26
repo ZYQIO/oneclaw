@@ -88,6 +88,8 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
+      NodesActionSpec(name = "ui_back", command = OpenClawUiCommand.Back.rawValue),
+      NodesActionSpec(name = "ui_home", command = OpenClawUiCommand.Home.rawValue),
       NodesActionSpec(name = "contacts_search", command = OpenClawContactsCommand.Search.rawValue),
       NodesActionSpec(name = "contacts_add", command = OpenClawContactsCommand.Add.rawValue),
       NodesActionSpec(name = "calendar_events", command = OpenClawCalendarCommand.Events.rawValue),
@@ -299,7 +301,9 @@ internal class LocalHostNodesToolBridge(
       "device_info",
       "device_permissions",
       "device_health",
-      "ui_state" -> buildJsonObject {}
+      "ui_state",
+      "ui_back",
+      "ui_home" -> buildJsonObject {}
       "ui_wait_for_text" ->
         buildJsonObject {
           copyString(params, "text")

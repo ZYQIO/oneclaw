@@ -52,6 +52,12 @@ class OpenClawAccessibilityService : AccessibilityService() {
       ComponentName(context, OpenClawAccessibilityService::class.java)
 
     fun snapshotActiveWindow(): JsonObject? = activeService?.snapshotActiveWindowInternal()
+
+    fun performGlobalBack(): Boolean =
+      activeService?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK) == true
+
+    fun performGlobalHome(): Boolean =
+      activeService?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) == true
   }
 
   private fun snapshotActiveWindowInternal(): JsonObject? {

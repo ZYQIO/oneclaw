@@ -40,6 +40,8 @@ class LocalHostNodesToolingTest {
     assertTrue("device_permissions" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
+    assertFalse("ui_back" in actions)
+    assertFalse("ui_home" in actions)
     assertFalse("sms_send" in actions)
     assertFalse("contacts_add" in actions)
     assertFalse("calendar_add" in actions)
@@ -126,5 +128,30 @@ class LocalHostNodesToolingTest {
         )
 
       assertTrue(result.outputText.contains("matched"))
+    }
+
+  @Test
+  fun uiBack_mapsInvokeCommandForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.back", command)
+            org.junit.Assert.assertEquals("{}", paramsJson)
+            GatewaySession.InvokeResult.ok("""{"ok":true,"action":"back"}""")
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"ui_back"}""",
+        )
+
+      assertTrue(result.outputText.contains("back"))
     }
 }

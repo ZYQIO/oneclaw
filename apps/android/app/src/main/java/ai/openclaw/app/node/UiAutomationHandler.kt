@@ -3,6 +3,12 @@ package ai.openclaw.app.node
 import android.os.SystemClock
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
 import ai.openclaw.app.gateway.GatewaySession
+import ai.openclaw.app.node.asObjectOrNull
+import ai.openclaw.app.node.asStringOrNull
+import ai.openclaw.app.node.parseJsonBooleanFlag
+import ai.openclaw.app.node.parseJsonInt
+import ai.openclaw.app.node.parseJsonParamsObject
+import ai.openclaw.app.node.parseJsonString
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -42,6 +48,12 @@ class UiAutomationHandler(
   private val activeWindowSnapshot: () -> JsonObject?,
   private val monotonicClockMs: () -> Long = { SystemClock.elapsedRealtime() },
   private val sleeper: suspend (Long) -> Unit = { delay(it) },
+  private val performBackAction: () -> Boolean = {
+    ai.openclaw.app.accessibility.OpenClawAccessibilityService.performGlobalBack()
+  },
+  private val performHomeAction: () -> Boolean = {
+    ai.openclaw.app.accessibility.OpenClawAccessibilityService.performGlobalHome()
+  },
 ) {
   fun handleUiState(_paramsJson: String?): GatewaySession.InvokeResult {
     val readiness = readinessSnapshot()
@@ -160,6 +172,14 @@ class UiAutomationHandler(
     )
   }
 
+  fun handleBack(_paramsJson: String?): GatewaySession.InvokeResult {
+    return handleGlobalAction(commandName = "back", action = performBackAction)
+  }
+
+  fun handleHome(_paramsJson: String?): GatewaySession.InvokeResult {
+    return handleGlobalAction(commandName = "home", action = performHomeAction)
+  }
+
   private fun buildUiStatePayload(
     readiness: LocalHostUiAutomationStatus,
     activeWindow: JsonObject?,
@@ -233,5 +253,37 @@ class UiAutomationHandler(
         .take(4)
     if (values.isEmpty()) return ""
     return values.joinToString(separator = ", ") { value -> "`$value`" }
+  }
+
+  private fun handleGlobalAction(
+    commandName: String,
+    action: () -> Boolean,
+  ): GatewaySession.InvokeResult {
+    val readiness = readinessSnapshot()
+    if (!readiness.enabled) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_DISABLED",
+        message = "UI_AUTOMATION_DISABLED: enable the OpenClaw accessibility service first",
+      )
+    }
+    if (!readiness.serviceConnected) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_UNAVAILABLE",
+        message = "UI_AUTOMATION_UNAVAILABLE: accessibility service is enabled but not yet bound",
+      )
+    }
+    if (!action()) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_ACTION_FAILED",
+        message = "UI_ACTION_FAILED: ui.$commandName was not accepted by the accessibility service",
+      )
+    }
+    val payload =
+      buildJsonObject {
+        put("ok", JsonPrimitive(true))
+        put("action", JsonPrimitive(commandName))
+        put("performed", JsonPrimitive(true))
+      }
+    return GatewaySession.InvokeResult.ok(payload.toString())
   }
 }

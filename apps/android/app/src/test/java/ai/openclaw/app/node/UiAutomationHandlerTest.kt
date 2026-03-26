@@ -208,4 +208,52 @@ class UiAutomationHandlerTest {
       assertFalse(result.ok)
       assertEquals("UI_AUTOMATION_DISABLED", result.error?.code)
     }
+
+  @Test
+  fun handleBack_runsInjectedGlobalAction() {
+    var backInvoked = false
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performBackAction = {
+          backInvoked = true
+          true
+        },
+      )
+
+    val result = handler.handleBack(null)
+
+    assertTrue(backInvoked)
+    assertTrue(result.ok)
+    val payload = json.parseToJsonElement(result.payloadJson!!).jsonObject
+    assertEquals("back", payload.getValue("action").jsonPrimitive.content)
+  }
+
+  @Test
+  fun handleHome_failsClearlyWhenGlobalActionRejected() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performHomeAction = { false },
+      )
+
+    val result = handler.handleHome(null)
+
+    assertFalse(result.ok)
+    assertEquals("UI_ACTION_FAILED", result.error?.code)
+  }
 }
