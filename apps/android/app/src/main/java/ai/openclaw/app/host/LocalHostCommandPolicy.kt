@@ -65,6 +65,9 @@ internal object LocalHostCommandPolicy {
       OpenClawContactsCommand.Add.rawValue,
       OpenClawNotificationsCommand.Actions.rawValue,
       OpenClawSmsCommand.Send.rawValue,
+      OpenClawUiCommand.Tap.rawValue,
+      OpenClawUiCommand.Back.rawValue,
+      OpenClawUiCommand.Home.rawValue,
     )
 
   fun isRemoteChatRole(role: String): Boolean = role.trim() == "remote-operator"

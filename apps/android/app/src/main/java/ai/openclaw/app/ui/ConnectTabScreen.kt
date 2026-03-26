@@ -171,6 +171,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           append("-H 'Content-Type: application/json' ")
           append("$baseUrl/api/local-host/v1/invoke ")
           append("-d '{\"command\":\"sms.send\",\"params\":{\"to\":\"+15551234567\",\"body\":\"Check in when you land.\"}}'")
+          append("\n\n")
+          append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
+          append("-H 'Content-Type: application/json' ")
+          append("$baseUrl/api/local-host/v1/invoke ")
+          append("-d '{\"command\":\"ui.tap\",\"params\":{\"text\":\"Chat\",\"matchMode\":\"exact\"}}'")
         }
       }
     }
@@ -712,7 +717,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             ) {
               Text("Write remote commands", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
               Text(
-                "Allow remote `sms.send`, `contacts.add`, `calendar.add`, and `notifications.actions`. Enable this only on networks and clients you trust.",
+                "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, and bounded `ui.tap` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
                 style = mobileCaption1,
                 color = mobileTextSecondary,
               )
@@ -741,11 +746,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           Text(
             when {
               localHostRemoteAccessAdvancedCommandsEnabled && localHostRemoteAccessWriteCommandsEnabled ->
-                "Remote `/invoke` allows the default read-control set plus camera and write-capable commands."
+                "Remote `/invoke` allows the default read-control set plus camera and write-capable commands, including bounded UI actions."
               localHostRemoteAccessAdvancedCommandsEnabled ->
                 "Remote `/invoke` allows the default read-control set plus camera commands."
               localHostRemoteAccessWriteCommandsEnabled ->
-                "Remote `/invoke` allows the default read-control set plus write-capable commands."
+                "Remote `/invoke` allows the default read-control set plus write-capable commands, including bounded UI actions."
               else ->
                 "Remote `/invoke` currently allows read-only device, location, notifications, contacts, calendar, photos, motion, call-log commands plus `system.notify`."
             },

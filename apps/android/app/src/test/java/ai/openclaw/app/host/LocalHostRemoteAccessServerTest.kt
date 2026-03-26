@@ -174,6 +174,9 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"dedicatedEnabled\":true"))
       assertTrue(response.body.contains("\"taskLockRecommended\":true"))
       assertTrue(response.body.contains("\"sms.send\""))
+      assertTrue(response.body.contains("\"ui.tap\""))
+      assertTrue(response.body.contains("\"ui.back\""))
+      assertTrue(response.body.contains("\"ui.home\""))
     } finally {
       server.stop()
       scope.cancel()
@@ -310,6 +313,9 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"notifications.actions\""))
       assertTrue(response.body.contains("\"contacts.add\""))
       assertTrue(response.body.contains("\"calendar.add\""))
+      assertTrue(response.body.contains("\"ui.tap\""))
+      assertTrue(response.body.contains("\"ui.back\""))
+      assertTrue(response.body.contains("\"ui.home\""))
     } finally {
       server.stop()
       scope.cancel()
@@ -542,6 +548,8 @@ class LocalHostRemoteAccessServerTest {
       assertEquals(200, response.statusCode)
       assertTrue(response.body.contains("\"invoke-sms-send\""))
       assertTrue(response.body.contains("sms.send"))
+      assertTrue(response.body.contains("\"invoke-ui-tap\""))
+      assertTrue(response.body.contains("ui.tap"))
     } finally {
       server.stop()
       scope.cancel()

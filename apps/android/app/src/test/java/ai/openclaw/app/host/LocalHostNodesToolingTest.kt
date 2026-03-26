@@ -157,6 +157,34 @@ class LocalHostNodesToolingTest {
     }
 
   @Test
+  fun remoteRole_includesUiWriteActionsWhenWriteTierIsEnabled() {
+    val bridge =
+      LocalHostNodesToolBridge(
+        json = json,
+        invoke = { _, _ -> GatewaySession.InvokeResult.ok("""{"ok":true}""") },
+        allowAdvancedRemoteCommands = { false },
+        allowWriteRemoteCommands = { true },
+      )
+
+    val tools = bridge.toolsForRole(role = "remote-operator")
+    val actions =
+      tools
+        .single()
+        .parameters
+        .getValue("properties")
+        .jsonObject
+        .getValue("action")
+        .jsonObject
+        .getValue("enum")
+        .jsonArray
+        .map { it.jsonPrimitive.content }
+
+    assertTrue("ui_tap" in actions)
+    assertTrue("ui_back" in actions)
+    assertTrue("ui_home" in actions)
+  }
+
+  @Test
   fun uiTap_mapsSelectorParamsForOperatorSessions() =
     runTest {
       val bridge =
