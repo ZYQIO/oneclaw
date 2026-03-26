@@ -27,6 +27,8 @@ As of March 26, 2026, the MVP happy path is working, the streaming gate has dire
 - 远程访问默认值、token 轮换和网络暴露说明现在已写入 `apps/android/README.md`，并明确只推荐 `LAN` / trusted tunnel、先探测 `/status`、以及在需要撤销访问时单独再生成 bearer token。Remote-access defaults, token rotation, and network-exposure guidance are now written down in `apps/android/README.md`, explicitly recommending only `LAN` / trusted tunnels, probing `/status` first, and regenerating the bearer token separately when access should be revoked.
 - 当前 MVP 远程命令面现在视为已收口：默认只读远控集 + 可选相机高级层 + 可选写操作层 + 共享 write gate 的 workspace 写能力；如果需要更广的手机操作能力，应转到单独的 UI 自动化阶段，而不是继续扩这条 MVP。The current MVP remote-command surface is now considered frozen: the default read-only remote set plus the optional camera advanced tier, the optional write tier, and workspace writes behind the shared write gate; broader phone-control capability should move into the separate UI-automation phase instead of expanding this MVP further.
 - UI 自动化阶段已经不再只是规划：Android app 里已有 `AccessibilityService` 骨架、Connect 页 readiness、`/status.host.uiAutomation*` 状态，以及第一条只读 `ui.state` 命令；未开启服务时它会返回结构化原因，开启后会返回当前窗口的 `packageName`、`visibleText`、`nodeCount` 和扁平节点摘要。The UI-automation phase is no longer just a plan: the Android app now has an `AccessibilityService` skeleton, Connect-tab readiness, `/status.host.uiAutomation*` state, and a first read-only `ui.state` command; before the service is enabled it returns a structured reason, and once enabled it returns the active window's `packageName`, `visibleText`, `nodeCount`, and a flattened node summary.
+- 2026 年 3 月 26 日已在真机补齐第一条 bounded control loop：write tier 关闭时远端只允许 `ui.state` / `ui.waitForText`，开启 write 后才放出 `ui.tap` / `ui.back` / `ui.home`；`ui.tap(text=\"Chat\")` 已成功切到 Chat tab，而 `ui.home` 与 `ui.back` 都能把活动 `packageName` 切到 `com.android.launcher`。On March 26, 2026, the first bounded control loop was completed on-device: with the write tier off, remote access only allows `ui.state` / `ui.waitForText`, and only after enabling write do `ui.tap` / `ui.back` / `ui.home` appear; `ui.tap(text=\"Chat\")` now successfully switches to the Chat tab, and both `ui.home` and `ui.back` move the active `packageName` to `com.android.launcher`.
+- “怎么操控手机”的调研结论继续写在 `apps/android/local-host-ui-automation-plan.md`：主路线仍是 app 内 `AccessibilityService`，把 ADB / Appium / `Open-AutoGLM` 当参考而不是主运行时。The answer to “how should we control the phone” continues to live in `apps/android/local-host-ui-automation-plan.md`: the primary path is still an in-app `AccessibilityService`, while ADB / Appium / `Open-AutoGLM` remain references rather than the main runtime.
 - 与这条 UI 自动化切片直接相关的 Android 编译和单测已经重新通过，包括 `:app:compileDebugKotlin` 以及定向的 `LocalHostRuntimeTest`、`LocalHostRemoteAccessServerTest`、`InvokeCommandRegistryTest`、`UiAutomationHandlerTest`。The Android compile and targeted tests directly tied to this UI-automation slice have been rerun successfully, including `:app:compileDebugKotlin` plus the targeted `LocalHostRuntimeTest`, `LocalHostRemoteAccessServerTest`, `InvokeCommandRegistryTest`, and `UiAutomationHandlerTest`.
 - `Dedicated host deployment` 形态已经接进 app：支持 idle-phone 场景下的前台服务保活、开机恢复、升级后恢复，以及本机 Host 掉线后的自愈重连。A `Dedicated host deployment` mode is now wired into the app: it supports idle-phone keepalive with foreground service persistence, restore after reboot, restore after app updates, and self-heal reconnect when Local Host drops.
 - dedicated 模式现在还会把 Android 电池优化状态直接展示出来，并提供跳转到电池豁免请求的入口；远端 `device.status` 也能看到 `backgroundExecution.batteryOptimizationIgnored`。Dedicated mode now also shows Android battery-optimization state directly and links to the battery-exemption flow; remote `device.status` can also see `backgroundExecution.batteryOptimizationIgnored`.
@@ -199,6 +201,7 @@ bash apps/android/scripts/local-host-permission-smoke.sh
 ## Known Quirks / 已知注意事项
 
 - `./gradlew :app:installDebug` 在这台设备上可能触发 ddmlib `InstallException: -99`，但直接 `adb install -r -d ...apk` 是可行的。`./gradlew :app:installDebug` may hit ddmlib `InstallException: -99` on this device, but direct `adb install -r -d ...apk` works.
+- 在当前 OPPO / ColorOS 真机上，重新安装 APK 后 accessibility grant 会被系统清空；如果 `ui.state` 突然回到 disabled，要先重新开启 OpenClaw 的无障碍服务。On the current OPPO / ColorOS phone, reinstalling the APK clears the accessibility grant; if `ui.state` suddenly returns to disabled again, re-enable the OpenClaw accessibility service first.
 - `pnpm android:local-host:smoke` 依赖当前 shell 能找到 `pnpm`；如果环境里 `pnpm` shim 不可用，直接调用脚本本体即可。`pnpm android:local-host:smoke` depends on a working `pnpm` shim; if `pnpm` is unavailable in the shell, run the script directly instead.
 - 这台 Android 15 设备拒绝 shell 侧 `pm revoke` 和 `appops set`；权限脚本会在权限已被拒绝时直接验证失败路径，只在权限已授予时才尝试临时撤回。This Android 15 device rejects shell-side `pm revoke` and `appops set`; the permission script validates already-denied cases directly and only attempts temporary revocation when a permission starts granted.
 - 这台 OPPO / ColorOS V15 设备会把 `Recents` 划卡当成系统级 `force stop`，并清空 app 闹钟；对 dedicated 部署来说，这比普通后台回收更激进。This OPPO / ColorOS V15 device treats a Recents swipe-away as a system-level `force stop` and clears the app's alarms; for dedicated deployment this is more aggressive than ordinary background eviction.
@@ -210,33 +213,34 @@ bash apps/android/scripts/local-host-permission-smoke.sh
 
 ### P0 / 最高优先级
 
-1. 先在真机上重新确认无障碍服务 readiness 与 `ui.state`。Reconfirm accessibility-service readiness plus `ui.state` on a real phone first.
-2. 继续推进第一条 UI 自动化闭环，优先 `wait_for_text`。Keep pushing the first UI-automation loop, with `wait_for_text` first.
+1. 先把当前真机 observe / wait / act 证据做成可重复的 smoke 路径。Turn the current real-device observe / wait / act proof into a repeatable smoke path first.
+2. 再补最缺的跨 app 动作，优先 `launch_app` 与 `input_text`。Then add the most missing cross-app actions, with `launch_app` and `input_text` first.
 
 ### P1 / 次优先级
 
-1. 再补第一批 bounded actions：`tap`、`back`、`home`。Then add the first bounded actions: `tap`, `back`, and `home`.
+1. 继续强化 selector 模型，优先资源 ID、包名作用域和更稳定的节点匹配顺序。Keep strengthening the selector model, prioritizing resource IDs, package-name scoping, and more stable node matching order.
 2. 如需补强，再做一次更强的 expired-auth 验证，但继续把它视为 hardening，不是 blocker。If more hardening is wanted, run a stronger expired-auth validation, but keep treating it as hardening rather than a blocker.
 
 ## Tomorrow Checklist / 明日清单
 
 If resuming tomorrow, do these in order. / 如果明天继续，按这个顺序推进。
 
-1. 先跑一次 `/status`，确认手机还在 `Local Host`。Run `/status` first and confirm the phone is still in `Local Host`.
-2. 再跑一次 `ui.state`，确认无障碍服务当前是否开启，以及 readiness 原因是否符合预期。Then run `ui.state` to confirm whether accessibility is currently enabled and whether the readiness reason matches expectations.
-3. 从 `wait_for_text` 开始，而不是先扩更多 UI 命令名。Start from `wait_for_text` rather than expanding a larger list of UI command names first.
+1. 先跑一次 `/status` 与 `ui.state`，确认手机还在 `Local Host`，并检查 accessibility grant 是否还在。Run `/status` plus `ui.state` first, confirm the phone is still in `Local Host`, and check whether the accessibility grant is still present.
+2. 若刚重装过 APK，优先恢复 OpenClaw 的无障碍服务，再继续任何 UI 自动化验证。If the APK was just reinstalled, restore the OpenClaw accessibility service before continuing any UI-automation validation.
+3. 先把现有 `ui.state` / `ui.waitForText` / `ui.tap` / `ui.home` / `ui.back` 组合成可重复的 smoke 路径。Turn the existing `ui.state` / `ui.waitForText` / `ui.tap` / `ui.home` / `ui.back` set into a repeatable smoke path first.
 4. 保持授权回跳问题处于挂起状态，不要让它打断当前 UI 自动化推进。Keep the auth-return issue parked so it does not interrupt the current UI-automation push.
 
 ## Suggested Next-Session Plan / 下一会话建议推进方式
 
 1. 先读 `apps/android/local-host-progress.md` 的 `Resume Plan`。Start with the `Resume Plan` in `apps/android/local-host-progress.md`.
-2. 先跑一次 `/status` 和 `ui.state`，确认手机仍在 `Local Host` 且 UI automation readiness 可见。Run `/status` and `ui.state` to confirm the phone is still in `Local Host` and UI-automation readiness is visible.
-3. 再读 `apps/android/local-host-ui-automation-plan.md` 里新的 next-session plan，按 `wait_for_text` -> `tap/back/home` 的顺序推进。Then read the updated next-session plan in `apps/android/local-host-ui-automation-plan.md` and continue in the order `wait_for_text` -> `tap/back/home`.
+2. 先跑一次 `/status` 和 `ui.state`，确认手机仍在 `Local Host` 且 UI automation readiness 可见；若刚重装过 APK，先恢复 accessibility grant。Run `/status` and `ui.state` to confirm the phone is still in `Local Host` and UI-automation readiness is visible; if the APK was just reinstalled, restore the accessibility grant first.
+3. 再读 `apps/android/local-host-ui-automation-plan.md` 里的当前 next-session plan，优先把现有闭环做成 smoke，再继续 `launch_app` / `input_text`。Then read the current next-session plan in `apps/android/local-host-ui-automation-plan.md`, first turn the existing loop into a smoke path, then continue with `launch_app` / `input_text`.
 4. 如果要继续补强，直接看 `apps/android/local-host-self-check.md` 里关于 optional hardening 的说明。If more hardening is wanted, jump straight to the optional-hardening note in `apps/android/local-host-self-check.md`.
 
 ## Related Docs / 相关文档
 
 - `apps/android/local-host-progress.md`
+- `apps/android/local-host-phone-control.md`
 - `apps/android/local-host-self-check.md`
 - `apps/android/local-host-ui-automation-plan.md`
 - `apps/android/README.md`
