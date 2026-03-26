@@ -150,6 +150,7 @@ enum class OpenClawCallLogCommand(val rawValue: String) {
 
 enum class OpenClawUiCommand(val rawValue: String) {
   State("ui.state"),
+  WaitForText("ui.waitForText"),
   ;
 
   companion object {

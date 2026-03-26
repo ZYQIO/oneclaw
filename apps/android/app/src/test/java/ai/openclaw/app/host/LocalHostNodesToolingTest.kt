@@ -38,6 +38,8 @@ class LocalHostNodesToolingTest {
 
     assertTrue("device_status" in actions)
     assertTrue("device_permissions" in actions)
+    assertTrue("ui_state" in actions)
+    assertTrue("ui_wait_for_text" in actions)
     assertFalse("sms_send" in actions)
     assertFalse("contacts_add" in actions)
     assertFalse("calendar_add" in actions)
@@ -97,5 +99,32 @@ class LocalHostNodesToolingTest {
       org.junit.Assert.assertEquals(1, result.imageInputs.size)
       org.junit.Assert.assertEquals("image/jpeg", result.imageInputs.single().mimeType)
       org.junit.Assert.assertEquals("ZmFrZS1waG90bw==", result.imageInputs.single().base64)
+    }
+
+  @Test
+  fun uiWaitForText_mapsInvokeParams() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.waitForText", command)
+            assertTrue(paramsJson.orEmpty().contains("Continue"))
+            assertTrue(paramsJson.orEmpty().contains("packageName"))
+            GatewaySession.InvokeResult.ok("""{"ok":true,"wait":{"matched":true}}""")
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson =
+            """{"action":"ui_wait_for_text","text":"Continue","timeoutMs":1500,"pollIntervalMs":100,"packageName":"com.example.app"}""",
+        )
+
+      assertTrue(result.outputText.contains("matched"))
     }
 }

@@ -147,6 +147,7 @@ class InvokeDispatcher(
 
       // UI automation command
       OpenClawUiCommand.State.rawValue -> uiAutomationHandler.handleUiState(paramsJson)
+      OpenClawUiCommand.WaitForText.rawValue -> uiAutomationHandler.handleWaitForText(paramsJson)
 
       // Photos command
       ai.openclaw.app.protocol.OpenClawPhotosCommand.Latest.rawValue -> photosHandler.handlePhotosLatest(

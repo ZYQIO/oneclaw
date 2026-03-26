@@ -49,6 +49,7 @@ class InvokeCommandRegistryTest {
       OpenClawNotificationsCommand.Actions.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
       OpenClawUiCommand.State.rawValue,
+      OpenClawUiCommand.WaitForText.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,
       OpenClawContactsCommand.Search.rawValue,
       OpenClawContactsCommand.Add.rawValue,

@@ -49,6 +49,7 @@ internal object LocalHostCommandPolicy {
       OpenClawPhotosCommand.Latest.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
       OpenClawUiCommand.State.rawValue,
+      OpenClawUiCommand.WaitForText.rawValue,
     )
 
   val advancedRemoteCommands: List<String> =

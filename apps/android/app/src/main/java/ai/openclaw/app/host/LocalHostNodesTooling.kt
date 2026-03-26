@@ -12,6 +12,7 @@ import ai.openclaw.app.protocol.OpenClawNotificationsCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
+import ai.openclaw.app.protocol.OpenClawUiCommand
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -85,6 +86,8 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_info", command = OpenClawDeviceCommand.Info.rawValue),
       NodesActionSpec(name = "device_permissions", command = OpenClawDeviceCommand.Permissions.rawValue),
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
+      NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
+      NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
       NodesActionSpec(name = "contacts_search", command = OpenClawContactsCommand.Search.rawValue),
       NodesActionSpec(name = "contacts_add", command = OpenClawContactsCommand.Add.rawValue),
       NodesActionSpec(name = "calendar_events", command = OpenClawCalendarCommand.Events.rawValue),
@@ -220,7 +223,13 @@ internal class LocalHostNodesToolBridge(
           putStringEnumProperty("notificationAction", listOf("open", "dismiss", "reply"))
           putStringProperty("notificationReplyText")
           putStringProperty("query")
+          putStringProperty("text")
           putNumberProperty("limit")
+          putNumberProperty("timeoutMs")
+          putNumberProperty("pollIntervalMs")
+          putBooleanProperty("ignoreCase")
+          putStringEnumProperty("matchMode", listOf("contains", "exact"))
+          putStringProperty("packageName")
           putStringProperty("givenName")
           putStringProperty("familyName")
           putStringProperty("organizationName")
@@ -289,7 +298,17 @@ internal class LocalHostNodesToolBridge(
       "device_status",
       "device_info",
       "device_permissions",
-      "device_health" -> buildJsonObject {}
+      "device_health",
+      "ui_state" -> buildJsonObject {}
+      "ui_wait_for_text" ->
+        buildJsonObject {
+          copyString(params, "text")
+          copyNumber(params, "timeoutMs")
+          copyNumber(params, "pollIntervalMs")
+          copyBoolean(params, "ignoreCase")
+          copyString(params, "matchMode")
+          copyString(params, "packageName")
+        }
       "notifications_action" ->
         buildJsonObject {
           readString(params, "notificationKey")?.let { put("key", JsonPrimitive(it)) }
