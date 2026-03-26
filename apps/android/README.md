@@ -224,6 +224,9 @@ curl -X POST -H 'Authorization: Bearer <token-from-connect-tab>' \
 - `POST /auth/codex/refresh` refreshes Codex model auth. It does not rotate the remote-access bearer token; rotate that separately from the Connect tab when access should be revoked.
 - Leave the default read-control surface in place for routine checks. Enable `Advanced remote commands` only when you need camera actions, and enable `Write remote commands` only for trusted clients that truly need `sms.send`, `contacts.add`, `calendar.add`, or `notifications.actions`.
 - For the current MVP, treat that read-control set plus the optional camera/write tiers as the intended remote surface. Broader cross-app automation belongs to the separate UI-automation phase, not to this MVP close-out.
+- The first UI-automation phone-control slice now exists separately from the MVP close-out surface: `ui.state` and `ui.waitForText` stay read-only by default, while `ui.tap`, `ui.back`, and `ui.home` sit behind the remote write tier.
+- On the current OPPO / ColorOS device, reinstalling the APK clears the OpenClaw accessibility grant. If UI automation suddenly reports disabled after reinstall, reopen the Connect tab and re-enable the OpenClaw accessibility service before debugging further.
+- For the shortest phone-control summary, read `apps/android/local-host-phone-control.md`. For the deeper research and runtime direction, read `apps/android/local-host-ui-automation-plan.md`.
 - For dedicated idle-phone deployments, keep advanced and write tiers off unless the operator is actively using them, and avoid swipe-to-clear on OEMs that turn Recents removal into a package `force stop`.
 - If you want a direct streaming-proof artifact for the self-check, run `pnpm android:local-host:streaming` and keep the generated event log plus summary JSON.
 
