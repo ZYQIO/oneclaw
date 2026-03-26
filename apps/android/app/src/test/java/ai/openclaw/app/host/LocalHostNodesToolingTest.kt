@@ -40,6 +40,7 @@ class LocalHostNodesToolingTest {
     assertTrue("device_permissions" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
+    assertFalse("ui_tap" in actions)
     assertFalse("ui_back" in actions)
     assertFalse("ui_home" in actions)
     assertFalse("sms_send" in actions)
@@ -153,5 +154,33 @@ class LocalHostNodesToolingTest {
         )
 
       assertTrue(result.outputText.contains("back"))
+    }
+
+  @Test
+  fun uiTap_mapsSelectorParamsForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.tap", command)
+            assertTrue(paramsJson.orEmpty().contains("\"text\":\"Continue\""))
+            assertTrue(paramsJson.orEmpty().contains("\"packageName\":\"com.example.app\""))
+            assertTrue(paramsJson.orEmpty().contains("\"index\":1"))
+            GatewaySession.InvokeResult.ok("""{"ok":true,"action":"tap","strategy":"node_click"}""")
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson =
+            """{"action":"ui_tap","text":"Continue","packageName":"com.example.app","index":1,"matchMode":"exact"}""",
+        )
+
+      assertTrue(result.outputText.contains("tap"))
     }
 }

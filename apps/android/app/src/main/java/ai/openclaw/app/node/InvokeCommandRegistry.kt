@@ -133,6 +133,9 @@ object InvokeCommandRegistry {
         name = OpenClawUiCommand.WaitForText.rawValue,
       ),
       InvokeCommandSpec(
+        name = OpenClawUiCommand.Tap.rawValue,
+      ),
+      InvokeCommandSpec(
         name = OpenClawUiCommand.Back.rawValue,
       ),
       InvokeCommandSpec(

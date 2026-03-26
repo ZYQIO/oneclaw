@@ -1,6 +1,8 @@
 package ai.openclaw.app.node
 
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
+import ai.openclaw.app.accessibility.UiAutomationTapRequest
+import ai.openclaw.app.accessibility.UiAutomationTapResult
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -208,6 +210,97 @@ class UiAutomationHandlerTest {
       assertFalse(result.ok)
       assertEquals("UI_AUTOMATION_DISABLED", result.error?.code)
     }
+
+  @Test
+  fun handleTap_passesSelectorRequestToInjectedAction() {
+    var capturedRequest: UiAutomationTapRequest? = null
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performTapAction = { request ->
+          capturedRequest = request
+          UiAutomationTapResult(
+            performed = true,
+            strategy = "node_click",
+            packageName = "com.example.app",
+            matchedText = "Continue",
+            x = 120.0,
+            y = 320.0,
+          )
+        },
+      )
+
+    val result =
+      handler.handleTap(
+        """{"text":"Continue","packageName":"com.example.app","matchMode":"exact","index":1}""",
+      )
+
+    assertTrue(result.ok)
+    val request = capturedRequest
+    org.junit.Assert.assertNotNull(request)
+    assertEquals("Continue", request?.text)
+    assertEquals("com.example.app", request?.packageName)
+    assertEquals(true, request?.exactMatch)
+    assertEquals(1, request?.index)
+    val payload = json.parseToJsonElement(result.payloadJson!!).jsonObject
+    assertEquals("tap", payload.getValue("action").jsonPrimitive.content)
+    assertEquals("Continue", payload.getValue("matchedText").jsonPrimitive.content)
+  }
+
+  @Test
+  fun handleTap_rejectsMixedCoordinateAndSelectorModes() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+      )
+
+    val result = handler.handleTap("""{"x":12,"y":34,"text":"Continue"}""")
+
+    assertFalse(result.ok)
+    assertEquals("INVALID_REQUEST", result.error?.code)
+  }
+
+  @Test
+  fun handleTap_surfacesTargetLookupFailuresClearly() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performTapAction = {
+          UiAutomationTapResult(
+            performed = false,
+            errorCode = "UI_TARGET_NOT_FOUND",
+            reason = "No matching accessibility node was found for the requested tap selector.",
+          )
+        },
+      )
+
+    val result = handler.handleTap("""{"text":"Continue"}""")
+
+    assertFalse(result.ok)
+    assertEquals("UI_TARGET_NOT_FOUND", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("requested tap selector"))
+  }
 
   @Test
   fun handleBack_runsInjectedGlobalAction() {

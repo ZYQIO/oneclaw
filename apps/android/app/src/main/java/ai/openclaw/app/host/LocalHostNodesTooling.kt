@@ -88,6 +88,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
+      NodesActionSpec(name = "ui_tap", command = OpenClawUiCommand.Tap.rawValue),
       NodesActionSpec(name = "ui_back", command = OpenClawUiCommand.Back.rawValue),
       NodesActionSpec(name = "ui_home", command = OpenClawUiCommand.Home.rawValue),
       NodesActionSpec(name = "contacts_search", command = OpenClawContactsCommand.Search.rawValue),
@@ -226,9 +227,14 @@ internal class LocalHostNodesToolBridge(
           putStringProperty("notificationReplyText")
           putStringProperty("query")
           putStringProperty("text")
+          putStringProperty("contentDescription")
+          putStringProperty("resourceId")
           putNumberProperty("limit")
           putNumberProperty("timeoutMs")
           putNumberProperty("pollIntervalMs")
+          putNumberProperty("x")
+          putNumberProperty("y")
+          putNumberProperty("index")
           putBooleanProperty("ignoreCase")
           putStringEnumProperty("matchMode", listOf("contains", "exact"))
           putStringProperty("packageName")
@@ -304,6 +310,18 @@ internal class LocalHostNodesToolBridge(
       "ui_state",
       "ui_back",
       "ui_home" -> buildJsonObject {}
+      "ui_tap" ->
+        buildJsonObject {
+          copyNumber(params, "x")
+          copyNumber(params, "y")
+          copyString(params, "text")
+          copyString(params, "contentDescription")
+          copyString(params, "resourceId")
+          copyString(params, "packageName")
+          copyNumber(params, "index")
+          copyBoolean(params, "ignoreCase")
+          copyString(params, "matchMode")
+        }
       "ui_wait_for_text" ->
         buildJsonObject {
           copyString(params, "text")

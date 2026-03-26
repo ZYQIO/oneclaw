@@ -2,10 +2,13 @@ package ai.openclaw.app.node
 
 import android.os.SystemClock
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
+import ai.openclaw.app.accessibility.UiAutomationTapRequest
+import ai.openclaw.app.accessibility.UiAutomationTapResult
 import ai.openclaw.app.gateway.GatewaySession
 import ai.openclaw.app.node.asObjectOrNull
 import ai.openclaw.app.node.asStringOrNull
 import ai.openclaw.app.node.parseJsonBooleanFlag
+import ai.openclaw.app.node.parseJsonDouble
 import ai.openclaw.app.node.parseJsonInt
 import ai.openclaw.app.node.parseJsonParamsObject
 import ai.openclaw.app.node.parseJsonString
@@ -43,6 +46,24 @@ private data class WaitForTextRequest(
   val packageName: String?,
 )
 
+private data class TapRequest(
+  val x: Double?,
+  val y: Double?,
+  val text: String?,
+  val contentDescription: String?,
+  val resourceId: String?,
+  val packageName: String?,
+  val ignoreCase: Boolean,
+  val matchMode: UiTextMatchMode,
+  val index: Int,
+) {
+  val hasCoordinates: Boolean
+    get() = x != null || y != null
+
+  val hasSelector: Boolean
+    get() = listOf(text, contentDescription, resourceId).any { !it.isNullOrEmpty() }
+}
+
 class UiAutomationHandler(
   private val readinessSnapshot: () -> LocalHostUiAutomationStatus,
   private val activeWindowSnapshot: () -> JsonObject?,
@@ -53,6 +74,9 @@ class UiAutomationHandler(
   },
   private val performHomeAction: () -> Boolean = {
     ai.openclaw.app.accessibility.OpenClawAccessibilityService.performGlobalHome()
+  },
+  private val performTapAction: (UiAutomationTapRequest) -> UiAutomationTapResult = { request ->
+    ai.openclaw.app.accessibility.OpenClawAccessibilityService.performTap(request)
   },
 ) {
   fun handleUiState(_paramsJson: String?): GatewaySession.InvokeResult {
@@ -180,6 +204,110 @@ class UiAutomationHandler(
     return handleGlobalAction(commandName = "home", action = performHomeAction)
   }
 
+  fun handleTap(paramsJson: String?): GatewaySession.InvokeResult {
+    val request =
+      parseTapRequest(paramsJson)
+        ?: return GatewaySession.InvokeResult.error(
+          code = "INVALID_REQUEST",
+          message =
+            "INVALID_REQUEST: expected JSON object with x/y or text/contentDescription/resourceId and optional packageName/matchMode/ignoreCase/index",
+        )
+    if (request.hasCoordinates && (request.x == null || request.y == null)) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.tap requires both x and y when using coordinate mode",
+      )
+    }
+    if (request.hasCoordinates && request.hasSelector) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.tap accepts either coordinates or selector fields, not both",
+      )
+    }
+    if (!request.hasCoordinates && !request.hasSelector) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.tap requires x/y or at least one selector field",
+      )
+    }
+    if ((request.x ?: 0.0) < 0.0 || (request.y ?: 0.0) < 0.0) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.tap coordinates must be non-negative",
+      )
+    }
+    if (request.index < 0) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.tap index must be zero or greater",
+      )
+    }
+
+    val readiness = readinessSnapshot()
+    if (!readiness.enabled) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_DISABLED",
+        message = "UI_AUTOMATION_DISABLED: enable the OpenClaw accessibility service first",
+      )
+    }
+    if (!readiness.serviceConnected) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_UNAVAILABLE",
+        message = "UI_AUTOMATION_UNAVAILABLE: accessibility service is enabled but not yet bound",
+      )
+    }
+
+    val result =
+      performTapAction(
+        UiAutomationTapRequest(
+          x = request.x,
+          y = request.y,
+          text = request.text,
+          contentDescription = request.contentDescription,
+          resourceId = request.resourceId,
+          packageName = request.packageName,
+          exactMatch = request.matchMode == UiTextMatchMode.Exact,
+          ignoreCase = request.ignoreCase,
+          index = request.index,
+        ),
+      )
+    if (!result.performed) {
+      val errorCode = result.errorCode ?: "UI_ACTION_FAILED"
+      val reason = result.reason ?: "ui.tap was not accepted by the accessibility service"
+      return GatewaySession.InvokeResult.error(
+        code = errorCode,
+        message = "$errorCode: $reason",
+      )
+    }
+
+    val payload =
+      buildJsonObject {
+        put("ok", JsonPrimitive(true))
+        put("action", JsonPrimitive("tap"))
+        put("performed", JsonPrimitive(true))
+        result.strategy?.let { put("strategy", JsonPrimitive(it)) }
+        result.packageName?.let { put("packageName", JsonPrimitive(it)) }
+        result.matchedText?.let { put("matchedText", JsonPrimitive(it)) }
+        result.matchedContentDescription?.let { put("matchedContentDescription", JsonPrimitive(it)) }
+        result.resourceId?.let { put("resourceId", JsonPrimitive(it)) }
+        result.x?.let { put("x", JsonPrimitive(it)) }
+        result.y?.let { put("y", JsonPrimitive(it)) }
+        put(
+          "selector",
+          buildJsonObject {
+            request.text?.let { put("text", JsonPrimitive(it)) }
+            request.contentDescription?.let { put("contentDescription", JsonPrimitive(it)) }
+            request.resourceId?.let { put("resourceId", JsonPrimitive(it)) }
+            request.packageName?.let { put("packageName", JsonPrimitive(it)) }
+            put("matchMode", JsonPrimitive(request.matchMode.wireValue))
+            put("ignoreCase", JsonPrimitive(request.ignoreCase))
+            put("index", JsonPrimitive(request.index))
+          },
+        )
+      }
+    return GatewaySession.InvokeResult.ok(payload.toString())
+  }
+
   private fun buildUiStatePayload(
     readiness: LocalHostUiAutomationStatus,
     activeWindow: JsonObject?,
@@ -221,6 +349,22 @@ class UiAutomationHandler(
       ignoreCase = parseJsonBooleanFlag(params, "ignoreCase") ?: true,
       matchMode = matchMode,
       packageName = parseJsonString(params, "packageName")?.trim()?.ifEmpty { null },
+    )
+  }
+
+  private fun parseTapRequest(paramsJson: String?): TapRequest? {
+    val params = parseJsonParamsObject(paramsJson) ?: return null
+    val matchMode = UiTextMatchMode.parse(parseJsonString(params, "matchMode")) ?: return null
+    return TapRequest(
+      x = parseJsonDouble(params, "x"),
+      y = parseJsonDouble(params, "y"),
+      text = parseJsonString(params, "text")?.trim()?.ifEmpty { null },
+      contentDescription = parseJsonString(params, "contentDescription")?.trim()?.ifEmpty { null },
+      resourceId = parseJsonString(params, "resourceId")?.trim()?.ifEmpty { null },
+      packageName = parseJsonString(params, "packageName")?.trim()?.ifEmpty { null },
+      ignoreCase = parseJsonBooleanFlag(params, "ignoreCase") ?: true,
+      matchMode = matchMode,
+      index = parseJsonInt(params, "index") ?: 0,
     )
   }
 
