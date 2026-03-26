@@ -19,6 +19,21 @@ ADB, Appium, `Open-AutoGLM`, and similar systems are useful references, but they
 - It keeps the core runtime on the phone instead of requiring a nearby laptop or a permanent remote controller. / 它让核心运行时留在手机上，而不是依赖一台近旁电脑或常驻远程控制端。
 - It also gives us a clean safety boundary: keep write actions behind explicit on-device enablement and the remote write tier. / 它还能提供清晰的安全边界：写动作继续放在显式设备侧开启和远端 write tier 门控之后。
 
+## What Recent GitHub Work Changes / 最近 GitHub 开源给出的新信号
+
+- [`droidrun/droidrun-portal`](https://github.com/droidrun/droidrun-portal) is now the closest runtime blueprint for OpenClaw Android: it uses an Android accessibility service, exports JSON UI trees, exposes launchable-app discovery, supports keyboard text input, and can run with local or reverse connections. / [`droidrun/droidrun-portal`](https://github.com/droidrun/droidrun-portal) 现在是最接近 OpenClaw Android 的 runtime 参考：它基于 Android 无障碍服务，导出 JSON UI 树，暴露可启动 app 列表，支持键盘文本输入，并且既能本地运行，也能反向连接。
+- [`zai-org/Open-AutoGLM`](https://github.com/zai-org/Open-AutoGLM) is still the clearest external-controller reference: its README centers on Python + VLM + ADB/HDC orchestration, remote debugging, and ADB-keyboard-style text input. That is useful for control-loop ideas and fallback mechanisms, but it is not the runtime shape we want for “the phone itself is the host.” / [`zai-org/Open-AutoGLM`](https://github.com/zai-org/Open-AutoGLM) 仍然是最清晰的外部主控参考：它的 README 主轴是 Python + VLM + ADB/HDC 编排、远程调试，以及类似 ADB Keyboard 的文本输入。这对动作闭环和兜底机制有参考价值，但不是“手机自己就是 host”要采用的运行时形态。
+- [`bytedance/UI-TARS`](https://github.com/bytedance/UI-TARS), [`X-PLUG/MobileAgent`](https://github.com/X-PLUG/MobileAgent), [`OpenBMB/AgentCPM-GUI`](https://github.com/OpenBMB/AgentCPM-GUI), and [`showlab/ShowUI`](https://github.com/showlab/ShowUI) mostly change the model layer, not the Android embedding layer: they provide stronger action schemas, mobile prompts, grounding, planning, reflection, memory, and compact on-device JSON action spaces. / [`bytedance/UI-TARS`](https://github.com/bytedance/UI-TARS)、[`X-PLUG/MobileAgent`](https://github.com/X-PLUG/MobileAgent)、[`OpenBMB/AgentCPM-GUI`](https://github.com/OpenBMB/AgentCPM-GUI)、[`showlab/ShowUI`](https://github.com/showlab/ShowUI) 主要改变的是模型层，而不是 Android 内嵌 runtime 层：它们提供了更强的动作 schema、移动端 prompt、grounding、planning、reflection、memory，以及更紧凑的端侧 JSON 动作空间。
+- [`google-research/android_world`](https://github.com/google-research/android_world) plus [`GUI-CEval`](https://arxiv.org/abs/2603.15039) should be treated as validation references, not runtime templates. They are the right inspiration for repeatable smoke, regression, and task evaluation once OpenClaw has a stable phone-control surface. / [`google-research/android_world`](https://github.com/google-research/android_world) 和 [`GUI-CEval`](https://arxiv.org/abs/2603.15039) 更应该被当成验证参考，而不是 runtime 模板。等 OpenClaw 有了稳定的手机操控面之后，它们才是做可重复 smoke、回归和任务评测的正确灵感来源。
+
+## How To Land It / 具体怎么落地
+
+- Keep the runtime local and Android-native first: expand the in-app `AccessibilityService` surface rather than adding a separate ADB-first controller. / 第一阶段继续保持 runtime 在手机内、Android 原生：优先扩 app 内 `AccessibilityService` 能力面，而不是再加一层 ADB-first 主控器。
+- Add `launch_app` next with a `packageName`-first contract and a normal Android launch intent. If package discovery becomes a blocker later, add a read-only launchable-app listing surface after that. / 下一步先补 `launch_app`，接口以 `packageName` 为主，并走正常 Android launch intent。如果后面 package 发现成为阻塞，再补一个只读的可启动 app 列表能力。
+- Add `input_text` after that by targeting the focused editable node and using accessibility text-setting first. Keep keyboard-IME-style fallbacks as a later compatibility layer, not the first dependency. / 再补 `input_text`，优先对准当前焦点 editable 节点，并先走无障碍文本设置能力。类似键盘 IME 的兜底应留作后续兼容层，而不是第一依赖。
+- Only after `launch_app` and `input_text` are stable should we spend more time on screenshot-grounding augmentation from `ShowUI`, `UI-TARS`, or `AgentCPM-GUI`. / 只有在 `launch_app` 和 `input_text` 稳定之后，才值得继续投入 `ShowUI`、`UI-TARS`、`AgentCPM-GUI` 这类截图 grounding 增强。
+- Use `AndroidWorld`-style and `GUI-CEval`-style tasks to judge progress, rather than treating “demo works once” as enough. / 进度判断应逐步靠近 `AndroidWorld` 风格和 `GUI-CEval` 风格的任务验证，而不是把“demo 成功一次”当成足够。
+
 ## What Works Now / 现在已经能做什么
 
 - `ui.state`: read the active window snapshot, including `packageName`, visible text, and node count. / `ui.state`：读取当前活动窗口快照，包括 `packageName`、可见文本和节点数量。
@@ -35,8 +50,8 @@ ADB, Appium, `Open-AutoGLM`, and similar systems are useful references, but they
 
 ## What Is Still Missing / 现在还缺什么
 
-- `launch_app`, so the phone can leave OpenClaw without ADB help. / `launch_app`，这样手机离开 OpenClaw 时就不再需要 ADB 帮忙。
-- `input_text`, so flows can move beyond pure navigation. / `input_text`，这样流程才能超出纯导航。
+- `launch_app`, ideally package-first in v1, so the phone can leave OpenClaw without ADB help. / `launch_app`，第一版最好以 package 为主，这样手机离开 OpenClaw 时就不再需要 ADB 帮忙。
+- `input_text`, ideally focused-field-first in v1, so flows can move beyond pure navigation. / `input_text`，第一版最好先从焦点输入框出发，这样流程才能超出纯导航。
 - Richer selectors such as stronger `resourceId` support and more stable node ranking. / 更丰富的 selector，例如更强的 `resourceId` 支持和更稳定的节点排序。
 - A repeatable real-device smoke script for the current observe / wait / act loop. / 一条可重复的真机 smoke 脚本，用来验证当前 observe / wait / act 闭环。
 
