@@ -65,6 +65,7 @@ internal object LocalHostCommandPolicy {
       OpenClawContactsCommand.Add.rawValue,
       OpenClawNotificationsCommand.Actions.rawValue,
       OpenClawSmsCommand.Send.rawValue,
+      OpenClawUiCommand.LaunchApp.rawValue,
       OpenClawUiCommand.Tap.rawValue,
       OpenClawUiCommand.Back.rawValue,
       OpenClawUiCommand.Home.rawValue,

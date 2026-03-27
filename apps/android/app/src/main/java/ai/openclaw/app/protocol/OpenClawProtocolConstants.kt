@@ -151,6 +151,7 @@ enum class OpenClawCallLogCommand(val rawValue: String) {
 enum class OpenClawUiCommand(val rawValue: String) {
   State("ui.state"),
   WaitForText("ui.waitForText"),
+  LaunchApp("ui.launchApp"),
   Tap("ui.tap"),
   Back("ui.back"),
   Home("ui.home"),

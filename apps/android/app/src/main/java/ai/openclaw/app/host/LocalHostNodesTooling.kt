@@ -88,6 +88,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
+      NodesActionSpec(name = "ui_launch_app", command = OpenClawUiCommand.LaunchApp.rawValue),
       NodesActionSpec(name = "ui_tap", command = OpenClawUiCommand.Tap.rawValue),
       NodesActionSpec(name = "ui_back", command = OpenClawUiCommand.Back.rawValue),
       NodesActionSpec(name = "ui_home", command = OpenClawUiCommand.Home.rawValue),
@@ -310,6 +311,10 @@ internal class LocalHostNodesToolBridge(
       "ui_state",
       "ui_back",
       "ui_home" -> buildJsonObject {}
+      "ui_launch_app" ->
+        buildJsonObject {
+          copyString(params, "packageName")
+        }
       "ui_tap" ->
         buildJsonObject {
           copyNumber(params, "x")

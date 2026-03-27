@@ -116,6 +116,12 @@ class NodeRuntime(
   private val uiAutomationHandler: UiAutomationHandler = UiAutomationHandler(
     readinessSnapshot = { localHostUiAutomationStatusSnapshot(appContext) },
     activeWindowSnapshot = { localHostUiAutomationActiveWindowSnapshot() },
+    launchAppAction = { packageName ->
+      UiAutomationHandler.launchAppFromContext(
+        appContext = appContext,
+        packageName = packageName,
+      )
+    },
   )
 
   private val photosHandler: PhotosHandler = PhotosHandler(

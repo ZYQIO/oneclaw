@@ -1,5 +1,8 @@
 package ai.openclaw.app.node
 
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.SystemClock
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
 import ai.openclaw.app.accessibility.UiAutomationTapRequest
@@ -46,6 +49,10 @@ private data class WaitForTextRequest(
   val packageName: String?,
 )
 
+private data class LaunchAppRequest(
+  val packageName: String,
+)
+
 private data class TapRequest(
   val x: Double?,
   val y: Double?,
@@ -64,6 +71,14 @@ private data class TapRequest(
     get() = listOf(text, contentDescription, resourceId).any { !it.isNullOrEmpty() }
 }
 
+data class UiAutomationLaunchAppResult(
+  val launched: Boolean,
+  val packageName: String,
+  val activityClassName: String? = null,
+  val errorCode: String? = null,
+  val reason: String? = null,
+)
+
 class UiAutomationHandler(
   private val readinessSnapshot: () -> LocalHostUiAutomationStatus,
   private val activeWindowSnapshot: () -> JsonObject?,
@@ -75,15 +90,120 @@ class UiAutomationHandler(
   private val performHomeAction: () -> Boolean = {
     ai.openclaw.app.accessibility.OpenClawAccessibilityService.performGlobalHome()
   },
+  private val launchAppAction: (String) -> UiAutomationLaunchAppResult = { packageName ->
+    UiAutomationLaunchAppResult(
+      launched = false,
+      packageName = packageName,
+      errorCode = "APP_LAUNCH_UNAVAILABLE",
+      reason = "No app-launch action is configured for ui.launchApp.",
+    )
+  },
   private val performTapAction: (UiAutomationTapRequest) -> UiAutomationTapResult = { request ->
     ai.openclaw.app.accessibility.OpenClawAccessibilityService.performTap(request)
   },
 ) {
+  companion object {
+    fun launchAppFromContext(
+      appContext: Context,
+      packageName: String,
+    ): UiAutomationLaunchAppResult {
+      val normalizedPackageName = packageName.trim()
+      val packageManager = appContext.packageManager
+      if (!isPackageInstalled(packageManager, normalizedPackageName)) {
+        return UiAutomationLaunchAppResult(
+          launched = false,
+          packageName = normalizedPackageName,
+          errorCode = "APP_NOT_INSTALLED",
+          reason = "Package `$normalizedPackageName` is not installed on this device.",
+        )
+      }
+
+      val launchIntent =
+        packageManager.getLaunchIntentForPackage(normalizedPackageName)
+          ?: return UiAutomationLaunchAppResult(
+            launched = false,
+            packageName = normalizedPackageName,
+            errorCode = "APP_NOT_LAUNCHABLE",
+            reason = "Package `$normalizedPackageName` is installed but has no launchable activity.",
+          )
+      val intent =
+        Intent(launchIntent).apply {
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+      val activityClassName = intent.component?.className ?: intent.resolveActivity(packageManager)?.className
+
+      return try {
+        appContext.startActivity(intent)
+        UiAutomationLaunchAppResult(
+          launched = true,
+          packageName = normalizedPackageName,
+          activityClassName = activityClassName,
+        )
+      } catch (err: Throwable) {
+        UiAutomationLaunchAppResult(
+          launched = false,
+          packageName = normalizedPackageName,
+          activityClassName = activityClassName,
+          errorCode = "APP_LAUNCH_FAILED",
+          reason = err.message ?: "Android rejected the launch intent for `$normalizedPackageName`.",
+        )
+      }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isPackageInstalled(
+      packageManager: PackageManager,
+      packageName: String,
+    ): Boolean {
+      return try {
+        packageManager.getPackageInfo(packageName, 0)
+        true
+      } catch (_: PackageManager.NameNotFoundException) {
+        false
+      }
+    }
+  }
+
   fun handleUiState(_paramsJson: String?): GatewaySession.InvokeResult {
     val readiness = readinessSnapshot()
     val activeWindow = activeWindowSnapshot()
 
     return GatewaySession.InvokeResult.ok(buildUiStatePayload(readiness, activeWindow).toString())
+  }
+
+  fun handleLaunchApp(paramsJson: String?): GatewaySession.InvokeResult {
+    val request =
+      parseLaunchAppRequest(paramsJson)
+        ?: return GatewaySession.InvokeResult.error(
+          code = "INVALID_REQUEST",
+          message = "INVALID_REQUEST: expected JSON object with packageName",
+        )
+    if (request.packageName.isEmpty()) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: packageName is required",
+      )
+    }
+
+    val result = launchAppAction(request.packageName)
+    if (!result.launched) {
+      val errorCode = result.errorCode ?: "APP_LAUNCH_FAILED"
+      val reason = result.reason ?: "ui.launchApp was not accepted by Android"
+      return GatewaySession.InvokeResult.error(
+        code = errorCode,
+        message = "$errorCode: $reason",
+      )
+    }
+
+    val payload =
+      buildJsonObject {
+        put("ok", JsonPrimitive(true))
+        put("action", JsonPrimitive("launchApp"))
+        put("launched", JsonPrimitive(true))
+        put("packageName", JsonPrimitive(result.packageName))
+        result.activityClassName?.let { put("activityClassName", JsonPrimitive(it)) }
+      }
+    return GatewaySession.InvokeResult.ok(payload.toString())
   }
 
   suspend fun handleWaitForText(paramsJson: String?): GatewaySession.InvokeResult {
@@ -336,8 +456,15 @@ class UiAutomationHandler(
         put("truncated", JsonPrimitive(false))
         put("visibleText", buildJsonArray {})
         put("nodes", buildJsonArray {})
-      }
     }
+  }
+
+  private fun parseLaunchAppRequest(paramsJson: String?): LaunchAppRequest? {
+    val params = parseJsonParamsObject(paramsJson) ?: return null
+    return LaunchAppRequest(
+      packageName = parseJsonString(params, "packageName")?.trim().orEmpty(),
+    )
+  }
 
   private fun parseWaitForTextRequest(paramsJson: String?): WaitForTextRequest? {
     val params = parseJsonParamsObject(paramsJson) ?: return null

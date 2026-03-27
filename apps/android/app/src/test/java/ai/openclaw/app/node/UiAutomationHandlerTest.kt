@@ -212,6 +212,92 @@ class UiAutomationHandlerTest {
     }
 
   @Test
+  fun handleLaunchApp_passesPackageNameToInjectedAction() {
+    var capturedPackageName: String? = null
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = false,
+            serviceConnected = false,
+            available = false,
+          )
+        },
+        activeWindowSnapshot = { null },
+        launchAppAction = { packageName ->
+          capturedPackageName = packageName
+          UiAutomationLaunchAppResult(
+            launched = true,
+            packageName = packageName,
+            activityClassName = "com.example.app.MainActivity",
+          )
+        },
+      )
+
+    val result = handler.handleLaunchApp("""{"packageName":"com.example.app"}""")
+
+    assertTrue(result.ok)
+    assertEquals("com.example.app", capturedPackageName)
+    val payload = json.parseToJsonElement(result.payloadJson!!).jsonObject
+    assertEquals("launchApp", payload.getValue("action").jsonPrimitive.content)
+    assertEquals("com.example.app", payload.getValue("packageName").jsonPrimitive.content)
+    assertEquals(
+      "com.example.app.MainActivity",
+      payload.getValue("activityClassName").jsonPrimitive.content,
+    )
+  }
+
+  @Test
+  fun handleLaunchApp_requiresPackageName() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = false,
+            serviceConnected = false,
+            available = false,
+          )
+        },
+        activeWindowSnapshot = { null },
+      )
+
+    val result = handler.handleLaunchApp("""{"packageName":"   "}""")
+
+    assertFalse(result.ok)
+    assertEquals("INVALID_REQUEST", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("packageName is required"))
+  }
+
+  @Test
+  fun handleLaunchApp_surfacesLaunchFailuresClearly() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = false,
+            serviceConnected = false,
+            available = false,
+          )
+        },
+        activeWindowSnapshot = { null },
+        launchAppAction = { packageName ->
+          UiAutomationLaunchAppResult(
+            launched = false,
+            packageName = packageName,
+            errorCode = "APP_NOT_LAUNCHABLE",
+            reason = "Package `com.example.app` is installed but has no launchable activity.",
+          )
+        },
+      )
+
+    val result = handler.handleLaunchApp("""{"packageName":"com.example.app"}""")
+
+    assertFalse(result.ok)
+    assertEquals("APP_NOT_LAUNCHABLE", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("no launchable activity"))
+  }
+
+  @Test
   fun handleTap_passesSelectorRequestToInjectedAction() {
     var capturedRequest: UiAutomationTapRequest? = null
     val handler =

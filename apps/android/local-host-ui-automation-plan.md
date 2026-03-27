@@ -2,7 +2,7 @@
 
 Purpose / 用途: capture today's status, findings, and next-session execution plan for making Android `Local Host` capable of operating the phone itself without a nearby computer. / 记录今天的状态、结论和下一会话执行计划，目标是让 Android `Local Host` 在没有电脑陪同的情况下也能自己操作手机。
 
-Last updated / 最后更新: March 26, 2026 / 2026 年 3 月 26 日
+Last updated / 最后更新: March 27, 2026 / 2026 年 3 月 27 日
 
 ## Session Goal / 本次会话目标
 
@@ -10,9 +10,11 @@ Move Android `Local Host` from "GPT can chat plus use curated device tools" towa
 
 ## Status Update / 状态更新
 
-- `ui.state`、`ui.waitForText`、`ui.tap`、`ui.back`、`ui.home` 都已经落地；其中可写 UI 动作继续挂在远端 write tier 后面，默认关闭。`ui.state`, `ui.waitForText`, `ui.tap`, `ui.back`, and `ui.home` are all now landed; the writable UI actions remain behind the remote write tier and stay off by default.
+- `ui.state`、`ui.waitForText`、`ui.launchApp`、`ui.tap`、`ui.back`、`ui.home` 都已经落地；其中 `ui.launchApp`、`ui.tap`、`ui.back`、`ui.home` 继续挂在远端 write tier 后面，默认关闭。`ui.state`, `ui.waitForText`, `ui.launchApp`, `ui.tap`, `ui.back`, and `ui.home` are all now landed; `ui.launchApp`, `ui.tap`, `ui.back`, and `ui.home` remain behind the remote write tier and stay off by default.
 - 2026 年 3 月 26 日已在真实 OPPO / ColorOS 手机上验证第一条 bounded control loop：`ui.tap(text=\"Chat\")` 成功切到 Chat tab，而 `ui.home` 与 `ui.back` 都能把活动窗口切回 `com.android.launcher`。On March 26, 2026, the first bounded control loop was validated on a real OPPO / ColorOS phone: `ui.tap(text=\"Chat\")` successfully switches to the Chat tab, and `ui.home` plus `ui.back` both return the active window to `com.android.launcher`.
-- 同一轮真机验证也确认了门控策略：write tier 关闭时远端只有 `ui.state` / `ui.waitForText`，开启 write 后才会放出 `ui.tap` / `ui.back` / `ui.home`。The same device run also confirmed the gating model: with the write tier off, remote access only exposes `ui.state` / `ui.waitForText`, and only after enabling write do `ui.tap` / `ui.back` / `ui.home` appear.
+- 2026 年 3 月 27 日又补上了 `ui.launchApp`：它采用 `packageName`-first 接口，通过标准 Android launch intent 拉起 app，并为 “未安装” / “已安装但不可启动” 返回清晰错误；相关 Kotlin 编译和定向单测已通过，而且 `ui.launchApp(packageName=\"com.android.settings\")` 已在真机成功把前台 activity 切到 `com.android.settings/.Settings`。On March 27, 2026, `ui.launchApp` was added as well: it uses a `packageName`-first contract, launches apps through standard Android launch intents, and returns clear errors for "not installed" versus "installed but not launchable"; the related Kotlin compile plus targeted unit tests now pass, and `ui.launchApp(packageName=\"com.android.settings\")` has already switched the foreground activity to `com.android.settings/.Settings` on-device.
+- 同一轮验证和代码接线也确认了门控策略：write tier 关闭时远端只有 `ui.state` / `ui.waitForText`，开启 write 后才会放出 `ui.launchApp` / `ui.tap` / `ui.back` / `ui.home`。The same validation and code wiring also confirm the gating model: with the write tier off, remote access only exposes `ui.state` / `ui.waitForText`, and only after enabling write do `ui.launchApp` / `ui.tap` / `ui.back` / `ui.home` appear.
+- 但同一轮真机也暴露了新的 OEM 边界：在当前 OPPO / ColorOS 设备上，OpenClaw 把别的 app 拉到前台后，远端 `/status` 虽然能短时间继续回包，但系统随后会通过 `OplusHansManager` 把后台的 `ai.openclaw.app` 冻住，导致后续远端请求超时，直到 OpenClaw 被重新带回前台。But the same device run also exposed a new OEM boundary: on the current OPPO / ColorOS phone, after OpenClaw brings another app to the foreground, remote `/status` can still answer briefly, but the system later freezes background `ai.openclaw.app` through `OplusHansManager`, and subsequent remote requests time out until OpenClaw is brought back to the foreground.
 - 当前 OPPO / ColorOS 真机在重新安装 APK 后会把 OpenClaw accessibility grant 清空；如果 `ui.state` 突然回到 disabled，需要先重新开启无障碍服务。On the current OPPO / ColorOS phone, reinstalling the APK clears the OpenClaw accessibility grant; if `ui.state` suddenly drops back to disabled, the accessibility service needs to be re-enabled first.
 
 ## What Happened Today / 今天做了什么
@@ -41,12 +43,12 @@ Today the Android app can already do these things well. / 当前 Android app 已
 - Execute a curated set of Android-native actions through the local `nodes` tool. / 通过本机 `nodes` tool 执行一组精选 Android 原生命令。
 - Maintain a dedicated idle-phone deployment with keepalive, restore, and readiness signals. / 以 dedicated idle-phone 形态运行，并具备保活、恢复和 readiness 信号。
 - Use an app-private local `workspace` for file-like operations. / 使用 app-private 本地 `workspace` 做文件式操作。
-- Observe the current active window with `ui.state`, wait on simple text conditions with `ui.waitForText`, and perform bounded `ui.tap` / `ui.back` / `ui.home` actions once accessibility plus the write tier are enabled. / 在开启无障碍服务和 write tier 后，用 `ui.state` 观察当前窗口、用 `ui.waitForText` 等待简单文本条件，并执行有边界的 `ui.tap` / `ui.back` / `ui.home` 动作。
+- Observe the current active window with `ui.state`, wait on simple text conditions with `ui.waitForText`, launch another app with the new package-first `ui.launchApp`, and perform bounded `ui.tap` / `ui.back` / `ui.home` actions once accessibility plus the write tier are enabled. / 在开启无障碍服务和 write tier 后，用 `ui.state` 观察当前窗口、用 `ui.waitForText` 等待简单文本条件、用新的 package-first `ui.launchApp` 拉起其他 app，并执行有边界的 `ui.tap` / `ui.back` / `ui.home` 动作。
 
 What it still cannot do yet. / 但它现在仍然做不到：
 
 - Read a deeper selector-friendly UI tree of other apps. / 读取更适合 selector 的、层次更完整的其他 app UI 树。
-- Launch another app, type text, swipe, long-press, or continue richer multi-step UI flows. / 拉起另一个 app、输入文本、滑动、长按，或继续更丰富的多步 UI 流程。
+- Type text, swipe, long-press, or continue richer multi-step UI flows after app launch without the current OEM background freeze interrupting the host. / 在拉起 app 之后继续输入文本、滑动、长按，或继续更丰富的多步 UI 流程，而且不会被当前 OEM 后台冻结打断。
 - Turn the current manual proof into a durable regression harness. / 把当前仍偏手工的验证过程变成稳定的回归验证面。
 - Behave like the desktop OpenClaw host when a task requires real cross-app navigation. / 在需要真实跨 app 导航时，像桌面 OpenClaw host 那样行动。
 
@@ -57,7 +59,7 @@ This is not mainly an auth problem. / 这主要不是授权问题。
 It is a missing runtime surface. / 而是缺了一层运行时能力面。
 
 - `apps/android/app/src/main/AndroidManifest.xml` now declares an accessibility service, but the runtime surface is still only partially built. / `apps/android/app/src/main/AndroidManifest.xml` 现在已经声明了无障碍服务，但这层运行时能力面仍只完成了一部分。
-- `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeCommandRegistry.kt` and `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeDispatcher.kt` now expose `ui.state`, `ui.waitForText`, `ui.tap`, `ui.back`, and `ui.home`, but there is still no `launch_app`, `swipe`, or `input_text` action path. / `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeCommandRegistry.kt` 和 `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeDispatcher.kt` 现在已经接入 `ui.state`、`ui.waitForText`、`ui.tap`、`ui.back`、`ui.home`，但仍然没有 `launch_app`、`swipe`、`input_text` 这类动作路径。
+- `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeCommandRegistry.kt` and `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeDispatcher.kt` now expose `ui.state`, `ui.waitForText`, `ui.launchApp`, `ui.tap`, `ui.back`, and `ui.home`, but there is still no `input_text`, `swipe`, or launchable-app listing path. / `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeCommandRegistry.kt` 和 `apps/android/app/src/main/java/ai/openclaw/app/node/InvokeDispatcher.kt` 现在已经接入 `ui.state`、`ui.waitForText`、`ui.launchApp`、`ui.tap`、`ui.back`、`ui.home`，但仍然没有 `input_text`、`swipe` 或可启动 app 列表这类路径。
 - The current `ui.state` output is intentionally lightweight: it is good enough for readiness, simple waits, and the first bounded actions, but it is not yet a selector-friendly control surface. / 当前 `ui.state` 输出是有意保持轻量的：它已经足够做 readiness、简单等待和第一批 bounded actions，但还不足以成为 selector-friendly 的操控面。
 - The model can only act within the runtime surface that exists, so until we add app launch, text entry, richer selectors, and a repeatable validation harness, the phone still cannot complete broader cross-app tasks reliably. / 模型只能在 runtime 已暴露的能力面内行动，所以在补上 app launch、文本输入、更丰富的 selector 和可重复验证面之前，手机仍然不能稳定完成更广的跨 app 任务。
 
@@ -113,7 +115,7 @@ It is a missing runtime surface. / 而是缺了一层运行时能力面。
 ### What This Means For OpenClaw Next / 这对 OpenClaw 下一步意味着什么
 
 - The runtime decision is now more stable, not less: keep building an in-app `AccessibilityService` portal, and do not switch the main architecture to ADB-driven control. / 运行时路线现在更加稳定，而不是更摇摆：继续构建 app 内 `AccessibilityService` portal，不要把主架构切到 ADB 驱动控制。
-- `launch_app` should be the next bounded primitive, ideally `packageName`-first in v1 with standard Android launch intents. A read-only launchable-app listing can follow if package discovery becomes the bottleneck. / `launch_app` 应该就是下一条 bounded primitive，第一版最好以 `packageName` 为主，并使用标准 Android launch intent。如果 package 发现变成瓶颈，再跟进一个只读的可启动 app 列表。
+- `launch_app` has now landed in code as `ui.launchApp`, with a `packageName`-first v1 contract and standard Android launch intents. The next decision is not whether to add it, but whether it needs a follow-up read-only launchable-app listing after on-device validation. / `launch_app` 现在已经以 `ui.launchApp` 的形式落到代码里，第一版采用 `packageName`-first 接口和标准 Android launch intent。下一步要判断的已经不是“要不要做”，而是它在真机验证后是否需要继续补一个只读的可启动 app 列表。
 - `input_text` should come right after that, with focused-editable-node plus accessibility text-setting as the first path. Keyboard-style fallbacks can remain optional until a real app proves we need them. / `input_text` 应该紧随其后，第一版先走焦点 editable 节点加无障碍文本设置。只有等真实 app 证明我们确实需要时，再补键盘式兜底。
 - Screenshot-grounding augmentation from `ShowUI`, `UI-TARS`, or `AgentCPM-GUI` should be treated as phase two, after the base `launch_app` / `input_text` / `tap` / `back` / `home` loop is stable. / `ShowUI`、`UI-TARS`、`AgentCPM-GUI` 这类截图 grounding 增强应被视为第二阶段，放在基础 `launch_app` / `input_text` / `tap` / `back` / `home` 闭环稳定之后。
 - Validation should keep moving toward task-based replay instead of one-off demos. `AndroidWorld` and `GUI-CEval` are the right mental model here. / 验证应该继续朝任务化重放收敛，而不是停留在一次性 demo。`AndroidWorld` 和 `GUI-CEval` 就是这里正确的心智模型。
@@ -187,8 +189,8 @@ Exit criteria / 退出标准:
 
 ### P2. Add the next missing primitives / 补下一批缺口 primitive
 
-- Add `launch_app` first so the phone can leave OpenClaw without ADB help. Prefer a `packageName`-first contract in v1, standard Android launch intents, and clear errors when an app is installed but not launchable. / 先补 `launch_app`，让手机离开 OpenClaw 时不再依赖 ADB 帮忙。第一版优先做 `packageName`-first 接口、标准 Android launch intent，以及“已安装但不可启动”这类清晰错误。
-- If package discovery becomes the practical bottleneck, add a read-only launchable-app listing after `launch_app`, not before it. / 如果 package 发现真的成为实际瓶颈，再在 `launch_app` 之后补一个只读的可启动 app 列表，而不是反过来。
+- Keep turning `ui.launchApp` into a repeatable real-device path, including immediate follow-up checks while another app is on top. / 继续把 `ui.launchApp` 收敛成可重复的真机路径，包括在其他 app 置前时立即做后续检查。
+- Investigate or document the current OPPO / ColorOS background freeze after OpenClaw leaves the foreground, because that behavior now blocks longer cross-app loops more than the absence of package discovery. / 调查或记录当前 OPPO / ColorOS 在 OpenClaw 退到后台后的冻结行为，因为这件事现在比缺 package 发现更直接地阻塞长一点的跨 app 闭环。
 - Add `input_text` next so tasks can move beyond navigation into form-like workflows. Prefer focused editable nodes plus accessibility text-setting in v1; keep IME-style fallbacks for later compatibility work. / 再补 `input_text`，让任务从纯导航迈向表单类流程。第一版优先做焦点 editable 节点加无障碍文本设置；IME 风格兜底留给后续兼容工作。
 - Keep preferring bounded selectors, package scoping, and stable resource IDs over "freeform do anything." / 继续优先做有边界 selector、包名作用域和稳定资源 ID，而不是“无限制自由操作”。
 
@@ -205,7 +207,7 @@ Exit criteria / 退出标准:
 ## Concrete Deliverables For The Next Session / 下一会话的具体产出
 
 - One repeatable real-device observe / wait / act smoke path. / 一条可重复的真机 observe / wait / act smoke 路径。
-- One app-launch path such as `launch_app`. / 一条 app 启动路径，例如 `launch_app`。
+- One repeatable real-device proof for `ui.launchApp`, including at least one follow-up check while the launched app is still on top. / 一条可重复的 `ui.launchApp` 真机验证路径，而且至少要包含 launched app 仍在前台时的一次后续检查。
 - One richer interaction primitive such as `input_text` or `swipe`. / 一条更丰富的交互 primitive，例如 `input_text` 或 `swipe`。
 
 ## Success Criteria / 成功标准

@@ -753,6 +753,19 @@ class LocalHostRemoteAccessServer(
                 )
                 add(
                   buildJsonObject {
+                    put("name", JsonPrimitive("invoke-ui-launch-app"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/invoke"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"ui.launchApp\",\"params\":{\"packageName\":\"com.android.settings\"}}'",
+                      ),
+                    )
+                  },
+                )
+                add(
+                  buildJsonObject {
                     put("name", JsonPrimitive("invoke-ui-tap"))
                     put("method", JsonPrimitive("POST"))
                     put("path", JsonPrimitive("$apiBasePath/invoke"))

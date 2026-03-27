@@ -40,6 +40,7 @@ class LocalHostNodesToolingTest {
     assertTrue("device_permissions" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
+    assertFalse("ui_launch_app" in actions)
     assertFalse("ui_tap" in actions)
     assertFalse("ui_back" in actions)
     assertFalse("ui_home" in actions)
@@ -157,6 +158,34 @@ class LocalHostNodesToolingTest {
     }
 
   @Test
+  fun uiLaunchApp_mapsPackageNameForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.launchApp", command)
+            assertTrue(paramsJson.orEmpty().contains("\"packageName\":\"com.example.app\""))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"action":"launchApp","packageName":"com.example.app"}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"ui_launch_app","packageName":"com.example.app"}""",
+        )
+
+      assertTrue(result.outputText.contains("launchApp"))
+      assertTrue(result.outputText.contains("com.example.app"))
+    }
+
+  @Test
   fun remoteRole_includesUiWriteActionsWhenWriteTierIsEnabled() {
     val bridge =
       LocalHostNodesToolBridge(
@@ -182,6 +211,7 @@ class LocalHostNodesToolingTest {
     assertTrue("ui_tap" in actions)
     assertTrue("ui_back" in actions)
     assertTrue("ui_home" in actions)
+    assertTrue("ui_launch_app" in actions)
   }
 
   @Test
