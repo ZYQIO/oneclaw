@@ -41,6 +41,7 @@ class LocalHostNodesToolingTest {
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
     assertFalse("ui_launch_app" in actions)
+    assertFalse("ui_input_text" in actions)
     assertFalse("ui_tap" in actions)
     assertFalse("ui_back" in actions)
     assertFalse("ui_home" in actions)
@@ -186,6 +187,37 @@ class LocalHostNodesToolingTest {
     }
 
   @Test
+  fun uiInputText_mapsValueAndSelectorForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.inputText", command)
+            assertTrue(paramsJson.orEmpty().contains("\"value\":\"OpenClaw\""))
+            assertTrue(paramsJson.orEmpty().contains("\"resourceId\":\"com.example.app:id/search\""))
+            assertTrue(paramsJson.orEmpty().contains("\"packageName\":\"com.example.app\""))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"action":"inputText","valueLength":8}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson =
+            """{"action":"ui_input_text","value":"OpenClaw","resourceId":"com.example.app:id/search","packageName":"com.example.app"}""",
+        )
+
+      assertTrue(result.outputText.contains("inputText"))
+      assertTrue(result.outputText.contains("valueLength"))
+    }
+
+  @Test
   fun remoteRole_includesUiWriteActionsWhenWriteTierIsEnabled() {
     val bridge =
       LocalHostNodesToolBridge(
@@ -212,6 +244,7 @@ class LocalHostNodesToolingTest {
     assertTrue("ui_back" in actions)
     assertTrue("ui_home" in actions)
     assertTrue("ui_launch_app" in actions)
+    assertTrue("ui_input_text" in actions)
   }
 
   @Test

@@ -89,6 +89,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
       NodesActionSpec(name = "ui_launch_app", command = OpenClawUiCommand.LaunchApp.rawValue),
+      NodesActionSpec(name = "ui_input_text", command = OpenClawUiCommand.InputText.rawValue),
       NodesActionSpec(name = "ui_tap", command = OpenClawUiCommand.Tap.rawValue),
       NodesActionSpec(name = "ui_back", command = OpenClawUiCommand.Back.rawValue),
       NodesActionSpec(name = "ui_home", command = OpenClawUiCommand.Home.rawValue),
@@ -228,6 +229,7 @@ internal class LocalHostNodesToolBridge(
           putStringProperty("notificationReplyText")
           putStringProperty("query")
           putStringProperty("text")
+          putStringProperty("value")
           putStringProperty("contentDescription")
           putStringProperty("resourceId")
           putNumberProperty("limit")
@@ -314,6 +316,17 @@ internal class LocalHostNodesToolBridge(
       "ui_launch_app" ->
         buildJsonObject {
           copyString(params, "packageName")
+        }
+      "ui_input_text" ->
+        buildJsonObject {
+          copyString(params, "value")
+          copyString(params, "text")
+          copyString(params, "contentDescription")
+          copyString(params, "resourceId")
+          copyString(params, "packageName")
+          copyNumber(params, "index")
+          copyBoolean(params, "ignoreCase")
+          copyString(params, "matchMode")
         }
       "ui_tap" ->
         buildJsonObject {

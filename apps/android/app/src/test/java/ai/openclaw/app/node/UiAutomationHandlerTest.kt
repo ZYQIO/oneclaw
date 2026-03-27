@@ -1,6 +1,8 @@
 package ai.openclaw.app.node
 
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
+import ai.openclaw.app.accessibility.UiAutomationInputTextRequest
+import ai.openclaw.app.accessibility.UiAutomationInputTextResult
 import ai.openclaw.app.accessibility.UiAutomationTapRequest
 import ai.openclaw.app.accessibility.UiAutomationTapResult
 import kotlinx.coroutines.test.runTest
@@ -295,6 +297,128 @@ class UiAutomationHandlerTest {
     assertFalse(result.ok)
     assertEquals("APP_NOT_LAUNCHABLE", result.error?.code)
     assertTrue(result.error?.message.orEmpty().contains("no launchable activity"))
+  }
+
+  @Test
+  fun handleInputText_passesRequestToInjectedAction() {
+    var capturedRequest: UiAutomationInputTextRequest? = null
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performInputTextAction = { request ->
+          capturedRequest = request
+          UiAutomationInputTextResult(
+            performed = true,
+            strategy = "selector_editable",
+            packageName = "com.example.app",
+            resourceId = "com.example.app:id/search",
+            valueLength = request.value.length,
+          )
+        },
+      )
+
+    val result =
+      handler.handleInputText(
+        """{"value":"OpenClaw","resourceId":"com.example.app:id/search","packageName":"com.example.app","matchMode":"exact","index":1}""",
+      )
+
+    assertTrue(result.ok)
+    assertEquals("OpenClaw", capturedRequest?.value)
+    assertEquals("com.example.app:id/search", capturedRequest?.resourceId)
+    assertEquals("com.example.app", capturedRequest?.packageName)
+    assertEquals(true, capturedRequest?.exactMatch)
+    assertEquals(1, capturedRequest?.index)
+    val payload = json.parseToJsonElement(result.payloadJson!!).jsonObject
+    assertEquals("inputText", payload.getValue("action").jsonPrimitive.content)
+    assertEquals(8, payload.getValue("valueLength").jsonPrimitive.content.toInt())
+  }
+
+  @Test
+  fun handleInputText_requiresValueField() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+      )
+
+    val result = handler.handleInputText("""{"resourceId":"com.example.app:id/search"}""")
+
+    assertFalse(result.ok)
+    assertEquals("INVALID_REQUEST", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("with value"))
+  }
+
+  @Test
+  fun handleInputText_allowsEmptyStringToClearFocusedField() {
+    var capturedRequest: UiAutomationInputTextRequest? = null
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performInputTextAction = { request ->
+          capturedRequest = request
+          UiAutomationInputTextResult(
+            performed = true,
+            strategy = "focused_editable",
+            packageName = "com.example.app",
+            valueLength = request.value.length,
+          )
+        },
+      )
+
+    val result = handler.handleInputText("""{"value":"","packageName":"com.example.app"}""")
+
+    assertTrue(result.ok)
+    assertEquals("", capturedRequest?.value)
+    val payload = json.parseToJsonElement(result.payloadJson!!).jsonObject
+    assertEquals(0, payload.getValue("valueLength").jsonPrimitive.content.toInt())
+  }
+
+  @Test
+  fun handleInputText_surfacesServiceFailuresClearly() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performInputTextAction = {
+          UiAutomationInputTextResult(
+            performed = false,
+            errorCode = "UI_TARGET_NOT_FOUND",
+            reason = "No editable accessibility node is available for ui.inputText.",
+          )
+        },
+      )
+
+    val result = handler.handleInputText("""{"value":"OpenClaw"}""")
+
+    assertFalse(result.ok)
+    assertEquals("UI_TARGET_NOT_FOUND", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("editable accessibility node"))
   }
 
   @Test

@@ -150,6 +150,7 @@ class InvokeDispatcher(
       OpenClawUiCommand.State.rawValue -> uiAutomationHandler.handleUiState(paramsJson)
       OpenClawUiCommand.WaitForText.rawValue -> uiAutomationHandler.handleWaitForText(paramsJson)
       OpenClawUiCommand.LaunchApp.rawValue -> uiAutomationHandler.handleLaunchApp(paramsJson)
+      OpenClawUiCommand.InputText.rawValue -> uiAutomationHandler.handleInputText(paramsJson)
       OpenClawUiCommand.Tap.rawValue -> uiAutomationHandler.handleTap(paramsJson)
       OpenClawUiCommand.Back.rawValue -> uiAutomationHandler.handleBack(paramsJson)
       OpenClawUiCommand.Home.rawValue -> uiAutomationHandler.handleHome(paramsJson)

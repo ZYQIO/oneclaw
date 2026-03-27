@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.Path
 import android.graphics.Rect
+import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.serialization.json.JsonObject
@@ -36,6 +37,32 @@ data class UiAutomationTapResult(
   val resourceId: String? = null,
   val x: Double? = null,
   val y: Double? = null,
+)
+
+data class UiAutomationInputTextRequest(
+  val value: String,
+  val text: String? = null,
+  val contentDescription: String? = null,
+  val resourceId: String? = null,
+  val packageName: String? = null,
+  val exactMatch: Boolean = false,
+  val ignoreCase: Boolean = true,
+  val index: Int = 0,
+) {
+  val hasSelector: Boolean
+    get() = listOf(text, contentDescription, resourceId).any { !it.isNullOrEmpty() }
+}
+
+data class UiAutomationInputTextResult(
+  val performed: Boolean,
+  val errorCode: String? = null,
+  val strategy: String? = null,
+  val reason: String? = null,
+  val packageName: String? = null,
+  val matchedText: String? = null,
+  val matchedContentDescription: String? = null,
+  val resourceId: String? = null,
+  val valueLength: Int? = null,
 )
 
 class OpenClawAccessibilityService : AccessibilityService() {
@@ -89,6 +116,14 @@ class OpenClawAccessibilityService : AccessibilityService() {
     fun performTap(request: UiAutomationTapRequest): UiAutomationTapResult =
       activeService?.performTapInternal(request)
         ?: UiAutomationTapResult(
+          performed = false,
+          errorCode = "UI_AUTOMATION_UNAVAILABLE",
+          reason = "Accessibility service is enabled but not yet bound.",
+        )
+
+    fun performInputText(request: UiAutomationInputTextRequest): UiAutomationInputTextResult =
+      activeService?.performInputTextInternal(request)
+        ?: UiAutomationInputTextResult(
           performed = false,
           errorCode = "UI_AUTOMATION_UNAVAILABLE",
           reason = "Accessibility service is enabled but not yet bound.",
@@ -213,7 +248,20 @@ class OpenClawAccessibilityService : AccessibilityService() {
       )
     }
 
-    val matchedNode = findMatchingNode(root = root, request = request)
+    val matchedNode =
+      findMatchingNode(
+        root = root,
+        index = request.index,
+      ) { node ->
+        matchesNodeSelector(
+          node = node,
+          text = request.text,
+          contentDescription = request.contentDescription,
+          resourceId = request.resourceId,
+          exactMatch = request.exactMatch,
+          ignoreCase = request.ignoreCase,
+        )
+      }
       ?: return UiAutomationTapResult(
         performed = false,
         errorCode = "UI_TARGET_NOT_FOUND",
@@ -282,6 +330,86 @@ class OpenClawAccessibilityService : AccessibilityService() {
     )
   }
 
+  private fun performInputTextInternal(
+    request: UiAutomationInputTextRequest,
+  ): UiAutomationInputTextResult {
+    val root = rootInActiveWindow
+      ?: return UiAutomationInputTextResult(
+        performed = false,
+        errorCode = "UI_TARGET_UNAVAILABLE",
+        reason = "No active accessibility window is available for ui.inputText.",
+      )
+    val activePackageName = root.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    if (
+      request.packageName != null &&
+      !request.packageName.equals(activePackageName, ignoreCase = true)
+    ) {
+      return UiAutomationInputTextResult(
+        performed = false,
+        errorCode = "UI_TARGET_MISMATCH",
+        reason =
+          "Active package `${activePackageName ?: "unknown"}` does not match `${request.packageName}`.",
+        packageName = activePackageName,
+      )
+    }
+
+    val target =
+      resolveInputTextTarget(root = root, request = request)
+        ?: return UiAutomationInputTextResult(
+          performed = false,
+          errorCode = "UI_TARGET_NOT_FOUND",
+          reason = "No editable accessibility node is available for ui.inputText.",
+          packageName = activePackageName,
+        )
+
+    if (!target.node.isEnabled) {
+      return UiAutomationInputTextResult(
+        performed = false,
+        errorCode = "UI_TARGET_DISABLED",
+        reason = "The selected editable accessibility node is disabled.",
+        packageName = activePackageName,
+        matchedText = normalizeNodeText(target.node.text?.toString()),
+        matchedContentDescription = normalizeNodeText(target.node.contentDescription?.toString()),
+        resourceId = target.node.viewIdResourceName?.trim()?.takeIf { it.isNotEmpty() },
+      )
+    }
+
+    if (!target.node.isFocused) {
+      target.node.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    }
+
+    val arguments =
+      Bundle().apply {
+        putCharSequence(
+          AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+          request.value,
+        )
+      }
+    if (!target.node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
+      return UiAutomationInputTextResult(
+        performed = false,
+        errorCode = "UI_ACTION_FAILED",
+        reason = "The selected editable node rejected ACTION_SET_TEXT.",
+        strategy = target.strategy,
+        packageName = activePackageName,
+        matchedText = normalizeNodeText(target.node.text?.toString()),
+        matchedContentDescription = normalizeNodeText(target.node.contentDescription?.toString()),
+        resourceId = target.node.viewIdResourceName?.trim()?.takeIf { it.isNotEmpty() },
+        valueLength = request.value.length,
+      )
+    }
+
+    return UiAutomationInputTextResult(
+      performed = true,
+      strategy = target.strategy,
+      packageName = activePackageName,
+      matchedText = normalizeNodeText(target.node.text?.toString()),
+      matchedContentDescription = normalizeNodeText(target.node.contentDescription?.toString()),
+      resourceId = target.node.viewIdResourceName?.trim()?.takeIf { it.isNotEmpty() },
+      valueLength = request.value.length,
+    )
+  }
+
   private fun buildTapSuccessResult(
     strategy: String,
     packageName: String?,
@@ -299,9 +427,64 @@ class OpenClawAccessibilityService : AccessibilityService() {
       y = center?.second,
     )
 
+  private data class EditableTargetSelection(
+    val node: AccessibilityNodeInfo,
+    val strategy: String,
+  )
+
+  private fun resolveInputTextTarget(
+    root: AccessibilityNodeInfo,
+    request: UiAutomationInputTextRequest,
+  ): EditableTargetSelection? {
+    if (request.hasSelector) {
+      val matchedNode =
+        findMatchingNode(
+          root = root,
+          index = request.index,
+        ) { node ->
+          node.isEditable &&
+            matchesNodeSelector(
+              node = node,
+              text = request.text,
+              contentDescription = request.contentDescription,
+              resourceId = request.resourceId,
+              exactMatch = request.exactMatch,
+              ignoreCase = request.ignoreCase,
+            )
+        }
+      return matchedNode?.let { EditableTargetSelection(node = it, strategy = "selector_editable") }
+    }
+
+    val focusedEditable =
+      findFirstMatchingNode(root) { node ->
+        node.isEditable && (node.isFocused || node.isAccessibilityFocused)
+      }
+    if (focusedEditable != null) {
+      return EditableTargetSelection(node = focusedEditable, strategy = "focused_editable")
+    }
+
+    val firstEditable =
+      findFirstMatchingNode(root) { node ->
+        node.isEditable
+      } ?: return null
+    val secondEditable =
+      findMatchingNode(
+        root = root,
+        index = 1,
+      ) { node ->
+        node.isEditable
+      }
+    return if (secondEditable == null) {
+      EditableTargetSelection(node = firstEditable, strategy = "single_editable")
+    } else {
+      null
+    }
+  }
+
   private fun findMatchingNode(
     root: AccessibilityNodeInfo,
-    request: UiAutomationTapRequest,
+    index: Int,
+    predicate: (AccessibilityNodeInfo) -> Boolean,
   ): AccessibilityNodeInfo? {
     var matchIndex = 0
     val queue = ArrayDeque<AccessibilityNodeInfo>()
@@ -309,8 +492,8 @@ class OpenClawAccessibilityService : AccessibilityService() {
 
     while (queue.isNotEmpty()) {
       val node = queue.removeFirst()
-      if (matchesTapSelector(node = node, request = request)) {
-        if (matchIndex == request.index) {
+      if (predicate(node)) {
+        if (matchIndex == index) {
           return node
         }
         matchIndex += 1
@@ -323,27 +506,50 @@ class OpenClawAccessibilityService : AccessibilityService() {
     return null
   }
 
+  private fun findFirstMatchingNode(
+    root: AccessibilityNodeInfo,
+    predicate: (AccessibilityNodeInfo) -> Boolean,
+  ): AccessibilityNodeInfo? = findMatchingNode(root = root, index = 0, predicate = predicate)
+
   private fun matchesTapSelector(
     node: AccessibilityNodeInfo,
     request: UiAutomationTapRequest,
   ): Boolean {
-    return selectorFieldMatches(
-      candidate = node.text?.toString(),
-      query = request.text,
+    return matchesNodeSelector(
+      node = node,
+      text = request.text,
+      contentDescription = request.contentDescription,
+      resourceId = request.resourceId,
       exactMatch = request.exactMatch,
       ignoreCase = request.ignoreCase,
+    )
+  }
+
+  private fun matchesNodeSelector(
+    node: AccessibilityNodeInfo,
+    text: String?,
+    contentDescription: String?,
+    resourceId: String?,
+    exactMatch: Boolean,
+    ignoreCase: Boolean,
+  ): Boolean {
+    return selectorFieldMatches(
+      candidate = node.text?.toString(),
+      query = text,
+      exactMatch = exactMatch,
+      ignoreCase = ignoreCase,
     ) &&
       selectorFieldMatches(
         candidate = node.contentDescription?.toString(),
-        query = request.contentDescription,
-        exactMatch = request.exactMatch,
-        ignoreCase = request.ignoreCase,
+        query = contentDescription,
+        exactMatch = exactMatch,
+        ignoreCase = ignoreCase,
       ) &&
       selectorFieldMatches(
         candidate = node.viewIdResourceName,
-        query = request.resourceId,
-        exactMatch = request.exactMatch,
-        ignoreCase = request.ignoreCase,
+        query = resourceId,
+        exactMatch = exactMatch,
+        ignoreCase = ignoreCase,
       )
   }
 

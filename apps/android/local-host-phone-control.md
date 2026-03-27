@@ -30,7 +30,7 @@ ADB, Appium, `Open-AutoGLM`, and similar systems are useful references, but they
 
 - Keep the runtime local and Android-native first: expand the in-app `AccessibilityService` surface rather than adding a separate ADB-first controller. / 第一阶段继续保持 runtime 在手机内、Android 原生：优先扩 app 内 `AccessibilityService` 能力面，而不是再加一层 ADB-first 主控器。
 - Keep `ui.launchApp` package-first in v1 and validate it on-device before expanding package discovery. If package discovery becomes a blocker later, add a read-only launchable-app listing surface after that. / 让 `ui.launchApp` 的第一版继续保持 package-first，并先在真机上验证它，再考虑扩 package 发现。如果后面 package 发现成为阻塞，再补一个只读的可启动 app 列表能力。
-- Add `input_text` next by targeting the focused editable node and using accessibility text-setting first. Keep keyboard-IME-style fallbacks as a later compatibility layer, not the first dependency. / 下一步补 `input_text`，优先对准当前焦点 editable 节点，并先走无障碍文本设置能力。类似键盘 IME 的兜底应留作后续兼容层，而不是第一依赖。
+- Keep `ui.inputText` focused-editable / selector-editable in v1 and validate it across more real apps before adding IME-style fallbacks. / 让 `ui.inputText` 在第一版继续保持 focused-editable / selector-editable 边界，并先在更多真实 app 上验证，再考虑补 IME 风格兜底。
 - Only after `ui.launchApp` and `input_text` are stable should we spend more time on screenshot-grounding augmentation from `ShowUI`, `UI-TARS`, or `AgentCPM-GUI`. / 只有在 `ui.launchApp` 和 `input_text` 稳定之后，才值得继续投入 `ShowUI`、`UI-TARS`、`AgentCPM-GUI` 这类截图 grounding 增强。
 - Use `AndroidWorld`-style and `GUI-CEval`-style tasks to judge progress, rather than treating “demo works once” as enough. / 进度判断应逐步靠近 `AndroidWorld` 风格和 `GUI-CEval` 风格的任务验证，而不是把“demo 成功一次”当成足够。
 
@@ -39,22 +39,24 @@ ADB, Appium, `Open-AutoGLM`, and similar systems are useful references, but they
 - `ui.state`: read the active window snapshot, including `packageName`, visible text, and node count. / `ui.state`：读取当前活动窗口快照，包括 `packageName`、可见文本和节点数量。
 - `ui.waitForText`: wait for a simple visible-text condition. / `ui.waitForText`：等待简单的可见文本条件。
 - `ui.launchApp`: launch an installed app with a package-first contract such as `com.android.settings`. / `ui.launchApp`：以 package-first 的方式拉起已安装 app，例如 `com.android.settings`。
+- `ui.inputText`: set text on a focused or selector-matched editable node through accessibility text-setting. / `ui.inputText`：通过无障碍文本设置能力，向当前焦点或 selector 命中的 editable 节点写入文本。
 - `ui.tap`: tap a bounded selector such as a text match. / `ui.tap`：点击一个有边界 selector，例如文本匹配。
 - `ui.back` and `ui.home`: execute bounded global actions. / `ui.back` 和 `ui.home`：执行有边界的全局动作。
-- Remote gating now works as intended: with write disabled, remote sessions only see `ui.state` and `ui.waitForText`; once write is enabled, `ui.launchApp`, `ui.tap`, `ui.back`, and `ui.home` appear. / 远端门控现在已按预期工作：write 关闭时远端只有 `ui.state` 和 `ui.waitForText`；开启 write 后，`ui.launchApp`、`ui.tap`、`ui.back`、`ui.home` 才会出现。
+- Remote gating now works as intended: with write disabled, remote sessions only see `ui.state` and `ui.waitForText`; once write is enabled, `ui.launchApp`, `ui.inputText`, `ui.tap`, `ui.back`, and `ui.home` appear. / 远端门控现在已按预期工作：write 关闭时远端只有 `ui.state` 和 `ui.waitForText`；开启 write 后，`ui.launchApp`、`ui.inputText`、`ui.tap`、`ui.back`、`ui.home` 才会出现。
 
 ## Real Device Proof / 真机证据
 
 - On March 26, 2026, `ui.tap(text=\"Chat\")` successfully switched OpenClaw from the Connect tab into the Chat tab on the connected OPPO / ColorOS phone. / 2026 年 3 月 26 日，`ui.tap(text=\"Chat\")` 已在当前接入的 OPPO / ColorOS 手机上成功把 OpenClaw 从 Connect tab 切到 Chat tab。
 - On the same phone, `ui.home` and `ui.back` both moved the active `packageName` to `com.android.launcher`. / 在同一台手机上，`ui.home` 和 `ui.back` 都已把活动 `packageName` 切到 `com.android.launcher`。
 - On March 27, 2026, `ui.launchApp(packageName=\"com.android.settings\")` was validated on-device: the remote invoke returned `launched=true`, and `adb shell dumpsys activity activities` showed `topResumedActivity=com.android.settings/.Settings`. / 2026 年 3 月 27 日，`ui.launchApp(packageName=\"com.android.settings\")` 已在真机验证：远端调用返回 `launched=true`，而 `adb shell dumpsys activity activities` 显示 `topResumedActivity=com.android.settings/.Settings`。
+- Later that same day, `ui.inputText(value=\"3945\", text=\"3945\", matchMode=\"exact\", packageName=\"ai.openclaw.app\")` also succeeded on-device against the Connect-screen port field, returning `performed=true` with `strategy=selector_editable`. / 同一天稍后，`ui.inputText(value=\"3945\", text=\"3945\", matchMode=\"exact\", packageName=\"ai.openclaw.app\")` 也已在真机针对 Connect 页端口输入框成功返回 `performed=true`，并给出 `strategy=selector_editable`。
 - On the same OPPO / ColorOS phone, remote `/status` still responded immediately after that app launch, but the system later froze `ai.openclaw.app` in the background and further remote requests timed out until OpenClaw was brought back to the foreground. / 在同一台 OPPO / ColorOS 手机上，app 启动后的第一时间远端 `/status` 仍然能回包，但随后系统会把后台的 `ai.openclaw.app` 冻住，后续远端请求超时，直到 OpenClaw 被重新带回前台。
 - Reinstalling the APK on this device clears the OpenClaw accessibility grant, so `ui.state` must be rechecked after reinstall and the service may need to be re-enabled. / 在这台设备上重新安装 APK 会清空 OpenClaw 的无障碍授权，因此重装后必须重新检查 `ui.state`，并且可能需要重新开启服务。
 
 ## What Is Still Missing / 现在还缺什么
 
 - A mitigation or operator playbook for the current OPPO / ColorOS background freeze after OpenClaw leaves the foreground, so follow-up remote commands can survive across app boundaries. / 当前 OPPO / ColorOS 在 OpenClaw 退到后台后会触发后台冻结，需要一条缓解方案或操作手册，这样后续远端命令才能跨 app 存活。
-- `input_text`, ideally focused-field-first in v1, so flows can move beyond pure navigation. / `input_text`，第一版最好先从焦点输入框出发，这样流程才能超出纯导航。
+- A repeatable cross-app path that combines `ui.launchApp` and `ui.inputText` without being interrupted by the current OPPO / ColorOS background freeze. / 一条可重复的跨 app 路径，把 `ui.launchApp` 和 `ui.inputText` 串起来，并且不会被当前 OPPO / ColorOS 的后台冻结中断。
 - A read-only launchable-app listing surface, but only if package discovery becomes the real blocker after `ui.launchApp` validation. / 一个只读的可启动 app 列表能力，但前提是 `ui.launchApp` 验证后，package 发现真的成为实际阻塞。
 - Richer selectors such as stronger `resourceId` support and more stable node ranking. / 更丰富的 selector，例如更强的 `resourceId` 支持和更稳定的节点排序。
 - A repeatable real-device smoke script for the current observe / wait / act loop. / 一条可重复的真机 smoke 脚本，用来验证当前 observe / wait / act 闭环。

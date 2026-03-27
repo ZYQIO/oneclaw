@@ -766,6 +766,19 @@ class LocalHostRemoteAccessServer(
                 )
                 add(
                   buildJsonObject {
+                    put("name", JsonPrimitive("invoke-ui-input-text"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/invoke"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"ui.inputText\",\"params\":{\"value\":\"OpenClaw\"}}'",
+                      ),
+                    )
+                  },
+                )
+                add(
+                  buildJsonObject {
                     put("name", JsonPrimitive("invoke-ui-tap"))
                     put("method", JsonPrimitive("POST"))
                     put("path", JsonPrimitive("$apiBasePath/invoke"))

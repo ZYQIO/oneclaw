@@ -175,6 +175,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
           append("-H 'Content-Type: application/json' ")
           append("$baseUrl/api/local-host/v1/invoke ")
+          append("-d '{\"command\":\"ui.inputText\",\"params\":{\"value\":\"OpenClaw\"}}'")
+          append("\n\n")
+          append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
+          append("-H 'Content-Type: application/json' ")
+          append("$baseUrl/api/local-host/v1/invoke ")
           append("-d '{\"command\":\"sms.send\",\"params\":{\"to\":\"+15551234567\",\"body\":\"Check in when you land.\"}}'")
           append("\n\n")
           append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
@@ -722,7 +727,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             ) {
               Text("Write remote commands", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
               Text(
-                "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, `ui.launchApp`, and bounded `ui.tap` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
+                "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, `ui.launchApp`, `ui.inputText`, and bounded `ui.tap` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
                 style = mobileCaption1,
                 color = mobileTextSecondary,
               )

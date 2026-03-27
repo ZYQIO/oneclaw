@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
+import ai.openclaw.app.accessibility.UiAutomationInputTextRequest
+import ai.openclaw.app.accessibility.UiAutomationInputTextResult
 import ai.openclaw.app.accessibility.UiAutomationTapRequest
 import ai.openclaw.app.accessibility.UiAutomationTapResult
 import ai.openclaw.app.gateway.GatewaySession
@@ -15,6 +17,7 @@ import ai.openclaw.app.node.parseJsonDouble
 import ai.openclaw.app.node.parseJsonInt
 import ai.openclaw.app.node.parseJsonParamsObject
 import ai.openclaw.app.node.parseJsonString
+import ai.openclaw.app.node.readJsonPrimitive
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -52,6 +55,20 @@ private data class WaitForTextRequest(
 private data class LaunchAppRequest(
   val packageName: String,
 )
+
+private data class InputTextRequest(
+  val value: String,
+  val text: String?,
+  val contentDescription: String?,
+  val resourceId: String?,
+  val packageName: String?,
+  val ignoreCase: Boolean,
+  val matchMode: UiTextMatchMode,
+  val index: Int,
+) {
+  val hasSelector: Boolean
+    get() = listOf(text, contentDescription, resourceId).any { !it.isNullOrEmpty() }
+}
 
 private data class TapRequest(
   val x: Double?,
@@ -97,6 +114,9 @@ class UiAutomationHandler(
       errorCode = "APP_LAUNCH_UNAVAILABLE",
       reason = "No app-launch action is configured for ui.launchApp.",
     )
+  },
+  private val performInputTextAction: (UiAutomationInputTextRequest) -> UiAutomationInputTextResult = { request ->
+    ai.openclaw.app.accessibility.OpenClawAccessibilityService.performInputText(request)
   },
   private val performTapAction: (UiAutomationTapRequest) -> UiAutomationTapResult = { request ->
     ai.openclaw.app.accessibility.OpenClawAccessibilityService.performTap(request)
@@ -324,6 +344,84 @@ class UiAutomationHandler(
     return handleGlobalAction(commandName = "home", action = performHomeAction)
   }
 
+  fun handleInputText(paramsJson: String?): GatewaySession.InvokeResult {
+    val request =
+      parseInputTextRequest(paramsJson)
+        ?: return GatewaySession.InvokeResult.error(
+          code = "INVALID_REQUEST",
+          message =
+            "INVALID_REQUEST: expected JSON object with value and optional text/contentDescription/resourceId/packageName/matchMode/ignoreCase/index",
+        )
+    if (request.index < 0) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.inputText index must be zero or greater",
+      )
+    }
+
+    val readiness = readinessSnapshot()
+    if (!readiness.enabled) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_DISABLED",
+        message = "UI_AUTOMATION_DISABLED: enable the OpenClaw accessibility service first",
+      )
+    }
+    if (!readiness.serviceConnected) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_UNAVAILABLE",
+        message = "UI_AUTOMATION_UNAVAILABLE: accessibility service is enabled but not yet bound",
+      )
+    }
+
+    val result =
+      performInputTextAction(
+        UiAutomationInputTextRequest(
+          value = request.value,
+          text = request.text,
+          contentDescription = request.contentDescription,
+          resourceId = request.resourceId,
+          packageName = request.packageName,
+          exactMatch = request.matchMode == UiTextMatchMode.Exact,
+          ignoreCase = request.ignoreCase,
+          index = request.index,
+        ),
+      )
+    if (!result.performed) {
+      val errorCode = result.errorCode ?: "UI_ACTION_FAILED"
+      val reason = result.reason ?: "ui.inputText was not accepted by the accessibility service"
+      return GatewaySession.InvokeResult.error(
+        code = errorCode,
+        message = "$errorCode: $reason",
+      )
+    }
+
+    val payload =
+      buildJsonObject {
+        put("ok", JsonPrimitive(true))
+        put("action", JsonPrimitive("inputText"))
+        put("performed", JsonPrimitive(true))
+        result.strategy?.let { put("strategy", JsonPrimitive(it)) }
+        result.packageName?.let { put("packageName", JsonPrimitive(it)) }
+        result.matchedText?.let { put("matchedText", JsonPrimitive(it)) }
+        result.matchedContentDescription?.let { put("matchedContentDescription", JsonPrimitive(it)) }
+        result.resourceId?.let { put("resourceId", JsonPrimitive(it)) }
+        put("valueLength", JsonPrimitive(result.valueLength ?: request.value.length))
+        put(
+          "selector",
+          buildJsonObject {
+            request.text?.let { put("text", JsonPrimitive(it)) }
+            request.contentDescription?.let { put("contentDescription", JsonPrimitive(it)) }
+            request.resourceId?.let { put("resourceId", JsonPrimitive(it)) }
+            request.packageName?.let { put("packageName", JsonPrimitive(it)) }
+            put("matchMode", JsonPrimitive(request.matchMode.wireValue))
+            put("ignoreCase", JsonPrimitive(request.ignoreCase))
+            put("index", JsonPrimitive(request.index))
+          },
+        )
+      }
+    return GatewaySession.InvokeResult.ok(payload.toString())
+  }
+
   fun handleTap(paramsJson: String?): GatewaySession.InvokeResult {
     val request =
       parseTapRequest(paramsJson)
@@ -456,13 +554,32 @@ class UiAutomationHandler(
         put("truncated", JsonPrimitive(false))
         put("visibleText", buildJsonArray {})
         put("nodes", buildJsonArray {})
+      }
     }
-  }
 
   private fun parseLaunchAppRequest(paramsJson: String?): LaunchAppRequest? {
     val params = parseJsonParamsObject(paramsJson) ?: return null
     return LaunchAppRequest(
       packageName = parseJsonString(params, "packageName")?.trim().orEmpty(),
+    )
+  }
+
+  private fun parseInputTextRequest(paramsJson: String?): InputTextRequest? {
+    val params = parseJsonParamsObject(paramsJson) ?: return null
+    if (readJsonPrimitive(params, "value") == null) {
+      return null
+    }
+    val matchMode = UiTextMatchMode.parse(parseJsonString(params, "matchMode")) ?: return null
+    val value = parseJsonString(params, "value") ?: return null
+    return InputTextRequest(
+      value = value,
+      text = parseJsonString(params, "text")?.trim()?.ifEmpty { null },
+      contentDescription = parseJsonString(params, "contentDescription")?.trim()?.ifEmpty { null },
+      resourceId = parseJsonString(params, "resourceId")?.trim()?.ifEmpty { null },
+      packageName = parseJsonString(params, "packageName")?.trim()?.ifEmpty { null },
+      ignoreCase = parseJsonBooleanFlag(params, "ignoreCase") ?: true,
+      matchMode = matchMode,
+      index = parseJsonInt(params, "index") ?: 0,
     )
   }
 
