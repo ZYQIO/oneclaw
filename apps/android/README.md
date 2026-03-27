@@ -204,7 +204,38 @@ Optional overrides:
 The UI smoke script verifies `/status` plus `/invoke/capabilities`, foregrounds OpenClaw with `ui.launchApp`, moves into the Chat tab with `ui.tap`, waits for a known Chat-ready text with `ui.waitForText`, focuses the composer, writes a temporary unsent draft through `ui.inputText`, then clears it again and verifies the editor hint returns. By default it stays inside OpenClaw so the result is repeatable and side-effect free.
 
 - Use `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=...` only when you also want an optional follow-up probe for the current cross-app freeze boundary.
-- On the current OPPO / ColorOS device, that optional cross-app probe may show the launched app on top while later remote requests still time out after `OplusHansManager` freezes OpenClaw in the background; treat that as the known OEM boundary, not as evidence that the in-app smoke regressed.
+- On March 28, 2026, the dedicated 5-second cross-app probe against `com.android.settings` classified as `foregrounded_host_reachable`: the target package reached the true foreground, all 10 `/status` probes still succeeded, and adb recovery brought OpenClaw cleanly back. Treat any later timeouts after a longer background stay as a separate OEM boundary, not as evidence that the in-app smoke regressed.
+
+## Local Host Cross-App Probe
+
+Use this when you want a ground-truth probe for the current cross-app boundary, not just the in-app smoke.
+
+USB + adb flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE='com.android.settings' \
+pnpm android:local-host:ui:cross-app
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=5000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=500`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS=1500`
+
+The cross-app probe calls `ui.launchApp` for the target package, then polls two truths in parallel:
+
+- ADB foreground-activity state, using `topResumedActivity` and current focus
+- Remote `/status`, to see whether OpenClaw stays reachable while another app is supposed to be on top
+
+At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON.
+
+- `classification=launch_accepted_not_foregrounded` means Android accepted the launch intent but the target package never became the true foreground app during the observation window.
+- `classification=foregrounded_host_reachable` means the target package reached the foreground and OpenClaw stayed reachable throughout the probe window.
+- `classification=foregrounded_then_remote_unreachable` means the target package reached the foreground first, then remote `/status` later stopped answering before recovery.
+- On March 28, 2026, the default `com.android.settings` probe on the current OPPO / ColorOS phone produced `classification=foregrounded_host_reachable` with `targetTopCount=9`, `statusSuccessCount=10`, and `recovery.ok=true`.
 
 ## Local Host Streaming Validation
 

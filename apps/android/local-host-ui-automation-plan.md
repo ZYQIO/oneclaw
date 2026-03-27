@@ -2,7 +2,7 @@
 
 Purpose / 用途: capture today's status, findings, and next-session execution plan for making Android `Local Host` capable of operating the phone itself without a nearby computer. / 记录今天的状态、结论和下一会话执行计划，目标是让 Android `Local Host` 在没有电脑陪同的情况下也能自己操作手机。
 
-Last updated / 最后更新: March 27, 2026 / 2026 年 3 月 27 日
+Last updated / 最后更新: March 28, 2026 / 2026 年 3 月 28 日
 
 ## Session Goal / 本次会话目标
 
@@ -15,7 +15,8 @@ Move Android `Local Host` from "GPT can chat plus use curated device tools" towa
 - 2026 年 3 月 27 日又补上了 `ui.launchApp`：它采用 `packageName`-first 接口，通过标准 Android launch intent 拉起 app，并为 “未安装” / “已安装但不可启动” 返回清晰错误；相关 Kotlin 编译和定向单测已通过，而且 `ui.launchApp(packageName=\"com.android.settings\")` 已在真机成功把前台 activity 切到 `com.android.settings/.Settings`。On March 27, 2026, `ui.launchApp` was added as well: it uses a `packageName`-first contract, launches apps through standard Android launch intents, and returns clear errors for "not installed" versus "installed but not launchable"; the related Kotlin compile plus targeted unit tests now pass, and `ui.launchApp(packageName=\"com.android.settings\")` has already switched the foreground activity to `com.android.settings/.Settings` on-device.
 - 同一天也补上了 `ui.inputText`：它采用 focused-editable / selector-editable 的第一版边界，并通过 accessibility `ACTION_SET_TEXT` 写入文本；相关 Kotlin 编译和定向单测也已通过，而且在 Connect 页端口输入框上，`ui.inputText(value=\"3945\", text=\"3945\", matchMode=\"exact\", packageName=\"ai.openclaw.app\")` 已在真机成功返回 `performed=true`。The same day also added `ui.inputText`: its first bounded form uses focused-editable / selector-editable targeting and writes text through accessibility `ACTION_SET_TEXT`; the related Kotlin compile plus targeted unit tests also pass, and on the Connect-screen port field `ui.inputText(value=\"3945\", text=\"3945\", matchMode=\"exact\", packageName=\"ai.openclaw.app\")` has already returned `performed=true` on-device.
 - 同一轮验证和代码接线也确认了门控策略：write tier 关闭时远端只有 `ui.state` / `ui.waitForText`，开启 write 后才会放出 `ui.launchApp` / `ui.inputText` / `ui.tap` / `ui.back` / `ui.home`。The same validation and code wiring also confirm the gating model: with the write tier off, remote access only exposes `ui.state` / `ui.waitForText`, and only after enabling write do `ui.launchApp` / `ui.inputText` / `ui.tap` / `ui.back` / `ui.home` appear.
-- 但同一轮真机也暴露了新的 OEM 边界：在当前 OPPO / ColorOS 设备上，OpenClaw 把别的 app 拉到前台后，远端 `/status` 虽然能短时间继续回包，但系统随后会通过 `OplusHansManager` 把后台的 `ai.openclaw.app` 冻住，导致后续远端请求超时，直到 OpenClaw 被重新带回前台。But the same device run also exposed a new OEM boundary: on the current OPPO / ColorOS phone, after OpenClaw brings another app to the foreground, remote `/status` can still answer briefly, but the system later freezes background `ai.openclaw.app` through `OplusHansManager`, and subsequent remote requests time out until OpenClaw is brought back to the foreground.
+- 2026 年 3 月 28 日，新加的 `pnpm android:local-host:ui:cross-app` 已在同一台 OPPO / ColorOS 手机上给出更扎实的短窗口证据：针对 `com.android.settings` 的 5 秒观察中，目标 app 确实在第 2 轮开始成为真前台，`targetTopCount=9`，同时 10 次远端 `/status` 探针全部成功，最终分类为 `foregrounded_host_reachable`。On March 28, 2026, the new `pnpm android:local-host:ui:cross-app` probe produced a stronger short-window result on the same OPPO / ColorOS phone: during a 5-second observation against `com.android.settings`, the target app truly became the foreground app starting in round 2, `targetTopCount=9`, and all 10 remote `/status` probes still succeeded, yielding `classification=foregrounded_host_reachable`.
+- 这也意味着当前真正未定的 OEM 边界已经收敛成“更长后台停留后何时开始冻结”，而不是“`ui.launchApp` 是否真的把别的 app 带到前台”。That also means the remaining OEM uncertainty has narrowed to "when the host starts freezing after a longer background stay," rather than "whether `ui.launchApp` truly brings another app to the foreground."
 - 当前 OPPO / ColorOS 真机在重新安装 APK 后会把 OpenClaw accessibility grant 清空；如果 `ui.state` 突然回到 disabled，需要先重新开启无障碍服务。On the current OPPO / ColorOS phone, reinstalling the APK clears the OpenClaw accessibility grant; if `ui.state` suddenly drops back to disabled, the accessibility service needs to be re-enabled first.
 
 ## What Happened Today / 今天做了什么
@@ -192,9 +193,10 @@ Exit criteria / 退出标准:
 ### P2. Add the next missing primitives / 补下一批缺口 primitive
 
 - Keep turning `ui.launchApp + ui.inputText` into a repeatable real-device path, including immediate follow-up checks while another app is on top. / 继续把 `ui.launchApp + ui.inputText` 收敛成可重复的真机路径，包括在其他 app 置前时立即做后续检查。
-- Investigate or document the current OPPO / ColorOS background freeze after OpenClaw leaves the foreground, because that behavior now blocks longer cross-app loops more than the absence of package discovery. / 调查或记录当前 OPPO / ColorOS 在 OpenClaw 退到后台后的冻结行为，因为这件事现在比缺 package 发现更直接地阻塞长一点的跨 app 闭环。
+- Investigate or document the current OPPO / ColorOS background freeze after OpenClaw leaves the foreground, now specifically by stretching the cross-app observation window and finding the first point where `/status` stops answering. / 调查或记录当前 OPPO / ColorOS 在 OpenClaw 退到后台后的冻结行为，具体做法是拉长 cross-app 观察窗口，找出 `/status` 第一次停止回包的边界点。
 - Keep validating `ui.inputText` so tasks can move beyond navigation into form-like workflows, then decide whether IME-style fallbacks are actually needed. / 继续验证 `ui.inputText`，让任务从纯导航迈向表单类流程，然后再决定是否真的需要 IME 风格兜底。
 - Keep preferring bounded selectors, package scoping, and stable resource IDs over "freeform do anything." / 继续优先做有边界 selector、包名作用域和稳定资源 ID，而不是“无限制自由操作”。
+- A dedicated probe now exists as `apps/android/scripts/local-host-ui-cross-app-probe.sh`, and it already proved the short-window `foregrounded_host_reachable` case on-device; the next step is to reuse that probe with a longer window and then layer `ui.inputText` or another follow-up action on top. / 现在已经有了独立的 `apps/android/scripts/local-host-ui-cross-app-probe.sh`，而且它已经在真机证明了短窗口 `foregrounded_host_reachable`；下一步是复用这条 probe，把观察窗口拉长，再在其上叠加 `ui.inputText` 或其他 follow-up action。
 
 Exit criteria / 退出标准:
 
