@@ -181,7 +181,8 @@ Exit criteria / 退出标准:
 ### P1. Turn the first loop into a smoke path / 把第一条闭环做成 smoke 路径
 
 - Reuse the current `ui.state` / `ui.waitForText` / `ui.tap` / `ui.home` / `ui.back` set instead of expanding command names first. / 第一阶段先复用现有 `ui.state` / `ui.waitForText` / `ui.tap` / `ui.home` / `ui.back`，而不是先扩更多命令名。
-- Capture a deterministic flow such as “open OpenClaw -> wait for a known text -> tap Chat -> verify chat view -> home/back to launcher.” / 固化一条确定性流程，例如“打开 OpenClaw -> 等待已知文本 -> 点击 Chat -> 验证聊天视图 -> home/back 回桌面”。
+- The first concrete script shape is now `apps/android/scripts/local-host-ui-smoke.sh`: `ui.launchApp(OpenClaw) -> ui.tap(Chat) -> ui.waitForText(chat-ready) -> ui.tap(editor) -> ui.inputText(write draft) -> ui.inputText(clear draft) -> ui.state`. / 第一条落地成脚本的路径现在是 `apps/android/scripts/local-host-ui-smoke.sh`：`ui.launchApp(OpenClaw) -> ui.tap(Chat) -> ui.waitForText(聊天就绪) -> ui.tap(输入框) -> ui.inputText(写入草稿) -> ui.inputText(清空草稿) -> ui.state`。
+- Keep the default smoke inside OpenClaw first so it stays repeatable and side-effect free; treat cross-app follow-up as the next probe, not as the baseline path yet. / 默认 smoke 先留在 OpenClaw app 内，这样才能保持可重复和无副作用；跨 app follow-up 继续作为下一步探针，而不是当前基线路径。
 - Keep the write-tier gate and explicit disclosure intact while doing this. / 在这个过程中继续保持 write tier 门控和明确提示不被放松。
 
 Exit criteria / 退出标准:

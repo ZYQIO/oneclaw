@@ -506,6 +506,7 @@
     "android:local-host:permissions": "bash apps/android/scripts/local-host-permission-smoke.sh",
     "android:local-host:smoke": "bash apps/android/scripts/local-host-remote-smoke.sh",
     "android:local-host:streaming": "bash apps/android/scripts/local-host-streaming-smoke.sh",
+    "android:local-host:ui": "bash apps/android/scripts/local-host-ui-smoke.sh",
     "android:run": "cd apps/android && ./gradlew :app:installDebug && adb shell am start -n ai.openclaw.app/.MainActivity",
     "android:test": "cd apps/android && ./gradlew :app:testDebugUnitTest",
     "android:test:integration": "OPENCLAW_LIVE_TEST=1 OPENCLAW_LIVE_ANDROID_NODE=1 vitest run --config vitest.live.config.ts src/gateway/android-node.capabilities.live.test.ts",

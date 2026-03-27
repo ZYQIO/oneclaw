@@ -169,6 +169,43 @@ Optional overrides:
 
 The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`, and `/invoke`, then prints a compact summary.
 
+## Local Host UI Automation Smoke
+
+Use this when you want one repeatable observe / wait / act proof for the current on-device phone-control loop.
+
+USB-friendly flow with `adb forward`:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
+pnpm android:local-host:ui
+```
+
+Direct LAN flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL='http://<phone-ip>:3945' \
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:ui
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE=ai.openclaw.app`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CONNECT_LABEL=Connect`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_LABEL=Chat`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_READY_TEXT="Select thinking level"`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_EDITOR_HINT_TEXT="Type a message"`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_DRAFT_VALUE="UI smoke draft"`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_WAIT_TIMEOUT_MS=10000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_POLL_INTERVAL_MS=250`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=com.android.settings`
+
+The UI smoke script verifies `/status` plus `/invoke/capabilities`, foregrounds OpenClaw with `ui.launchApp`, moves into the Chat tab with `ui.tap`, waits for a known Chat-ready text with `ui.waitForText`, focuses the composer, writes a temporary unsent draft through `ui.inputText`, then clears it again and verifies the editor hint returns. By default it stays inside OpenClaw so the result is repeatable and side-effect free.
+
+- Use `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=...` only when you also want an optional follow-up probe for the current cross-app freeze boundary.
+- On the current OPPO / ColorOS device, that optional cross-app probe may show the launched app on top while later remote requests still time out after `OplusHansManager` freezes OpenClaw in the background; treat that as the known OEM boundary, not as evidence that the in-app smoke regressed.
+
 ## Local Host Streaming Validation
 
 Use this when you want direct evidence that streaming deltas arrive before the final assistant message.
