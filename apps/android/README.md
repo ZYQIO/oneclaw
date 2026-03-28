@@ -7,6 +7,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - Progress tracker / 进度跟踪: `apps/android/local-host-progress.md`
 - Self-check gate / 自检门槛: `apps/android/local-host-self-check.md`
 - Session handoff / 接续手册: `apps/android/local-host-handoff.md`
+- Dedicated-device plan / 专机部署方案: `apps/android/local-host-dedicated-device.md`
 
 ### Local Host Scope Today / 当前 Local Host 范围
 
@@ -27,6 +28,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - On the validated OPPO / ColorOS phone, swiping the OpenClaw card away from Recents still force-stops the package and clears alarms even after the battery exemption is granted, so dedicated deployments on that device family should keep the app locked in Recents and avoid swipe-to-clear.
 - The Local Host UI and readiness snapshot now surface this OEM background-policy risk so the idle-phone deployment story is explicit instead of implicit.
 - This is a keepalive layer for the current Android-native host. It is not yet the full desktop shell/browser/plugin runtime embedded in the APK.
+- For spare-phone deployment planning, use `pnpm android:local-host:dedicated:readiness` to decide whether the current device should go through the `Device Owner` lane first or whether root/systemize work is even worth considering yet.
 
 ### Rebuild Checklist
 

@@ -205,6 +205,9 @@
 
 ## Agent-Specific Notes
 
+- Autonomous project work: when the user asks for sustained progress or says you can keep optimizing without repeated approval, proactively research, scope, implement, validate, document, commit, and push aligned improvements on your own. Pause only for destructive operations, irreversible security/privacy risk, or decisions that would clearly fork the product direction.
+- For that autonomous mode, keep the current project docs (`apps/android/local-host-progress.md`, handoff docs, or the equivalent area docs) updated so the rationale and next steps stay visible to the next session instead of living only in chat.
+
 - Vocabulary: "makeup" = "mac app".
 - Parallels macOS retests: use the snapshot most closely named like `macOS 26.3.1 fresh` when the user asks for a clean/fresh macOS rerun; avoid older Tahoe snapshots unless explicitly requested.
 - Parallels beta smoke: use `--target-package-spec openclaw@<beta-version>` for the beta artifact, and pin the stable side with both `--install-version <stable-version>` and `--latest-version <stable-version>` for upgrade runs. npm dist-tags can move mid-run.
