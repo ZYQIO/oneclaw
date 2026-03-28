@@ -23,6 +23,8 @@ There is now also a `Device Owner` helper at `apps/android/scripts/local-host-de
 
 For the factory-reset path that Android officially prefers on dedicated devices, there is now also a provisioning-QR toolchain: `apps/android/scripts/local-host-dedicated-provisioning-qr.ts` plus the `TestDPC` wrapper `apps/android/scripts/local-host-dedicated-testdpc-qr.sh`, exposed as `pnpm android:local-host:dedicated:testdpc-qr`. / 对于 Android 官方更偏好的“恢复出厂后走 QR 入管”路径，现在还新增了一套 provisioning QR 工具链：底层生成器 `apps/android/scripts/local-host-dedicated-provisioning-qr.ts`，以及 `TestDPC` wrapper `apps/android/scripts/local-host-dedicated-testdpc-qr.sh`，命令入口为 `pnpm android:local-host:dedicated:testdpc-qr`。
 
+There is now also a post-provision checker at `apps/android/scripts/local-host-dedicated-post-provision-check.sh`, exposed as `pnpm android:local-host:dedicated:post-provision`. It inspects adb owner state, lock-task state, launcher resolution, and OpenClaw's plain `shared_prefs` via `run-as` when available, so the project can tell whether the remaining gap is still DPC provisioning or already inside the app. / 现在还新增了一条 post-provision checker：`apps/android/scripts/local-host-dedicated-post-provision-check.sh`，命令入口为 `pnpm android:local-host:dedicated:post-provision`。它会同时检查 adb 的 owner / lock-task 状态、launcher resolution，以及在可用时通过 `run-as` 读取 OpenClaw 的明文 `shared_prefs`，从而把“剩余差距还在 DPC provisioning”还是“已经进入 app 内部问题”区分开。
+
 Its March 28, 2026 run on the currently connected spare OPPO phone produced: / 2026 年 3 月 28 日它在当前接入的闲置 OPPO 手机上跑出的结果是：
 
 - `manufacturer=OPPO`, `model=PFEM10`, `android=15`, `sdk=35`
@@ -38,6 +40,7 @@ Meaning / 含义:
 
 - The phone is not ready for adb-based device-owner provisioning yet, because it still has configured accounts and no DPC installed. / 这台手机当前还不能直接走 adb 的 device-owner 配置，因为它还有账号，且没装 DPC。
 - The root / custom-ROM lane is currently higher friction than the device-owner lane, because the bootloader is still locked and OEM unlock support is not yet confirmed. / root / 自定义 ROM 路线当前比 device-owner 路线更难，因为 bootloader 还锁着，而且 OEM unlock 能不能走通还没确认。
+- The new post-provision check on the same phone already shows that OpenClaw itself is mostly ready: `dedicatedEnabled=true`, `onboardingCompleted=true`, `gatewayConnectionMode=localHost`, the launcher still resolves to `ai.openclaw.app/.MainActivity`, and the local APK manifest already reports `if_whitelisted`. The missing pieces are still `Device Owner` and the DPC lock-task allowlist. / 同一台手机上新的 post-provision 检查也表明 OpenClaw 自身其实已经基本 ready：`dedicatedEnabled=true`、`onboardingCompleted=true`、`gatewayConnectionMode=localHost`、launcher 仍然正确指向 `ai.openclaw.app/.MainActivity`，而且本地 APK manifest 已经是 `if_whitelisted`。真正缺的仍然是 `Device Owner` 和 DPC 的 lock-task allowlist。
 
 ## Deployment Ladder / 部署梯度
 
@@ -148,6 +151,7 @@ Why / 原因:
 - Keep OpenClaw dedicated deployment enabled inside the app
 - Relaunch OpenClaw; `MainActivity` now declares `android:lockTaskMode="if_whitelisted"` and calls `startLockTask()` only when dedicated mode, local-host mode, onboarding completion, and the DPC allowlist are all in place
 - Check `host.deployment.lockTaskPermitted`, `host.deployment.lockTaskAutoEnterReady`, and `host.deployment.lockTaskModeState` through the app or remote `/status`
+- Run `pnpm android:local-host:dedicated:post-provision` as the first verification pass, and use `pnpm android:local-host:dedicated:post-provision -- --launch` when you want the script to relaunch OpenClaw and re-check lock-task after launch
 
 ### Before Root / 尝试 Root 前
 
@@ -193,6 +197,18 @@ pnpm android:local-host:dedicated:testdpc-qr -- \
   --wifi-ssid SparePhoneWiFi \
   --wifi-security WPA \
   --wifi-password example-password
+```
+
+Check post-provision dedicated readiness:
+
+```bash
+pnpm android:local-host:dedicated:post-provision
+```
+
+Check post-provision dedicated readiness and relaunch OpenClaw:
+
+```bash
+pnpm android:local-host:dedicated:post-provision -- --launch
 ```
 
 Optional DPC override:

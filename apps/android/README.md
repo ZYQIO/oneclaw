@@ -31,6 +31,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - For spare-phone deployment planning, use `pnpm android:local-host:dedicated:readiness` to decide whether the current device should go through the `Device Owner` lane first or whether root/systemize work is even worth considering yet.
 - When the device is close to ready, use `pnpm android:local-host:dedicated:device-owner` as a dry-run wrapper before attempting a real `adb shell dpm set-device-owner ...` provisioning step.
 - For the official factory-reset path, use `pnpm android:local-host:dedicated:testdpc-qr` to fetch the latest public `TestDPC` GitHub release, compute a checksum, and render a provisioning QR for setup wizard scanning.
+- After provisioning, use `pnpm android:local-host:dedicated:post-provision` to check owner state, lock-task allowlisting, launcher resolution, and OpenClaw's own dedicated/local-host flags in one place.
 - Once a DPC allowlists `ai.openclaw.app` for lock-task, `MainActivity` now advertises `android:lockTaskMode=\"if_whitelisted\"` and auto-enters lock-task on launch when dedicated deployment is enabled and the app is already onboarded in local-host mode.
 
 ### Rebuild Checklist
