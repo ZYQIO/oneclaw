@@ -37,6 +37,7 @@ Move Android `Local Host` from "GPT can chat plus use curated device tools" towa
 - Reviewed Z.ai's recent GitHub open-source work to separate model-side references from Android-runtime references. / 已补看 Z.ai 最近在 GitHub 开源的项目，区分哪些更适合当模型参考、哪些更适合当 Android runtime 参考。
 - Reduced the architecture choice to a concrete direction instead of continuing vague scope expansion. / 已把架构选择收敛到明确方向，而不是继续模糊扩范围。
 - The latest background-control research now points to a hybrid runtime answer rather than a model-only answer: use official Android keepalive/recovery tools where possible, prefer a reverse outbound transport over a background LAN listener, and keep an external-controller fallback in mind for hostile OEMs. / 最新一轮后台操控调研已经把答案收敛成“混合 runtime”而不是“模型层自己解决”：能用 Android 官方保活 / 恢复工具的地方先用，控制面优先考虑 reverse outbound transport 而不是长期依赖后台 LAN 监听，同时为 hostile OEM 预留外部主控 fallback。
+- The new dedicated-phone research also clarifies the system-integration ladder: for a spare phone, device-owner / lock-task mode should be evaluated before Magisk systemization, custom-ROM `priv-app` preload, or a true platform `system_server` service. / 新一轮闲置手机调研也把系统集成梯度说明白了：对闲置手机来说，应该先评估 device-owner / lock-task mode，再考虑 Magisk systemize、自定义 ROM 的 `priv-app` 预装，最后才是真正的平台 `system_server` 服务。
 
 ## Current Reality / 当前现实
 
