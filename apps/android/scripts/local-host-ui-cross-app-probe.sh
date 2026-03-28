@@ -11,6 +11,22 @@ OBSERVE_WINDOW_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS:
 POLL_INTERVAL_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS:-500}"
 REQUEST_TIMEOUT_SEC="${OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC:-5}"
 RECOVERY_WAIT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS:-1500}"
+FOLLOW_UP_WAIT_TEXT="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT:-}"
+FOLLOW_UP_WAIT_MATCH_MODE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_MATCH_MODE:-contains}"
+FOLLOW_UP_WAIT_TIMEOUT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TIMEOUT_MS:-10000}"
+FOLLOW_UP_WAIT_POLL_INTERVAL_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_POLL_INTERVAL_MS:-250}"
+FOLLOW_UP_TAP_TEXT="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT:-}"
+FOLLOW_UP_TAP_CONTENT_DESCRIPTION="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_CONTENT_DESCRIPTION:-}"
+FOLLOW_UP_TAP_RESOURCE_ID="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID:-}"
+FOLLOW_UP_TAP_MATCH_MODE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_MATCH_MODE:-contains}"
+FOLLOW_UP_TAP_INDEX="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_INDEX:-0}"
+FOLLOW_UP_INPUT_VALUE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE:-}"
+FOLLOW_UP_INPUT_TEXT="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT:-}"
+FOLLOW_UP_INPUT_CONTENT_DESCRIPTION="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_CONTENT_DESCRIPTION:-}"
+FOLLOW_UP_INPUT_RESOURCE_ID="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID:-}"
+FOLLOW_UP_INPUT_MATCH_MODE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_MATCH_MODE:-contains}"
+FOLLOW_UP_INPUT_INDEX="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_INDEX:-0}"
+FOLLOW_UP_SETTLE_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS:-1000}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-local-host-cross-app.XXXXXX)}"
 
 usage() {
@@ -21,14 +37,23 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=com.android.settings] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=5000] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=500] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT="Settings"] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID="com.example:id/search"] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE="openclaw"] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID="com.example:id/search_src_text"] \
   ./apps/android/scripts/local-host-ui-cross-app-probe.sh
 
 What it does:
   1. Requires adb plus a reachable local-host bearer token
   2. Verifies /status and /invoke/capabilities, then foregrounds OpenClaw
   3. Calls ui.launchApp for the target package
-  4. Polls both adb foreground activity state and remote /status over time
-  5. Restores OpenClaw with adb and verifies the host is reachable again
+  4. Optionally runs wait/tap/inputText follow-up actions inside the launched app
+  5. Polls both adb foreground activity state and remote /status over time
+  6. Restores OpenClaw with adb and verifies the host is reachable again
+
+Follow-up note:
+  - The optional wait/tap/input selectors are app and OEM specific.
+  - Keep the current 30s reachability proof separate from follow-up-action proof.
 
 Requirements:
   - curl
@@ -54,10 +79,55 @@ require_cmd curl
 require_cmd jq
 require_cmd adb
 
+validate_match_mode() {
+  local raw=$1
+  case "$raw" in
+    exact | contains) ;;
+    *)
+      echo "Unsupported match mode: $raw (expected exact or contains)." >&2
+      exit 1
+      ;;
+  esac
+}
+
 if [[ -z "$TOKEN" ]]; then
   echo "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN is required." >&2
   usage >&2
   exit 1
+fi
+
+validate_match_mode "$FOLLOW_UP_WAIT_MATCH_MODE"
+validate_match_mode "$FOLLOW_UP_TAP_MATCH_MODE"
+validate_match_mode "$FOLLOW_UP_INPUT_MATCH_MODE"
+
+follow_up_wait_requested=false
+if [[ -n "$FOLLOW_UP_WAIT_TEXT" ]]; then
+  follow_up_wait_requested=true
+fi
+
+follow_up_tap_requested=false
+if [[ -n "$FOLLOW_UP_TAP_TEXT$FOLLOW_UP_TAP_CONTENT_DESCRIPTION$FOLLOW_UP_TAP_RESOURCE_ID" ]]; then
+  follow_up_tap_requested=true
+fi
+
+follow_up_input_selector_requested=false
+if [[ -n "$FOLLOW_UP_INPUT_TEXT$FOLLOW_UP_INPUT_CONTENT_DESCRIPTION$FOLLOW_UP_INPUT_RESOURCE_ID" ]]; then
+  follow_up_input_selector_requested=true
+fi
+
+follow_up_input_requested=false
+if [[ -n "$FOLLOW_UP_INPUT_VALUE" || "$follow_up_input_selector_requested" == "true" ]]; then
+  follow_up_input_requested=true
+fi
+
+if [[ "$follow_up_input_selector_requested" == "true" && -z "$FOLLOW_UP_INPUT_VALUE" ]]; then
+  echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE is required when input selectors are set." >&2
+  exit 1
+fi
+
+follow_up_requested=false
+if [[ "$follow_up_wait_requested" == "true" || "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
+  follow_up_requested=true
 fi
 
 device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
@@ -80,6 +150,10 @@ CAPABILITIES_JSON="$ARTIFACT_DIR/capabilities.json"
 LAUNCH_SELF_JSON="$ARTIFACT_DIR/ui-launch-self.json"
 LAUNCH_TARGET_JSON="$ARTIFACT_DIR/ui-launch-target.json"
 TIMELINE_JSONL="$ARTIFACT_DIR/timeline.jsonl"
+FOLLOW_UP_WAIT_JSON="$ARTIFACT_DIR/ui-follow-up-wait.json"
+FOLLOW_UP_TAP_JSON="$ARTIFACT_DIR/ui-follow-up-tap.json"
+FOLLOW_UP_INPUT_JSON="$ARTIFACT_DIR/ui-follow-up-input.json"
+FOLLOW_UP_STATE_JSON="$ARTIFACT_DIR/ui-follow-up-state.json"
 RECOVERY_STATUS_JSON="$ARTIFACT_DIR/recovery-status.json"
 RECOVERY_STATUS_CODE="$ARTIFACT_DIR/recovery-status.code"
 RECOVERY_STATE_JSON="$ARTIFACT_DIR/recovery-state.json"
@@ -100,7 +174,8 @@ get_json() {
 post_json() {
   local url=$1
   local body=$2
-  curl --fail --silent --show-error --max-time "$REQUEST_TIMEOUT_SEC" \
+  local max_time=${3:-$REQUEST_TIMEOUT_SEC}
+  curl --fail --silent --show-error --max-time "$max_time" \
     -H "$AUTH_HEADER" \
     -H 'Content-Type: application/json' \
     -X POST \
@@ -112,6 +187,7 @@ invoke_command() {
   local command=$1
   local params_json=${2:-}
   local output_file=$3
+  local max_time=${4:-$REQUEST_TIMEOUT_SEC}
   local body
   body="$(jq -cn --arg command "$command" --arg params "$params_json" '
     if ($params | length) > 0 then
@@ -120,7 +196,7 @@ invoke_command() {
       {command:$command}
     end
   ')"
-  post_json "$BASE_URL/api/local-host/v1/invoke" "$body" | tee "$output_file" >/dev/null
+  post_json "$BASE_URL/api/local-host/v1/invoke" "$body" "$max_time" | tee "$output_file" >/dev/null
 }
 
 status_probe() {
@@ -188,6 +264,15 @@ get_json "$BASE_URL/api/local-host/v1/invoke/capabilities" | tee "$CAPABILITIES_
 for required_command in ui.launchApp ui.state; do
   assert_allowed_command "$required_command"
 done
+if [[ "$follow_up_wait_requested" == "true" ]]; then
+  assert_allowed_command "ui.waitForText"
+fi
+if [[ "$follow_up_tap_requested" == "true" ]]; then
+  assert_allowed_command "ui.tap"
+fi
+if [[ "$follow_up_input_requested" == "true" ]]; then
+  assert_allowed_command "ui.inputText"
+fi
 
 invoke_command "ui.launchApp" "$(jq -cn --arg packageName "$APP_PACKAGE" '{packageName:$packageName}')" "$LAUNCH_SELF_JSON"
 if ! jq -e --arg package "$APP_PACKAGE" '
@@ -211,6 +296,131 @@ if ! jq -e --arg package "$TARGET_PACKAGE" '
   echo "ui.launchApp failed for the target cross-app package." >&2
   jq '.' "$LAUNCH_TARGET_JSON" >&2
   exit 1
+fi
+
+follow_up_wait_ok=false
+follow_up_wait_matched_text=""
+follow_up_tap_ok=false
+follow_up_tap_strategy=""
+follow_up_input_ok=false
+follow_up_input_strategy=""
+follow_up_state_ok=false
+follow_up_state_package=""
+
+if [[ "$follow_up_requested" == "true" ]]; then
+  echo "cross_app.follow_up=requested"
+
+  if [[ "$follow_up_wait_requested" == "true" ]]; then
+    follow_up_wait_request_timeout_sec="$(
+      awk "BEGIN { printf \"%.0f\", ($FOLLOW_UP_WAIT_TIMEOUT_MS / 1000) + 5 }"
+    )"
+    invoke_command \
+      "ui.waitForText" \
+      "$(jq -cn \
+        --arg text "$FOLLOW_UP_WAIT_TEXT" \
+        --arg packageName "$TARGET_PACKAGE" \
+        --arg matchMode "$FOLLOW_UP_WAIT_MATCH_MODE" \
+        --argjson timeoutMs "$FOLLOW_UP_WAIT_TIMEOUT_MS" \
+        --argjson pollIntervalMs "$FOLLOW_UP_WAIT_POLL_INTERVAL_MS" \
+        '{text:$text, packageName:$packageName, matchMode:$matchMode, timeoutMs:$timeoutMs, pollIntervalMs:$pollIntervalMs}')" \
+      "$FOLLOW_UP_WAIT_JSON" \
+      "$follow_up_wait_request_timeout_sec"
+    if ! jq -e --arg package "$TARGET_PACKAGE" '
+      .ok == true and
+      .payload.packageName == $package and
+      .payload.wait.matched == true
+    ' "$FOLLOW_UP_WAIT_JSON" >/dev/null; then
+      echo "Cross-app follow-up wait did not match inside the target package." >&2
+      jq '.' "$FOLLOW_UP_WAIT_JSON" >&2
+      exit 1
+    fi
+    follow_up_wait_ok=true
+    follow_up_wait_matched_text="$(jq -r '.payload.wait.matchedText // ""' "$FOLLOW_UP_WAIT_JSON" 2>/dev/null || printf '%s' "")"
+  fi
+
+  if [[ "$follow_up_tap_requested" == "true" ]]; then
+    invoke_command \
+      "ui.tap" \
+      "$(jq -cn \
+        --arg text "$FOLLOW_UP_TAP_TEXT" \
+        --arg contentDescription "$FOLLOW_UP_TAP_CONTENT_DESCRIPTION" \
+        --arg resourceId "$FOLLOW_UP_TAP_RESOURCE_ID" \
+        --arg packageName "$TARGET_PACKAGE" \
+        --arg matchMode "$FOLLOW_UP_TAP_MATCH_MODE" \
+        --argjson index "$FOLLOW_UP_TAP_INDEX" \
+        '{
+          packageName:$packageName,
+          matchMode:$matchMode,
+          index:$index
+        }
+        + (if $text != "" then {text:$text} else {} end)
+        + (if $contentDescription != "" then {contentDescription:$contentDescription} else {} end)
+        + (if $resourceId != "" then {resourceId:$resourceId} else {} end)')" \
+      "$FOLLOW_UP_TAP_JSON"
+    if ! jq -e --arg package "$TARGET_PACKAGE" '
+      .ok == true and
+      .payload.action == "tap" and
+      .payload.performed == true and
+      .payload.packageName == $package
+    ' "$FOLLOW_UP_TAP_JSON" >/dev/null; then
+      echo "Cross-app follow-up tap did not complete inside the target package." >&2
+      jq '.' "$FOLLOW_UP_TAP_JSON" >&2
+      exit 1
+    fi
+    follow_up_tap_ok=true
+    follow_up_tap_strategy="$(jq -r '.payload.strategy // ""' "$FOLLOW_UP_TAP_JSON" 2>/dev/null || printf '%s' "")"
+  fi
+
+  if [[ "$follow_up_input_requested" == "true" ]]; then
+    invoke_command \
+      "ui.inputText" \
+      "$(jq -cn \
+        --arg value "$FOLLOW_UP_INPUT_VALUE" \
+        --arg text "$FOLLOW_UP_INPUT_TEXT" \
+        --arg contentDescription "$FOLLOW_UP_INPUT_CONTENT_DESCRIPTION" \
+        --arg resourceId "$FOLLOW_UP_INPUT_RESOURCE_ID" \
+        --arg packageName "$TARGET_PACKAGE" \
+        --arg matchMode "$FOLLOW_UP_INPUT_MATCH_MODE" \
+        --argjson index "$FOLLOW_UP_INPUT_INDEX" \
+        '{
+          value:$value,
+          packageName:$packageName,
+          matchMode:$matchMode,
+          index:$index
+        }
+        + (if $text != "" then {text:$text} else {} end)
+        + (if $contentDescription != "" then {contentDescription:$contentDescription} else {} end)
+        + (if $resourceId != "" then {resourceId:$resourceId} else {} end)')" \
+      "$FOLLOW_UP_INPUT_JSON"
+    if ! jq -e --arg package "$TARGET_PACKAGE" '
+      .ok == true and
+      .payload.action == "inputText" and
+      .payload.performed == true and
+      .payload.packageName == $package
+    ' "$FOLLOW_UP_INPUT_JSON" >/dev/null; then
+      echo "Cross-app follow-up input did not complete inside the target package." >&2
+      jq '.' "$FOLLOW_UP_INPUT_JSON" >&2
+      exit 1
+    fi
+    follow_up_input_ok=true
+    follow_up_input_strategy="$(jq -r '.payload.strategy // ""' "$FOLLOW_UP_INPUT_JSON" 2>/dev/null || printf '%s' "")"
+  fi
+
+  if [[ "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
+    sleep "$(sleep_seconds_from_ms "$FOLLOW_UP_SETTLE_MS")"
+  fi
+
+  invoke_command "ui.state" "" "$FOLLOW_UP_STATE_JSON"
+  if ! jq -e --arg package "$TARGET_PACKAGE" '
+    .ok == true and
+    .payload.packageName == $package
+  ' "$FOLLOW_UP_STATE_JSON" >/dev/null; then
+    echo "Cross-app follow-up state check no longer reports the target package on top." >&2
+    jq '.' "$FOLLOW_UP_STATE_JSON" >&2
+    exit 1
+  fi
+  follow_up_state_ok=true
+  follow_up_state_package="$(jq -r '.payload.packageName // ""' "$FOLLOW_UP_STATE_JSON" 2>/dev/null || printf '%s' "")"
 fi
 
 rounds=$(( (OBSERVE_WINDOW_MS + POLL_INTERVAL_MS - 1) / POLL_INTERVAL_MS ))
@@ -307,6 +517,26 @@ jq -n \
   --arg recoveryHttpCode "$recovery_http_code" \
   --argjson recoveryOk "$( [[ "$recovery_ok" == "true" ]] && printf 'true' || printf 'false' )" \
   --arg recoveredPackage "$recovered_package" \
+  --arg followUpWaitText "$FOLLOW_UP_WAIT_TEXT" \
+  --arg followUpWaitMatchedText "$follow_up_wait_matched_text" \
+  --arg followUpTapText "$FOLLOW_UP_TAP_TEXT" \
+  --arg followUpTapContentDescription "$FOLLOW_UP_TAP_CONTENT_DESCRIPTION" \
+  --arg followUpTapResourceId "$FOLLOW_UP_TAP_RESOURCE_ID" \
+  --arg followUpTapStrategy "$follow_up_tap_strategy" \
+  --arg followUpInputText "$FOLLOW_UP_INPUT_TEXT" \
+  --arg followUpInputContentDescription "$FOLLOW_UP_INPUT_CONTENT_DESCRIPTION" \
+  --arg followUpInputResourceId "$FOLLOW_UP_INPUT_RESOURCE_ID" \
+  --arg followUpInputStrategy "$follow_up_input_strategy" \
+  --arg followUpStatePackage "$follow_up_state_package" \
+  --argjson followUpRequested "$( [[ "$follow_up_requested" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpWaitRequested "$( [[ "$follow_up_wait_requested" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpWaitOk "$( [[ "$follow_up_wait_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpTapRequested "$( [[ "$follow_up_tap_requested" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpTapOk "$( [[ "$follow_up_tap_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpInputRequested "$( [[ "$follow_up_input_requested" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpInputOk "$( [[ "$follow_up_input_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpStateOk "$( [[ "$follow_up_state_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpInputValueLength "${#FOLLOW_UP_INPUT_VALUE}" \
   '{
     appPackage: $appPackage,
     targetPackage: $targetPackage,
@@ -318,6 +548,28 @@ jq -n \
     targetTopCount: $targetTopCount,
     firstTargetRound: $firstTargetRound,
     firstStatusFailureRound: $firstStatusFailureRound,
+    followUp: {
+      requested: $followUpRequested,
+      waitRequested: $followUpWaitRequested,
+      waitText: ($followUpWaitText | select(length > 0)),
+      waitMatchedText: ($followUpWaitMatchedText | select(length > 0)),
+      waitOk: $followUpWaitOk,
+      tapRequested: $followUpTapRequested,
+      tapText: ($followUpTapText | select(length > 0)),
+      tapContentDescription: ($followUpTapContentDescription | select(length > 0)),
+      tapResourceId: ($followUpTapResourceId | select(length > 0)),
+      tapStrategy: ($followUpTapStrategy | select(length > 0)),
+      tapOk: $followUpTapOk,
+      inputRequested: $followUpInputRequested,
+      inputText: ($followUpInputText | select(length > 0)),
+      inputContentDescription: ($followUpInputContentDescription | select(length > 0)),
+      inputResourceId: ($followUpInputResourceId | select(length > 0)),
+      inputStrategy: ($followUpInputStrategy | select(length > 0)),
+      inputValueLength: (if $followUpInputRequested then $followUpInputValueLength else null end),
+      inputOk: $followUpInputOk,
+      stateOk: $followUpStateOk,
+      statePackage: (if $followUpStatePackage == "" then null else $followUpStatePackage end)
+    },
     recovery: {
       httpCode: $recoveryHttpCode,
       ok: $recoveryOk,
@@ -329,6 +581,10 @@ printf 'cross_app.target=%s classification=%s target_top_rounds=%s status_succes
   "$TARGET_PACKAGE" "$classification" "$target_top_count" "$status_success_count"
 printf 'cross_app.first_target_round=%s first_status_failure_round=%s\n' \
   "$first_target_round" "$first_status_failure_round"
+if [[ "$follow_up_requested" == "true" ]]; then
+  printf 'cross_app.follow_up wait_ok=%s tap_ok=%s input_ok=%s state_ok=%s\n' \
+    "$follow_up_wait_ok" "$follow_up_tap_ok" "$follow_up_input_ok" "$follow_up_state_ok"
+fi
 printf 'recovery.http_code=%s recovery.ok=%s recovered_package=%s\n' \
   "$recovery_http_code" "$recovery_ok" "${recovered_package:-unknown}"
 

@@ -12,6 +12,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 ### Local Host Scope Today / 当前 Local Host 范围
 
 - `Local Host` currently provides on-device Codex-backed chat, a curated Android command surface, an app-private on-device workspace for text files with search/edit/copy/move support, and a dedicated idle-phone deployment mode that can keep the host service alive across app relaunches, package upgrades, and reboots.
+- The app now supports a settings-driven English / Simplified Chinese toggle across the tab bar, Connect tab, Settings tab, onboarding flow, Chat / Voice primary surfaces, Voice runtime/microphone status copy, common gateway auth/pairing edge states, the browser-based Codex auth success/failure page, and several runtime/auth status strings. Some deeper secondary copy still remains to be localized.
 - It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
 
@@ -234,11 +235,18 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=5000`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=500`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS=1500`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS=1000`
 
 The cross-app probe calls `ui.launchApp` for the target package, then polls two truths in parallel:
 
 - ADB foreground-activity state, using `topResumedActivity` and current focus
 - Remote `/status`, to see whether OpenClaw stays reachable while another app is supposed to be on top
+
+When the optional follow-up env vars are set, the same probe can also run `ui.waitForText`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Treat those selectors as app- and OEM-specific until the corresponding real-device proof is captured.
 
 At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON.
 
