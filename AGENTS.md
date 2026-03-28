@@ -207,6 +207,8 @@
 
 - Autonomous project work: when the user asks for sustained progress or says you can keep optimizing without repeated approval, proactively research, scope, implement, validate, document, commit, and push aligned improvements on your own. Pause only for destructive operations, irreversible security/privacy risk, or decisions that would clearly fork the product direction.
 - For that autonomous mode, keep the current project docs (`apps/android/local-host-progress.md`, handoff docs, or the equivalent area docs) updated so the rationale and next steps stay visible to the next session instead of living only in chat.
+- In that autonomous mode, treat each meaningful small iteration as a commit boundary: once one bounded slice is implemented and validated, create a scoped commit and push it before moving on to the next slice.
+- In that autonomous mode, do a brief retrospective every three small iterations: compare the current track against the project objective, record whether there is any drift, and update the area docs with the corrected next step before continuing.
 - Before pausing an autonomous workstream for a later session, leave a checkpoint in the area docs that records the current objective, validated state, blockers, exact next commands, and any “do not reopen” rules; commit and push that checkpoint before ending the session.
 
 - Vocabulary: "makeup" = "mac app".
