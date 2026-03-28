@@ -505,6 +505,7 @@
     "android:lint:android": "cd apps/android && ./gradlew :app:lintDebug",
     "android:local-host:dedicated:device-owner": "bash apps/android/scripts/local-host-dedicated-device-owner.sh",
     "android:local-host:dedicated:readiness": "bash apps/android/scripts/local-host-dedicated-readiness.sh",
+    "android:local-host:dedicated:testdpc-qr": "bash apps/android/scripts/local-host-dedicated-testdpc-qr.sh",
     "android:local-host:permissions": "bash apps/android/scripts/local-host-permission-smoke.sh",
     "android:local-host:smoke": "bash apps/android/scripts/local-host-remote-smoke.sh",
     "android:local-host:streaming": "bash apps/android/scripts/local-host-streaming-smoke.sh",
