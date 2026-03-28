@@ -44,17 +44,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ai.openclaw.app.AppLanguage
 import ai.openclaw.app.MainViewModel
 
 private enum class HomeTab(
-  val label: String,
   val icon: ImageVector,
 ) {
-  Connect(label = "Connect", icon = Icons.Default.CheckCircle),
-  Chat(label = "Chat", icon = Icons.Default.ChatBubble),
-  Voice(label = "Voice", icon = Icons.Default.RecordVoiceOver),
-  Screen(label = "Screen", icon = Icons.AutoMirrored.Filled.ScreenShare),
-  Settings(label = "Settings", icon = Icons.Default.Settings),
+  Connect(icon = Icons.Default.CheckCircle),
+  Chat(icon = Icons.Default.ChatBubble),
+  Voice(icon = Icons.Default.RecordVoiceOver),
+  Screen(icon = Icons.AutoMirrored.Filled.ScreenShare),
+  Settings(icon = Icons.Default.Settings),
 }
 
 private enum class StatusVisual {
@@ -67,6 +67,7 @@ private enum class StatusVisual {
 
 @Composable
 fun PostOnboardingTabs(viewModel: MainViewModel, modifier: Modifier = Modifier) {
+  val language = LocalAppLanguage.current
   var activeTab by rememberSaveable { mutableStateOf(HomeTab.Connect) }
 
   // Stop TTS when user navigates away from voice tab
@@ -99,6 +100,7 @@ fun PostOnboardingTabs(viewModel: MainViewModel, modifier: Modifier = Modifier) 
     contentWindowInsets = WindowInsets(0, 0, 0, 0),
     topBar = {
       TopStatusBar(
+        language = language,
         statusText = statusText,
         statusVisual = statusVisual,
       )
@@ -106,6 +108,7 @@ fun PostOnboardingTabs(viewModel: MainViewModel, modifier: Modifier = Modifier) 
     bottomBar = {
       if (!hideBottomTabBar) {
         BottomTabBar(
+          language = language,
           activeTab = activeTab,
           onSelect = { activeTab = it },
         )
@@ -147,6 +150,7 @@ private fun ScreenTabScreen(viewModel: MainViewModel) {
 
 @Composable
 private fun TopStatusBar(
+  language: AppLanguage,
   statusText: String,
   statusVisual: StatusVisual,
 ) {
@@ -224,7 +228,7 @@ private fun TopStatusBar(
             Box(modifier = Modifier.padding(4.dp))
           }
           Text(
-            text = statusText.trim().ifEmpty { "Offline" },
+            text = localizeConnectionStatus(language, statusText).ifEmpty { language.pick("Offline", "离线") },
             style = mobileCaption1,
             color = chipText,
             maxLines = 1,
@@ -237,6 +241,7 @@ private fun TopStatusBar(
 
 @Composable
 private fun BottomTabBar(
+  language: AppLanguage,
   activeTab: HomeTab,
   onSelect: (HomeTab) -> Unit,
 ) {
@@ -265,6 +270,7 @@ private fun BottomTabBar(
       ) {
         HomeTab.entries.forEach { tab ->
           val active = tab == activeTab
+          val label = tab.label(language)
           Surface(
             onClick = { onSelect(tab) },
             modifier = Modifier.weight(1f).heightIn(min = 58.dp),
@@ -280,11 +286,11 @@ private fun BottomTabBar(
             ) {
               Icon(
                 imageVector = tab.icon,
-                contentDescription = tab.label,
+                contentDescription = label,
                 tint = if (active) mobileAccent else mobileTextTertiary,
               )
               Text(
-                text = tab.label,
+                text = label,
                 color = if (active) mobileAccent else mobileTextSecondary,
                 style = mobileCaption2.copy(fontWeight = if (active) FontWeight.Bold else FontWeight.Medium),
               )
@@ -293,5 +299,15 @@ private fun BottomTabBar(
         }
       }
     }
+  }
+}
+
+private fun HomeTab.label(language: AppLanguage): String {
+  return when (this) {
+    HomeTab.Connect -> language.pick("Connect", "连接")
+    HomeTab.Chat -> language.pick("Chat", "聊天")
+    HomeTab.Voice -> language.pick("Voice", "语音")
+    HomeTab.Screen -> language.pick("Screen", "屏幕")
+    HomeTab.Settings -> language.pick("Settings", "设置")
   }
 }

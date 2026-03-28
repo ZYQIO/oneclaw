@@ -18,8 +18,9 @@ class OpenAICodexAuthManagerTest {
   fun oauthSuccessHtml_includesReturnToOpenClawCta() {
     val html = oauthSuccessHtml("OpenAI authentication completed. You can close this window.")
 
-    assertTrue(html.contains("Return to OpenClaw"))
+    assertTrue(html.contains("Return to OpenClaw / 返回 OpenClaw"))
     assertTrue(html.contains("OpenClaw should reopen automatically"))
+    assertTrue(html.contains("OpenAI 授权已完成。你可以关闭这个窗口。"))
     assertTrue(html.contains(buildOpenAICodexAppReturnUri()))
   }
 

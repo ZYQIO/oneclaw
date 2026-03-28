@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ai.openclaw.app.ui.LocalAppLanguage
 import ai.openclaw.app.ui.mobileAccent
 import ai.openclaw.app.ui.mobileAccentBorderStrong
 import ai.openclaw.app.ui.mobileAccentSoft
@@ -54,10 +55,12 @@ import ai.openclaw.app.ui.mobileCallout
 import ai.openclaw.app.ui.mobileCaption1
 import ai.openclaw.app.ui.mobileCardSurface
 import ai.openclaw.app.ui.mobileHeadline
+import ai.openclaw.app.ui.localizeThinkingLevel
 import ai.openclaw.app.ui.mobileSurface
 import ai.openclaw.app.ui.mobileText
 import ai.openclaw.app.ui.mobileTextSecondary
 import ai.openclaw.app.ui.mobileTextTertiary
+import ai.openclaw.app.ui.pick
 
 @Composable
 fun ChatComposer(
@@ -72,6 +75,8 @@ fun ChatComposer(
   onAbort: () -> Unit,
   onSend: (text: String) -> Unit,
 ) {
+  val language = LocalAppLanguage.current
+  fun t(english: String, simplifiedChinese: String): String = language.pick(english, simplifiedChinese)
   var input by rememberSaveable { mutableStateOf("") }
   var showThinkingMenu by remember { mutableStateOf(false) }
 
@@ -87,7 +92,7 @@ fun ChatComposer(
       value = input,
       onValueChange = { input = it },
       modifier = Modifier.fillMaxWidth(),
-      placeholder = { Text("Type a message…", style = mobileBodyStyle(), color = mobileTextTertiary) },
+      placeholder = { Text(t("Type a message…", "输入一条消息…"), style = mobileBodyStyle(), color = mobileTextTertiary) },
       minLines = 2,
       maxLines = 5,
       textStyle = mobileBodyStyle().copy(color = mobileText),
@@ -97,7 +102,7 @@ fun ChatComposer(
 
     if (!healthOk) {
       Text(
-        text = "Gateway is offline. Connect first in the Connect tab.",
+        text = t("Gateway is offline. Connect first in the Connect tab.", "Gateway 当前离线。请先到连接页完成连接。"),
         style = mobileCallout,
         color = ai.openclaw.app.ui.mobileWarning,
       )
@@ -120,11 +125,11 @@ fun ChatComposer(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-              text = thinkingLabel(thinkingLevel),
+              text = localizeThinkingLevel(language, thinkingLevel),
               style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold),
               color = mobileTextSecondary,
             )
-            Icon(Icons.Default.ArrowDropDown, contentDescription = "Select thinking level", modifier = Modifier.size(18.dp), tint = mobileTextTertiary)
+            Icon(Icons.Default.ArrowDropDown, contentDescription = t("Select thinking level", "选择思考强度"), modifier = Modifier.size(18.dp), tint = mobileTextTertiary)
           }
         }
 
@@ -137,15 +142,15 @@ fun ChatComposer(
           shadowElevation = 8.dp,
           border = BorderStroke(1.dp, mobileBorder),
         ) {
-          ThinkingMenuItem("off", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
-          ThinkingMenuItem("low", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
-          ThinkingMenuItem("medium", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
-          ThinkingMenuItem("high", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
+          ThinkingMenuItem("off", thinkingLevel, onSetThinkingLevel, language) { showThinkingMenu = false }
+          ThinkingMenuItem("low", thinkingLevel, onSetThinkingLevel, language) { showThinkingMenu = false }
+          ThinkingMenuItem("medium", thinkingLevel, onSetThinkingLevel, language) { showThinkingMenu = false }
+          ThinkingMenuItem("high", thinkingLevel, onSetThinkingLevel, language) { showThinkingMenu = false }
         }
       }
 
       SecondaryActionButton(
-        label = "Attach",
+        label = t("Attach", "附件"),
         icon = Icons.Default.AttachFile,
         enabled = true,
         compact = true,
@@ -153,7 +158,7 @@ fun ChatComposer(
       )
 
       SecondaryActionButton(
-        label = "Refresh",
+        label = t("Refresh", "刷新"),
         icon = Icons.Default.Refresh,
         enabled = true,
         compact = true,
@@ -161,7 +166,7 @@ fun ChatComposer(
       )
 
       SecondaryActionButton(
-        label = "Abort",
+        label = t("Abort", "中止"),
         icon = Icons.Default.Stop,
         enabled = pendingRunCount > 0,
         compact = true,
@@ -196,7 +201,7 @@ fun ChatComposer(
         }
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-          text = "Send",
+          text = t("Send", "发送"),
           style = mobileHeadline.copy(fontWeight = FontWeight.Bold),
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
@@ -246,10 +251,11 @@ private fun ThinkingMenuItem(
   value: String,
   current: String,
   onSet: (String) -> Unit,
+  language: ai.openclaw.app.AppLanguage,
   onDismiss: () -> Unit,
 ) {
   DropdownMenuItem(
-    text = { Text(thinkingLabel(value), style = mobileCallout, color = mobileText) },
+    text = { Text(localizeThinkingLevel(language, value), style = mobileCallout, color = mobileText) },
     onClick = {
       onSet(value)
       onDismiss()
@@ -262,15 +268,6 @@ private fun ThinkingMenuItem(
       }
     },
   )
-}
-
-private fun thinkingLabel(raw: String): String {
-  return when (raw.trim().lowercase()) {
-    "low" -> "Low"
-    "medium" -> "Medium"
-    "high" -> "High"
-    else -> "Off"
-  }
 }
 
 @Composable
@@ -293,6 +290,7 @@ private fun AttachmentsStrip(
 
 @Composable
 private fun AttachmentChip(fileName: String, onRemove: () -> Unit) {
+  val language = LocalAppLanguage.current
   Surface(
     shape = RoundedCornerShape(999.dp),
     color = mobileAccentSoft,
@@ -317,7 +315,7 @@ private fun AttachmentChip(fileName: String, onRemove: () -> Unit) {
         border = BorderStroke(1.dp, mobileBorderStrong),
       ) {
         Text(
-          text = "×",
+          text = language.pick("×", "×"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
           color = mobileTextSecondary,
           modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),

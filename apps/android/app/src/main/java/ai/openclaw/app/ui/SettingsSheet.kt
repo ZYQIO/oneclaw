@@ -65,6 +65,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import ai.openclaw.app.AppLanguage
 import ai.openclaw.app.BuildConfig
 import ai.openclaw.app.LocationMode
 import ai.openclaw.app.MainViewModel
@@ -76,11 +77,17 @@ fun SettingsSheet(viewModel: MainViewModel) {
   val lifecycleOwner = LocalLifecycleOwner.current
   val instanceId by viewModel.instanceId.collectAsState()
   val displayName by viewModel.displayName.collectAsState()
+  val appLanguage by viewModel.appLanguage.collectAsState()
   val cameraEnabled by viewModel.cameraEnabled.collectAsState()
   val locationMode by viewModel.locationMode.collectAsState()
   val locationPreciseEnabled by viewModel.locationPreciseEnabled.collectAsState()
   val preventSleep by viewModel.preventSleep.collectAsState()
   val canvasDebugStatusEnabled by viewModel.canvasDebugStatusEnabled.collectAsState()
+  val language = LocalAppLanguage.current
+  fun t(english: String, simplifiedChinese: String): String = language.pick(english, simplifiedChinese)
+  val manageLabel = t("Manage", "管理")
+  val grantLabel = t("Grant", "授权")
+  val enableLabel = t("Enable", "启用")
 
   val listState = rememberLazyListState()
   val deviceModel =
@@ -360,10 +367,66 @@ fun SettingsSheet(viewModel: MainViewModel) {
       contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+      item {
+        Text(
+          t("LANGUAGE", "语言"),
+          style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+          color = mobileAccent,
+        )
+      }
+      item {
+        Column(modifier = Modifier.settingsRowModifier()) {
+          ListItem(
+            modifier = Modifier.fillMaxWidth(),
+            colors = listItemColors,
+            headlineContent = { Text(t("Language", "语言"), style = mobileHeadline) },
+            supportingContent = {
+              Text(
+                t(
+                  "Switch app copy without rerunning onboarding.",
+                  "无需重新跑 onboarding，即可切换 App 文案语言。",
+                ),
+                style = mobileCallout,
+              )
+            },
+          )
+          HorizontalDivider(color = mobileBorder)
+          ListItem(
+            modifier = Modifier.fillMaxWidth(),
+            colors = listItemColors,
+            headlineContent = { Text(AppLanguage.English.displayName(), style = mobileHeadline) },
+            supportingContent = {
+              Text(t("Use English labels and descriptions.", "使用英文标签和说明。"), style = mobileCallout)
+            },
+            trailingContent = {
+              RadioButton(
+                selected = appLanguage == AppLanguage.English,
+                onClick = { viewModel.setAppLanguage(AppLanguage.English) },
+              )
+            },
+          )
+          HorizontalDivider(color = mobileBorder)
+          ListItem(
+            modifier = Modifier.fillMaxWidth(),
+            colors = listItemColors,
+            headlineContent = { Text(AppLanguage.SimplifiedChinese.displayName(), style = mobileHeadline) },
+            supportingContent = {
+              Text(t("Use Simplified Chinese labels and descriptions.", "使用简体中文标签和说明。"), style = mobileCallout)
+            },
+            trailingContent = {
+              RadioButton(
+                selected = appLanguage == AppLanguage.SimplifiedChinese,
+                onClick = { viewModel.setAppLanguage(AppLanguage.SimplifiedChinese) },
+              )
+            },
+          )
+        }
+      }
+
       // ── Node ──
       item {
         Text(
-          "DEVICE",
+          t("DEVICE", "设备"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
           color = mobileAccent,
         )
@@ -373,7 +436,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
           OutlinedTextField(
             value = displayName,
             onValueChange = viewModel::setDisplayName,
-            label = { Text("Name", style = mobileCaption1, color = mobileTextSecondary) },
+            label = { Text(t("Name", "名称"), style = mobileCaption1, color = mobileTextSecondary) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             textStyle = mobileBody.copy(color = mobileText),
             colors = settingsTextFieldColors(),
@@ -396,7 +459,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
       // ── Media ──
       item {
         Text(
-          "MEDIA",
+          t("MEDIA", "媒体"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
           color = mobileAccent,
         )
@@ -406,10 +469,10 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Microphone", style = mobileHeadline) },
+            headlineContent = { Text(t("Microphone", "麦克风"), style = mobileHeadline) },
             supportingContent = {
               Text(
-                if (micPermissionGranted) "Granted" else "Required for voice transcription.",
+                if (micPermissionGranted) t("Granted", "已授权") else t("Required for voice transcription.", "语音转写需要此权限。"),
                 style = mobileCallout,
               )
             },
@@ -426,7 +489,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (micPermissionGranted) "Manage" else "Grant",
+                  if (micPermissionGranted) manageLabel else grantLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -436,8 +499,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Camera", style = mobileHeadline) },
-            supportingContent = { Text("Photos and video clips (foreground only).", style = mobileCallout) },
+            headlineContent = { Text(t("Camera", "相机"), style = mobileHeadline) },
+            supportingContent = { Text(t("Photos and video clips (foreground only).", "照片和视频片段（仅前台）。"), style = mobileCallout) },
             trailingContent = { Switch(checked = cameraEnabled, onCheckedChange = ::setCameraEnabledChecked) },
           )
         }
@@ -446,7 +509,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
       // ── Notifications & Messaging ──
       item {
         Text(
-          "NOTIFICATIONS",
+          t("NOTIFICATIONS", "通知"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
           color = mobileAccent,
         )
@@ -456,9 +519,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("System Notifications", style = mobileHeadline) },
+            headlineContent = { Text(t("System Notifications", "系统通知"), style = mobileHeadline) },
             supportingContent = {
-              Text("Alerts and foreground service.", style = mobileCallout)
+              Text(t("Alerts and foreground service.", "提醒与前台服务通知。"), style = mobileCallout)
             },
             trailingContent = {
               Button(
@@ -473,7 +536,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (notificationsPermissionGranted) "Manage" else "Grant",
+                  if (notificationsPermissionGranted) manageLabel else grantLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -483,9 +546,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Notification Listener", style = mobileHeadline) },
+            headlineContent = { Text(t("Notification Listener", "通知监听"), style = mobileHeadline) },
             supportingContent = {
-              Text("Read and interact with notifications.", style = mobileCallout)
+              Text(t("Read and interact with notifications.", "读取并操作通知。"), style = mobileCallout)
             },
             trailingContent = {
               Button(
@@ -494,7 +557,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (notificationListenerEnabled) "Manage" else "Enable",
+                  if (notificationListenerEnabled) manageLabel else enableLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -505,9 +568,9 @@ fun SettingsSheet(viewModel: MainViewModel) {
             ListItem(
               modifier = Modifier.fillMaxWidth(),
               colors = listItemColors,
-              headlineContent = { Text("SMS", style = mobileHeadline) },
+              headlineContent = { Text(t("SMS", "短信"), style = mobileHeadline) },
               supportingContent = {
-                Text("Send SMS from this device.", style = mobileCallout)
+                Text(t("Send SMS from this device.", "从这台设备发送短信。"), style = mobileCallout)
               },
               trailingContent = {
                 Button(
@@ -522,7 +585,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                   shape = RoundedCornerShape(14.dp),
                 ) {
                   Text(
-                    if (smsPermissionGranted) "Manage" else "Grant",
+                    if (smsPermissionGranted) manageLabel else grantLabel,
                     style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                   )
                 }
@@ -535,7 +598,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
       // ── Data Access ──
       item {
         Text(
-          "DATA ACCESS",
+          t("DATA ACCESS", "数据访问"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
           color = mobileAccent,
         )
@@ -545,8 +608,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Photos", style = mobileHeadline) },
-            supportingContent = { Text("Access recent photos.", style = mobileCallout) },
+            headlineContent = { Text(t("Photos", "照片"), style = mobileHeadline) },
+            supportingContent = { Text(t("Access recent photos.", "访问最近照片。"), style = mobileCallout) },
             trailingContent = {
               Button(
                 onClick = {
@@ -560,7 +623,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (photosPermissionGranted) "Manage" else "Grant",
+                  if (photosPermissionGranted) manageLabel else grantLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -570,8 +633,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Contacts", style = mobileHeadline) },
-            supportingContent = { Text("Search and add contacts.", style = mobileCallout) },
+            headlineContent = { Text(t("Contacts", "联系人"), style = mobileHeadline) },
+            supportingContent = { Text(t("Search and add contacts.", "搜索并新增联系人。"), style = mobileCallout) },
             trailingContent = {
               Button(
                 onClick = {
@@ -585,7 +648,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (contactsPermissionGranted) "Manage" else "Grant",
+                  if (contactsPermissionGranted) manageLabel else grantLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -595,8 +658,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Calendar", style = mobileHeadline) },
-            supportingContent = { Text("Read and create events.", style = mobileCallout) },
+            headlineContent = { Text(t("Calendar", "日历"), style = mobileHeadline) },
+            supportingContent = { Text(t("Read and create events.", "读取并创建日程。"), style = mobileCallout) },
             trailingContent = {
               Button(
                 onClick = {
@@ -610,7 +673,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (calendarPermissionGranted) "Manage" else "Grant",
+                  if (calendarPermissionGranted) manageLabel else grantLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -620,8 +683,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Call Log", style = mobileHeadline) },
-            supportingContent = { Text("Search recent call history.", style = mobileCallout) },
+            headlineContent = { Text(t("Call Log", "通话记录"), style = mobileHeadline) },
+            supportingContent = { Text(t("Search recent call history.", "搜索最近通话记录。"), style = mobileCallout) },
             trailingContent = {
               Button(
                 onClick = {
@@ -635,7 +698,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
                 shape = RoundedCornerShape(14.dp),
               ) {
                 Text(
-                  if (callLogPermissionGranted) "Manage" else "Grant",
+                  if (callLogPermissionGranted) manageLabel else grantLabel,
                   style = mobileCallout.copy(fontWeight = FontWeight.Bold),
                 )
               }
@@ -646,14 +709,14 @@ fun SettingsSheet(viewModel: MainViewModel) {
             ListItem(
               modifier = Modifier.fillMaxWidth(),
               colors = listItemColors,
-              headlineContent = { Text("Motion", style = mobileHeadline) },
-              supportingContent = { Text("Track steps and activity.", style = mobileCallout) },
+              headlineContent = { Text(t("Motion", "运动"), style = mobileHeadline) },
+              supportingContent = { Text(t("Track steps and activity.", "记录步数和活动状态。"), style = mobileCallout) },
               trailingContent = {
                 val motionButtonLabel =
                   when {
-                    !motionPermissionRequired -> "Manage"
-                    motionPermissionGranted -> "Manage"
-                    else -> "Grant"
+                    !motionPermissionRequired -> manageLabel
+                    motionPermissionGranted -> manageLabel
+                    else -> grantLabel
                   }
                 Button(
                   onClick = {
@@ -677,7 +740,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
       // ── Location ──
       item {
         Text(
-          "LOCATION",
+          t("LOCATION", "位置"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
           color = mobileAccent,
         )
@@ -687,8 +750,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Off", style = mobileHeadline) },
-            supportingContent = { Text("Disable location sharing.", style = mobileCallout) },
+            headlineContent = { Text(t("Off", "关闭"), style = mobileHeadline) },
+            supportingContent = { Text(t("Disable location sharing.", "关闭位置共享。"), style = mobileCallout) },
             trailingContent = {
               RadioButton(
                 selected = locationMode == LocationMode.Off,
@@ -700,8 +763,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("While Using", style = mobileHeadline) },
-            supportingContent = { Text("Only while OpenClaw is open.", style = mobileCallout) },
+            headlineContent = { Text(t("While Using", "使用期间"), style = mobileHeadline) },
+            supportingContent = { Text(t("Only while OpenClaw is open.", "仅在 OpenClaw 打开时使用。"), style = mobileCallout) },
             trailingContent = {
               RadioButton(
                 selected = locationMode == LocationMode.WhileUsing,
@@ -713,8 +776,8 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Precise Location", style = mobileHeadline) },
-            supportingContent = { Text("Use precise GPS when available.", style = mobileCallout) },
+            headlineContent = { Text(t("Precise Location", "精确位置"), style = mobileHeadline) },
+            supportingContent = { Text(t("Use precise GPS when available.", "可用时使用精确 GPS。"), style = mobileCallout) },
             trailingContent = {
               Switch(
                 checked = locationPreciseEnabled,
@@ -729,7 +792,7 @@ fun SettingsSheet(viewModel: MainViewModel) {
       // ── Preferences ──
       item {
         Text(
-          "PREFERENCES",
+          t("PREFERENCES", "偏好"),
           style = mobileCaption1.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
           color = mobileAccent,
         )
@@ -739,16 +802,16 @@ fun SettingsSheet(viewModel: MainViewModel) {
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Prevent Sleep", style = mobileHeadline) },
-            supportingContent = { Text("Keep screen awake while open.", style = mobileCallout) },
+            headlineContent = { Text(t("Prevent Sleep", "防止休眠"), style = mobileHeadline) },
+            supportingContent = { Text(t("Keep screen awake while open.", "打开期间保持屏幕常亮。"), style = mobileCallout) },
             trailingContent = { Switch(checked = preventSleep, onCheckedChange = viewModel::setPreventSleep) },
           )
           HorizontalDivider(color = mobileBorder)
           ListItem(
             modifier = Modifier.fillMaxWidth(),
             colors = listItemColors,
-            headlineContent = { Text("Debug Canvas", style = mobileHeadline) },
-            supportingContent = { Text("Show status overlay on canvas.", style = mobileCallout) },
+            headlineContent = { Text(t("Debug Canvas", "调试 Canvas"), style = mobileHeadline) },
+            supportingContent = { Text(t("Show status overlay on canvas.", "在 Canvas 上显示状态叠层。"), style = mobileCallout) },
             trailingContent = {
               Switch(
                 checked = canvasDebugStatusEnabled,

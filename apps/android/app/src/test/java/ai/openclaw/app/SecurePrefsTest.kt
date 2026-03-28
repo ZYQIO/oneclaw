@@ -61,6 +61,23 @@ class SecurePrefsTest {
   }
 
   @Test
+  fun appLanguage_defaultsToEnglishAndPersistsChinese() {
+    val context = RuntimeEnvironment.getApplication()
+    val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)
+    val securePrefs = context.getSharedPreferences("openclaw.node.secure.test.language", Context.MODE_PRIVATE)
+    plainPrefs.edit().clear().commit()
+    securePrefs.edit().clear().commit()
+
+    val prefs = SecurePrefs(context, securePrefsOverride = securePrefs)
+    assertEquals(AppLanguage.English, prefs.appLanguage.value)
+
+    prefs.setAppLanguage(AppLanguage.SimplifiedChinese)
+
+    assertEquals(AppLanguage.SimplifiedChinese, prefs.appLanguage.value)
+    assertEquals(AppLanguage.SimplifiedChinese.rawValue, plainPrefs.getString(SecurePrefs.appLanguageKey, null))
+  }
+
+  @Test
   fun localHostDedicatedDeployment_defaultsOffAndPersists() {
     val context = RuntimeEnvironment.getApplication()
     val plainPrefs = context.getSharedPreferences("openclaw.node", Context.MODE_PRIVATE)

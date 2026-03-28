@@ -19,12 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ai.openclaw.app.chat.ChatMessage
 import ai.openclaw.app.chat.ChatPendingToolCall
+import ai.openclaw.app.ui.LocalAppLanguage
 import ai.openclaw.app.ui.mobileBorder
 import ai.openclaw.app.ui.mobileCallout
 import ai.openclaw.app.ui.mobileCardSurface
 import ai.openclaw.app.ui.mobileHeadline
 import ai.openclaw.app.ui.mobileText
 import ai.openclaw.app.ui.mobileTextSecondary
+import ai.openclaw.app.ui.pick
 
 @Composable
 fun ChatMessageListCard(
@@ -91,6 +93,7 @@ fun ChatMessageListCard(
 
 @Composable
 private fun EmptyChatHint(modifier: Modifier = Modifier, healthOk: Boolean) {
+  val language = LocalAppLanguage.current
   Surface(
     modifier = modifier.fillMaxWidth(),
     shape = RoundedCornerShape(14.dp),
@@ -101,13 +104,13 @@ private fun EmptyChatHint(modifier: Modifier = Modifier, healthOk: Boolean) {
       modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-      Text("No messages yet", style = mobileHeadline, color = mobileText)
+      Text(language.pick("No messages yet", "还没有消息"), style = mobileHeadline, color = mobileText)
       Text(
         text =
           if (healthOk) {
-            "Send the first prompt to start this session."
+            language.pick("Send the first prompt to start this session.", "发送第一条提示词，开始这个会话。")
           } else {
-            "Connect gateway first, then return to chat."
+            language.pick("Connect gateway first, then return to chat.", "请先连接 gateway，然后再回到聊天页。")
           },
         style = mobileCallout,
         color = mobileTextSecondary,

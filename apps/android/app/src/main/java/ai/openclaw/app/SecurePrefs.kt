@@ -23,6 +23,7 @@ class SecurePrefs(
   companion object {
     val defaultWakeWords: List<String> = listOf("openclaw", "claude")
     private const val defaultLocalHostRemoteAccessPort = 3945
+    internal const val appLanguageKey = "ui.language"
     internal const val displayNameKey = "node.displayName"
     internal const val locationModeKey = "location.enabledMode"
     internal const val voiceWakeModeKey = "voiceWake.mode"
@@ -51,6 +52,9 @@ class SecurePrefs(
   private val _displayName =
     MutableStateFlow(loadOrMigrateDisplayName(context = context))
   val displayName: StateFlow<String> = _displayName
+
+  private val _appLanguage = MutableStateFlow(loadAppLanguage())
+  val appLanguage: StateFlow<AppLanguage> = _appLanguage
 
   private val _cameraEnabled = MutableStateFlow(plainPrefs.getBoolean("camera.enabled", true))
   val cameraEnabled: StateFlow<Boolean> = _cameraEnabled
@@ -153,6 +157,11 @@ class SecurePrefs(
     val trimmed = value.trim()
     plainPrefs.edit { putString(displayNameKey, trimmed) }
     _displayName.value = trimmed
+  }
+
+  fun setAppLanguage(value: AppLanguage) {
+    plainPrefs.edit { putString(appLanguageKey, value.rawValue) }
+    _appLanguage.value = value
   }
 
   fun setCameraEnabled(value: Boolean) {
@@ -377,6 +386,11 @@ class SecurePrefs(
 
     plainPrefs.edit { putString(displayNameKey, resolved) }
     return resolved
+  }
+
+  private fun loadAppLanguage(): AppLanguage {
+    val stored = plainPrefs.getString(appLanguageKey, null)
+    return AppLanguage.fromRawValue(stored)
   }
 
   fun setWakeWords(words: List<String>) {

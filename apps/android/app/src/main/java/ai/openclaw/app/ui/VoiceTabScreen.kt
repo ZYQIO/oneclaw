@@ -69,6 +69,29 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import ai.openclaw.app.MainViewModel
+import ai.openclaw.app.ui.localizeConnectionStatus
+import ai.openclaw.app.ui.localizeMicCaptureStatus
+import ai.openclaw.app.ui.mobileAccent
+import ai.openclaw.app.ui.mobileAccentSoft
+import ai.openclaw.app.ui.mobileBackgroundGradient
+import ai.openclaw.app.ui.mobileBorder
+import ai.openclaw.app.ui.mobileBorderStrong
+import ai.openclaw.app.ui.mobileCallout
+import ai.openclaw.app.ui.mobileCaption1
+import ai.openclaw.app.ui.mobileCaption2
+import ai.openclaw.app.ui.mobileCardSurface
+import ai.openclaw.app.ui.mobileDanger
+import ai.openclaw.app.ui.mobileDangerSoft
+import ai.openclaw.app.ui.mobileHeadline
+import ai.openclaw.app.ui.mobileSuccess
+import ai.openclaw.app.ui.mobileSuccessSoft
+import ai.openclaw.app.ui.mobileSurface
+import ai.openclaw.app.ui.mobileSurfaceStrong
+import ai.openclaw.app.ui.mobileText
+import ai.openclaw.app.ui.mobileTextSecondary
+import ai.openclaw.app.ui.mobileTextTertiary
+import ai.openclaw.app.ui.mobileWarning
+import ai.openclaw.app.ui.pick
 import ai.openclaw.app.voice.VoiceConversationEntry
 import ai.openclaw.app.voice.VoiceConversationRole
 import kotlin.math.max
@@ -79,6 +102,8 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
   val lifecycleOwner = LocalLifecycleOwner.current
   val activity = remember(context) { context.findActivity() }
   val listState = rememberLazyListState()
+  val language = LocalAppLanguage.current
+  fun t(english: String, simplifiedChinese: String): String = language.pick(english, simplifiedChinese)
 
   val gatewayStatus by viewModel.statusText.collectAsState()
   val micEnabled by viewModel.micEnabled.collectAsState()
@@ -90,6 +115,8 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
   val micConversation by viewModel.micConversation.collectAsState()
   val micInputLevel by viewModel.micInputLevel.collectAsState()
   val micIsSending by viewModel.micIsSending.collectAsState()
+  val localizedGatewayStatus = remember(language, gatewayStatus) { localizeConnectionStatus(language, gatewayStatus) }
+  val localizedMicStatus = remember(language, micStatusText) { localizeMicCaptureStatus(language, micStatusText) }
 
   val hasStreamingAssistant = micConversation.any { it.role == VoiceConversationRole.Assistant && it.isStreaming }
   val showThinkingBubble = micIsSending && !hasStreamingAssistant
@@ -161,12 +188,12 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
                 tint = mobileTextTertiary,
               )
               Text(
-                "Tap the mic to start",
+                t("Tap the mic to start", "点击麦克风开始"),
                 style = mobileHeadline,
                 color = mobileTextSecondary,
               )
               Text(
-                "Each pause sends a turn automatically.",
+                t("Each pause sends a turn automatically.", "每次停顿都会自动发送一轮。"),
                 style = mobileCallout,
                 color = mobileTextTertiary,
               )
@@ -225,13 +252,13 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           ) {
             Icon(
               imageVector = if (speakerEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-              contentDescription = if (speakerEnabled) "Mute speaker" else "Unmute speaker",
+              contentDescription = if (speakerEnabled) t("Mute speaker", "静音扬声器") else t("Unmute speaker", "取消静音"),
               modifier = Modifier.size(22.dp),
               tint = if (speakerEnabled) mobileTextSecondary else mobileDanger,
             )
           }
           Text(
-            if (speakerEnabled) "Speaker" else "Muted",
+            if (speakerEnabled) t("Speaker", "扬声器") else t("Muted", "静音"),
             style = mobileCaption2,
             color = if (speakerEnabled) mobileTextTertiary else mobileDanger,
           )
@@ -281,7 +308,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           ) {
             Icon(
               imageVector = if (micEnabled) Icons.Default.MicOff else Icons.Default.Mic,
-              contentDescription = if (micEnabled) "Turn microphone off" else "Turn microphone on",
+              contentDescription = if (micEnabled) t("Turn microphone off", "关闭麦克风") else t("Turn microphone on", "开启麦克风"),
               modifier = Modifier.size(24.dp),
             )
           }
@@ -299,11 +326,11 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
       val queueCount = micQueuedMessages.size
       val stateText =
         when {
-          queueCount > 0 -> "$queueCount queued"
-          micIsSending -> "Sending"
-          micCooldown -> "Cooldown"
-          micEnabled -> "Listening"
-          else -> "Mic off"
+          queueCount > 0 -> t("$queueCount queued", "$queueCount 条排队中")
+          micIsSending -> t("Sending", "发送中")
+          micCooldown -> t("Cooldown", "冷却中")
+          micEnabled -> t("Listening", "监听中")
+          else -> t("Mic off", "麦克风关闭")
         }
       val stateColor =
         when {
@@ -311,16 +338,36 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           micIsSending -> mobileAccent
           else -> mobileTextSecondary
         }
+      val showDetailedMicStatus =
+        remember(micStatusText, queueCount, micIsSending, micEnabled) {
+          when (micStatusText.trim()) {
+            "",
+            "Mic off",
+            "Listening",
+            "Sending queued voice" -> queueCount > 0 || !micIsSending
+            else -> true
+          }
+        }
+      val detailedMicStatusColor = micStatusDetailColor(micStatusText)
       Surface(
         shape = RoundedCornerShape(999.dp),
         color = if (micEnabled) mobileSuccessSoft else mobileSurface,
         border = BorderStroke(1.dp, if (micEnabled) mobileSuccess.copy(alpha = 0.3f) else mobileBorder),
       ) {
         Text(
-          "$gatewayStatus · $stateText",
+          "$localizedGatewayStatus · $stateText",
           style = mobileCallout.copy(fontWeight = FontWeight.SemiBold),
           color = stateColor,
           modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+        )
+      }
+      if (showDetailedMicStatus) {
+        Text(
+          localizedMicStatus,
+          style = mobileCaption1,
+          color = detailedMicStatusColor,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.fillMaxWidth(),
         )
       }
 
@@ -333,9 +380,9 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           }
         Text(
           if (showRationale) {
-            "Microphone permission is required for voice mode."
+            t("Microphone permission is required for voice mode.", "语音模式需要麦克风权限。")
           } else {
-            "Microphone blocked. Open app settings to enable it."
+            t("Microphone blocked. Open app settings to enable it.", "麦克风权限被阻止了。请打开应用设置进行启用。")
           },
           style = mobileCaption1,
           color = mobileWarning,
@@ -346,7 +393,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           shape = RoundedCornerShape(12.dp),
           colors = ButtonDefaults.buttonColors(containerColor = mobileSurfaceStrong, contentColor = mobileText),
         ) {
-          Text("Open settings", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold))
+          Text(t("Open settings", "打开设置"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold))
         }
       }
     }
@@ -355,6 +402,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
 
 @Composable
 private fun VoiceTurnBubble(entry: VoiceConversationEntry) {
+  val language = LocalAppLanguage.current
   val isUser = entry.role == VoiceConversationRole.User
   Row(
     modifier = Modifier.fillMaxWidth(),
@@ -371,12 +419,12 @@ private fun VoiceTurnBubble(entry: VoiceConversationEntry) {
         verticalArrangement = Arrangement.spacedBy(3.dp),
       ) {
         Text(
-          if (isUser) "You" else "OpenClaw",
+          if (isUser) language.pick("You", "你") else "OpenClaw",
           style = mobileCaption2.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp),
           color = if (isUser) mobileAccent else mobileTextSecondary,
         )
         Text(
-          if (entry.isStreaming && entry.text.isBlank()) "Listening response…" else entry.text,
+          if (entry.isStreaming && entry.text.isBlank()) language.pick("Listening response…", "正在接收回应…") else entry.text,
           style = mobileCallout,
           color = mobileText,
         )
@@ -387,6 +435,7 @@ private fun VoiceTurnBubble(entry: VoiceConversationEntry) {
 
 @Composable
 private fun VoiceThinkingBubble() {
+  val language = LocalAppLanguage.current
   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
     Surface(
       modifier = Modifier.fillMaxWidth(0.68f),
@@ -400,7 +449,7 @@ private fun VoiceThinkingBubble() {
         verticalAlignment = Alignment.CenterVertically,
       ) {
         ThinkingDots(color = mobileTextSecondary)
-        Text("OpenClaw is thinking…", style = mobileCallout, color = mobileTextSecondary)
+        Text(language.pick("OpenClaw is thinking…", "OpenClaw 正在思考…"), style = mobileCallout, color = mobileTextSecondary)
       }
     }
   }
@@ -445,4 +494,24 @@ private fun openAppSettings(context: Context) {
       Uri.fromParts("package", context.packageName, null),
     )
   context.startActivity(intent)
+}
+
+@Composable
+private fun micStatusDetailColor(statusText: String): Color {
+  val trimmed = statusText.trim()
+  return when {
+    trimmed.isEmpty() -> mobileTextTertiary
+    trimmed.startsWith("Start failed:", ignoreCase = true) -> mobileWarning
+    trimmed.startsWith("Send failed:", ignoreCase = true) -> mobileWarning
+    trimmed.contains("error", ignoreCase = true) -> mobileWarning
+    trimmed.contains("permission required", ignoreCase = true) -> mobileWarning
+    trimmed.contains("unavailable", ignoreCase = true) -> mobileWarning
+    trimmed.contains("disconnected", ignoreCase = true) -> mobileWarning
+    trimmed.contains("limited", ignoreCase = true) -> mobileWarning
+    trimmed.contains("timed out", ignoreCase = true) -> mobileWarning
+    trimmed.contains("waiting for gateway", ignoreCase = true) -> mobileAccent
+    trimmed.contains("queued", ignoreCase = true) -> mobileAccent
+    trimmed.contains("sending", ignoreCase = true) -> mobileAccent
+    else -> mobileTextTertiary
+  }
 }

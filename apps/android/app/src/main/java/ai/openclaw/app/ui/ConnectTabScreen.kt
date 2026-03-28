@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ai.openclaw.app.AppLanguage
 import ai.openclaw.app.GatewayConnectionMode
 import ai.openclaw.app.MainViewModel
 import ai.openclaw.app.accessibility.openLocalHostUiAutomationSettings
@@ -64,6 +65,8 @@ import ai.openclaw.app.ui.mobileCardSurface
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
+import ai.openclaw.app.auth.OpenAICodexAuthUiState
 
 private enum class ConnectInputMode {
   SetupCode,
@@ -74,6 +77,8 @@ private enum class ConnectInputMode {
 fun ConnectTabScreen(viewModel: MainViewModel) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
+  val language = LocalAppLanguage.current
+  fun t(english: String, simplifiedChinese: String): String = language.pick(english, simplifiedChinese)
   val statusText by viewModel.statusText.collectAsState()
   val isConnected by viewModel.isConnected.collectAsState()
   val remoteAddress by viewModel.remoteAddress.collectAsState()
@@ -133,11 +138,16 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   }
   val remoteAccessExamples =
     remember(
+      language,
       localHostRemoteAccessUrl,
       localHostRemoteAccessPort,
       localHostRemoteAccessAdvancedCommandsEnabled,
       localHostRemoteAccessWriteCommandsEnabled,
     ) {
+      val summaryMessage = t("Summarize my notifications", "帮我总结一下通知")
+      val inputTextValue = t("OpenClaw", "OpenClaw")
+      val smsBody = t("Check in when you land.", "到了报个平安。")
+      val chatTabLabel = t("Chat", "聊天")
       val baseUrl = localHostRemoteAccessUrl?.trim().orEmpty().ifEmpty { "http://<phone-ip>:${localHostRemoteAccessPort}" }
       buildString {
         append("curl -H 'Authorization: Bearer <TOKEN>' ")
@@ -149,7 +159,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
         append("-H 'Content-Type: application/json' ")
         append("$baseUrl/api/local-host/v1/chat/send-wait ")
-        append("-d '{\"message\":\"Summarize my notifications\",\"waitMs\":30000}'")
+        append("-d '{\"message\":\"$summaryMessage\",\"waitMs\":30000}'")
         append("\n\n")
         append("curl -H 'Authorization: Bearer <TOKEN>' ")
         append("'$baseUrl/api/local-host/v1/events?cursor=0&waitMs=20000'")
@@ -175,19 +185,30 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
           append("-H 'Content-Type: application/json' ")
           append("$baseUrl/api/local-host/v1/invoke ")
-          append("-d '{\"command\":\"ui.inputText\",\"params\":{\"value\":\"OpenClaw\"}}'")
+          append("-d '{\"command\":\"ui.inputText\",\"params\":{\"value\":\"$inputTextValue\"}}'")
           append("\n\n")
           append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
           append("-H 'Content-Type: application/json' ")
           append("$baseUrl/api/local-host/v1/invoke ")
-          append("-d '{\"command\":\"sms.send\",\"params\":{\"to\":\"+15551234567\",\"body\":\"Check in when you land.\"}}'")
+          append("-d '{\"command\":\"sms.send\",\"params\":{\"to\":\"+15551234567\",\"body\":\"$smsBody\"}}'")
           append("\n\n")
           append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
           append("-H 'Content-Type: application/json' ")
           append("$baseUrl/api/local-host/v1/invoke ")
-          append("-d '{\"command\":\"ui.tap\",\"params\":{\"text\":\"Chat\",\"matchMode\":\"exact\"}}'")
+          append("-d '{\"command\":\"ui.tap\",\"params\":{\"text\":\"$chatTabLabel\",\"matchMode\":\"exact\"}}'")
         }
       }
+    }
+  val localizedStatusText = remember(language, statusText) { localizeConnectionStatus(language, statusText) }
+  val localizedRemoteAccessStatusText =
+    remember(language, localHostRemoteAccessStatusText) { localizeRemoteAccessStatus(language, localHostRemoteAccessStatusText) }
+  val localizedUiAutomationStatusText =
+    remember(language, localHostUiAutomationStatus) { uiAutomationStatusText(language, localHostUiAutomationStatus) }
+  val localizedUiAutomationDetailText =
+    remember(language, localHostUiAutomationStatus) { uiAutomationDetailText(language, localHostUiAutomationStatus) }
+  val localizedAuthStatusText =
+    remember(language, openAICodexAuthUiState, hasOpenAICodexCredential) {
+      codexAuthStatusText(language, openAICodexAuthUiState, hasOpenAICodexCredential)
     }
 
   if (pendingTrust != null) {
@@ -195,10 +216,13 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     AlertDialog(
       onDismissRequest = { viewModel.declineGatewayTrustPrompt() },
       containerColor = mobileCardSurface,
-      title = { Text("Trust this gateway?", style = mobileHeadline, color = mobileText) },
+      title = { Text(t("Trust this gateway?", "信任这个 gateway 吗？"), style = mobileHeadline, color = mobileText) },
       text = {
         Text(
-          "First-time TLS connection.\n\nVerify this SHA-256 fingerprint before trusting:\n${prompt.fingerprintSha256}",
+          t(
+            "First-time TLS connection.\n\nVerify this SHA-256 fingerprint before trusting:\n${prompt.fingerprintSha256}",
+            "这是第一次 TLS 连接。\n\n请在信任前核对这个 SHA-256 指纹：\n${prompt.fingerprintSha256}",
+          ),
           style = mobileCallout,
           color = mobileText,
         )
@@ -208,7 +232,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           onClick = { viewModel.acceptGatewayTrustPrompt() },
           colors = ButtonDefaults.textButtonColors(contentColor = mobileAccent),
         ) {
-          Text("Trust and continue")
+          Text(t("Trust and continue", "信任并继续"))
         }
       },
       dismissButton = {
@@ -216,7 +240,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           onClick = { viewModel.declineGatewayTrustPrompt() },
           colors = ButtonDefaults.textButtonColors(contentColor = mobileTextSecondary),
         ) {
-          Text("Cancel")
+          Text(t("Cancel", "取消"))
         }
       },
     )
@@ -231,10 +255,10 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     remember(isConnected, remoteAddress, setupResolvedEndpoint, manualResolvedEndpoint, inputMode, connectionMode) {
       when {
         connectionMode == GatewayConnectionMode.LocalHost && isConnected && !remoteAddress.isNullOrBlank() -> remoteAddress!!
-        connectionMode == GatewayConnectionMode.LocalHost -> "This phone"
+        connectionMode == GatewayConnectionMode.LocalHost -> t("This phone", "这台手机")
         isConnected && !remoteAddress.isNullOrBlank() -> remoteAddress!!
-        inputMode == ConnectInputMode.SetupCode -> setupResolvedEndpoint ?: "Not set"
-        else -> manualResolvedEndpoint ?: "Not set"
+        inputMode == ConnectInputMode.SetupCode -> setupResolvedEndpoint ?: t("Not set", "未设置")
+        else -> manualResolvedEndpoint ?: t("Not set", "未设置")
       }
     }
 
@@ -243,14 +267,17 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-      Text("Gateway Connection", style = mobileTitle1, color = mobileText)
+      Text(t("Gateway Connection", "Gateway 连接"), style = mobileTitle1, color = mobileText)
       Text(
         when {
-          isConnected && connectionMode == GatewayConnectionMode.LocalHost -> "OpenClaw is running directly on this phone."
-          isConnected -> "Your gateway is active and ready."
+          isConnected && connectionMode == GatewayConnectionMode.LocalHost -> t("OpenClaw is running directly on this phone.", "OpenClaw 正直接运行在这台手机上。")
+          isConnected -> t("Your gateway is active and ready.", "你的 gateway 已激活并就绪。")
           connectionMode == GatewayConnectionMode.LocalHost ->
-            "Run OpenClaw locally on this phone with Codex-backed chat and a limited on-device command set."
-          else -> "Connect to your gateway to get started."
+            t(
+              "Run OpenClaw locally on this phone with Codex-backed chat and a limited on-device command set.",
+              "在这台手机上本地运行 OpenClaw，使用 Codex 驱动聊天，并启用一组受限的机上命令。",
+            )
+          else -> t("Connect to your gateway to get started.", "先连接你的 gateway 再开始。")
         },
         style = mobileCallout,
         color = mobileTextSecondary,
@@ -267,10 +294,10 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
-        Text("Runtime mode", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+        Text(t("Runtime mode", "运行模式"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           MethodChip(
-            label = "Local Host",
+            label = t("Local Host", "本机 Host"),
             active = connectionMode == GatewayConnectionMode.LocalHost,
             onClick = {
               viewModel.setGatewayConnectionMode(GatewayConnectionMode.LocalHost)
@@ -278,7 +305,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             },
           )
           MethodChip(
-            label = "Remote Gateway",
+            label = t("Remote Gateway", "远程 Gateway"),
             active = connectionMode == GatewayConnectionMode.RemoteGateway,
             onClick = {
               viewModel.setGatewayConnectionMode(GatewayConnectionMode.RemoteGateway)
@@ -289,15 +316,24 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         if (connectionMode == GatewayConnectionMode.LocalHost) {
           Text(
             if (hasOpenAICodexCredential) {
-              "Codex auth is present. Starting local host will use your on-device OAuth credential."
+              t(
+                "Codex auth is present. Starting local host will use your on-device OAuth credential.",
+                "已检测到 Codex 授权。启动本机 Host 时会使用手机上的 OAuth 凭证。",
+              )
             } else {
-              "Codex auth is still missing. Local host will start, but chat requests will fail until OAuth is added."
+              t(
+                "Codex auth is still missing. Local host will start, but chat requests will fail until OAuth is added.",
+                "还没有 Codex 授权。本机 Host 可以启动，但在补上 OAuth 前聊天请求会失败。",
+              )
             },
             style = mobileCaption1,
             color = if (hasOpenAICodexCredential) mobileTextSecondary else mobileWarning,
           )
           Text(
-            "Current scope is local chat plus selected Android device commands. It does not yet match the full desktop gateway tool/runtime surface.",
+            t(
+              "Current scope is local chat plus selected Android device commands. It does not yet match the full desktop gateway tool/runtime surface.",
+              "当前范围是本地聊天加部分 Android 设备命令，还没有覆盖桌面 gateway 的完整工具与 runtime 面。",
+            ),
             style = mobileCaption1,
             color = mobileTextSecondary,
           )
@@ -325,9 +361,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              Text("UI automation", style = mobileHeadline, color = mobileText)
+              Text(t("UI automation", "UI 自动化"), style = mobileHeadline, color = mobileText)
               Text(
-                "Prepare on-device accessibility access for `ui.state`, `ui.tap`, and future richer bounded cross-app control.",
+                t(
+                  "Prepare on-device accessibility access for `ui.state`, `ui.tap`, and future richer bounded cross-app control.",
+                  "为 `ui.state`、`ui.tap` 以及后续更丰富的有边界跨 app 控制准备机上的无障碍权限。",
+                ),
                 style = mobileCallout,
                 color = mobileTextSecondary,
               )
@@ -339,14 +378,14 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
             ) {
               Text(
-                if (localHostUiAutomationStatus.enabled) "Review access" else "Enable",
+                if (localHostUiAutomationStatus.enabled) t("Review access", "查看权限") else t("Enable", "启用"),
                 style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
               )
             }
           }
 
           Text(
-            localHostUiAutomationStatus.statusText,
+            localizedUiAutomationStatusText,
             style = mobileCallout,
             color =
               when {
@@ -356,12 +395,15 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               },
           )
           Text(
-            localHostUiAutomationStatus.detailText,
+            localizedUiAutomationDetailText,
             style = mobileCaption1,
             color = mobileTextSecondary,
           )
           Text(
-            "Once enabled, local-host `/status` will report `uiAutomationAvailable` and a detailed `uiAutomation` readiness object.",
+            t(
+              "Once enabled, local-host `/status` will report `uiAutomationAvailable` and a detailed `uiAutomation` readiness object.",
+              "启用后，本机 Host 的 `/status` 会返回 `uiAutomationAvailable` 和详细的 `uiAutomation` readiness 对象。",
+            ),
             style = mobileCaption1,
             color = mobileTextSecondary,
           )
@@ -378,18 +420,9 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
           verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-          Text("Codex authentication", style = mobileHeadline, color = mobileText)
-          val authStatusText =
-            when {
-              !openAICodexAuthUiState.errorText.isNullOrBlank() -> openAICodexAuthUiState.errorText!!
-              !openAICodexAuthUiState.statusText.isNullOrBlank() -> openAICodexAuthUiState.statusText!!
-              hasOpenAICodexCredential && !openAICodexAuthUiState.signedInEmail.isNullOrBlank() ->
-                "Signed in as ${openAICodexAuthUiState.signedInEmail}"
-              hasOpenAICodexCredential -> "OpenAI Codex OAuth is stored on this phone."
-              else -> "Sign in once and local-host chat can call GPT through your Codex subscription."
-            }
+          Text(t("Codex authentication", "Codex 授权"), style = mobileHeadline, color = mobileText)
           Text(
-            authStatusText,
+            localizedAuthStatusText,
             style = mobileCallout,
             color =
               when {
@@ -405,7 +438,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               onValueChange = { manualAuthorizationInput = it },
               placeholder = {
                 Text(
-                  "Paste redirect URL or authorization code",
+                  t("Paste redirect URL or authorization code", "粘贴回跳 URL 或授权码"),
                   style = mobileBody,
                   color = mobileTextTertiary,
                 )
@@ -435,7 +468,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               ),
           ) {
             Text(
-              if (hasOpenAICodexCredential) "Reconnect Codex" else "Sign in with Codex",
+              if (hasOpenAICodexCredential) t("Reconnect Codex", "重新连接 Codex") else t("Sign in with Codex", "使用 Codex 登录"),
               style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
             )
           }
@@ -452,17 +485,17 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 ),
               border = BorderStroke(1.dp, mobileBorderStrong),
             ) {
-              Text("Paste code", style = mobileCaption1.copy(fontWeight = FontWeight.Bold))
+              Text(t("Paste code", "粘贴授权码"), style = mobileCaption1.copy(fontWeight = FontWeight.Bold))
             }
           }
 
           if (openAICodexAuthUiState.inProgress) {
             TextButton(onClick = { viewModel.cancelOpenAICodexLogin() }) {
-              Text("Cancel", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
+              Text(t("Cancel", "取消"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
             }
           } else if (hasOpenAICodexCredential) {
             TextButton(onClick = { viewModel.clearOpenAICodexCredential() }) {
-              Text("Clear auth", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileDanger)
+              Text(t("Clear auth", "清除授权"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileDanger)
             }
           }
         }
@@ -489,9 +522,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              Text("Dedicated host deployment", style = mobileHeadline, color = mobileText)
+              Text(t("Dedicated host deployment", "专机部署"), style = mobileHeadline, color = mobileText)
               Text(
-                "Keep this idle phone in always-on host mode. OpenClaw will keep a foreground service up, restart after reboot or app updates, and auto-heal Local Host if it drops.",
+                t(
+                  "Keep this idle phone in always-on host mode. OpenClaw will keep a foreground service up, restart after reboot or app updates, and auto-heal Local Host if it drops.",
+                  "把这台闲置手机保持在常驻 host 模式。OpenClaw 会维持前台服务，在重启或应用更新后恢复，并在本机 Host 掉线时自动自愈。",
+                ),
                 style = mobileCallout,
                 color = mobileTextSecondary,
               )
@@ -509,9 +545,15 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
 
           Text(
             if (localHostDedicatedDeploymentEnabled) {
-              "Dedicated deployment is on. Disable it before expecting Local Host to stay offline after a disconnect."
+              t(
+                "Dedicated deployment is on. Disable it before expecting Local Host to stay offline after a disconnect.",
+                "专机部署已开启。如果你希望断开后本机 Host 保持离线，请先关闭它。",
+              )
             } else {
-              "Dedicated deployment is off. Local Host only stays up while the app/session keeps it alive."
+              t(
+                "Dedicated deployment is off. Local Host only stays up while the app/session keeps it alive.",
+                "专机部署已关闭。本机 Host 只会在 App 或当前会话维持它时保持在线。",
+              )
             },
             style = mobileCaption1,
             color = if (localHostDedicatedDeploymentEnabled) mobileSuccess else mobileTextSecondary,
@@ -532,12 +574,18 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                   modifier = Modifier.weight(1f),
                   verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                  Text("Battery optimization", style = mobileHeadline, color = mobileText)
+                  Text(t("Battery optimization", "电池优化"), style = mobileHeadline, color = mobileText)
                   Text(
                     if (batteryOptimizationIgnored) {
-                      "Unrestricted battery mode is active for OpenClaw. Android is less likely to delay dedicated-host recovery."
+                      t(
+                        "Unrestricted battery mode is active for OpenClaw. Android is less likely to delay dedicated-host recovery.",
+                        "OpenClaw 已启用不受限制的电池模式，Android 更不容易延迟专机恢复。",
+                      )
                     } else {
-                      "Android battery optimization is still active. On idle phones, that can delay dedicated-host restarts after long idle periods."
+                      t(
+                        "Android battery optimization is still active. On idle phones, that can delay dedicated-host restarts after long idle periods.",
+                        "Android 电池优化仍在生效。对闲置手机来说，这可能会让专机在长时间空闲后恢复得更慢。",
+                      )
                     },
                     style = mobileCallout,
                     color = mobileTextSecondary,
@@ -553,7 +601,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                   contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                 ) {
                   Text(
-                    if (batteryOptimizationIgnored) "Review" else "Allow background",
+                    if (batteryOptimizationIgnored) t("Review", "查看") else t("Allow background", "允许后台"),
                     style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
                   )
                 }
@@ -561,9 +609,15 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
 
               Text(
                 if (batteryOptimizationIgnored) {
-                  "Remote `device.status` now reports `backgroundExecution.batteryOptimizationIgnored=true` for this phone."
+                  t(
+                    "Remote `device.status` now reports `backgroundExecution.batteryOptimizationIgnored=true` for this phone.",
+                    "远端 `device.status` 现在会为这台手机返回 `backgroundExecution.batteryOptimizationIgnored=true`。",
+                  )
                 } else {
-                  "For trusted idle-phone deployments, Android's own docs treat battery-optimization exemption as one of the ways foreground-service restarts are less restricted."
+                  t(
+                    "For trusted idle-phone deployments, Android's own docs treat battery-optimization exemption as one of the ways foreground-service restarts are less restricted.",
+                    "对可信的闲置手机部署，Android 官方文档把电池优化豁免视为放宽前台服务重启限制的方式之一。",
+                  )
                 },
                 style = mobileCaption1,
                 color = if (batteryOptimizationIgnored) mobileSuccess else mobileWarning,
@@ -580,7 +634,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                   ) {
-                    Text("Background policy", style = mobileHeadline, color = mobileText)
+                    Text(t("Background policy", "后台策略"), style = mobileHeadline, color = mobileText)
                     Text(
                       note,
                       style = mobileCallout,
@@ -594,7 +648,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                   ) {
                     Text(
-                      "App settings",
+                      t("App settings", "应用设置"),
                       style = mobileCaption1.copy(fontWeight = FontWeight.Bold),
                     )
                   }
@@ -602,9 +656,15 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
 
                 Text(
                   if (batteryOptimizationIgnored) {
-                    "Battery optimization is already exempted here, but that still does not protect OpenClaw from OEM task cleaners after a Recents swipe."
+                    t(
+                      "Battery optimization is already exempted here, but that still does not protect OpenClaw from OEM task cleaners after a Recents swipe.",
+                      "这里虽然已经获得电池优化豁免，但这仍然不能防止 OpenClaw 在最近任务划卡后被 OEM 的任务清理机制杀掉。",
+                    )
                   } else {
-                    "Battery optimization exemption helps with idle recovery, but this phone may still force-stop OpenClaw if you swipe its Recents card away."
+                    t(
+                      "Battery optimization exemption helps with idle recovery, but this phone may still force-stop OpenClaw if you swipe its Recents card away.",
+                      "电池优化豁免有助于空闲恢复，但如果你把最近任务卡片划掉，这台手机仍可能直接 force-stop OpenClaw。",
+                    )
                   },
                   style = mobileCaption1,
                   color = mobileWarning,
@@ -622,9 +682,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              Text("Remote access", style = mobileHeadline, color = mobileText)
+              Text(t("Remote access", "远程访问"), style = mobileHeadline, color = mobileText)
               Text(
-                "Expose local-host chat and selected Android device commands on trusted networks or Tailscale.",
+                t(
+                  "Expose local-host chat and selected Android device commands on trusted networks or Tailscale.",
+                  "在可信网络或 Tailscale 上暴露本机 Host 聊天和部分 Android 设备命令。",
+                ),
                 style = mobileCallout,
                 color = mobileTextSecondary,
               )
@@ -641,7 +704,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           }
 
           Text(
-            localHostRemoteAccessStatusText,
+            localizedRemoteAccessStatusText,
             style = mobileCallout,
             color =
               when {
@@ -664,7 +727,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             onValueChange = { remoteAccessPortInput = it.filter(Char::isDigit) },
             placeholder = {
               Text(
-                "Remote access port",
+                t("Remote access port", "远程访问端口"),
                 style = mobileBody,
                 color = mobileTextTertiary,
               )
@@ -698,9 +761,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              Text("Advanced remote commands", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
+              Text(t("Advanced remote commands", "高级远程命令"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
               Text(
-                "Allow remote camera commands like `camera.list`, `camera.snap`, and `camera.clip`.",
+                t(
+                  "Allow remote camera commands like `camera.list`, `camera.snap`, and `camera.clip`.",
+                  "允许远程相机命令，例如 `camera.list`、`camera.snap` 和 `camera.clip`。",
+                ),
                 style = mobileCaption1,
                 color = mobileTextSecondary,
               )
@@ -725,9 +791,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-              Text("Write remote commands", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
+              Text(t("Write remote commands", "写入型远程命令"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
               Text(
-                "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, `ui.launchApp`, `ui.inputText`, and bounded `ui.tap` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
+                t(
+                  "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, `ui.launchApp`, `ui.inputText`, and bounded `ui.tap` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
+                  "允许远程 `sms.send`、`contacts.add`、`calendar.add`、`notifications.actions`、`ui.launchApp`、`ui.inputText` 以及有边界的 `ui.tap` / `ui.back` / `ui.home`。只应在你信任的网络和客户端上启用。",
+                ),
                 style = mobileCaption1,
                 color = mobileTextSecondary,
               )
@@ -744,25 +813,43 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           }
 
           Text(
-            "Use header `Authorization: Bearer <token>` for `/status`, `/health`, `/events`, `/chat/*`, and `/invoke`.",
+            t(
+              "Use header `Authorization: Bearer <token>` for `/status`, `/health`, `/events`, `/chat/*`, and `/invoke`.",
+              "调用 `/status`、`/health`、`/events`、`/chat/*` 和 `/invoke` 时，请使用请求头 `Authorization: Bearer <token>`。",
+            ),
             style = mobileCaption1,
             color = mobileTextSecondary,
           )
           Text(
-            "Probe `/status` first if you want a one-shot readiness snapshot with Codex auth, session counts, enabled command tiers, and UI automation readiness.",
+            t(
+              "Probe `/status` first if you want a one-shot readiness snapshot with Codex auth, session counts, enabled command tiers, and UI automation readiness.",
+              "如果你想一次拿到包含 Codex 授权、会话数量、已启用命令层级和 UI 自动化 readiness 的快照，请先探测 `/status`。",
+            ),
             style = mobileCaption1,
             color = mobileTextSecondary,
           )
           Text(
             when {
               localHostRemoteAccessAdvancedCommandsEnabled && localHostRemoteAccessWriteCommandsEnabled ->
-                "Remote `/invoke` allows the default read-control set plus camera and write-capable commands, including bounded UI actions."
+                t(
+                  "Remote `/invoke` allows the default read-control set plus camera and write-capable commands, including bounded UI actions.",
+                  "远程 `/invoke` 允许默认只读控制集，再加上相机和可写命令，包括有边界的 UI 动作。",
+                )
               localHostRemoteAccessAdvancedCommandsEnabled ->
-                "Remote `/invoke` allows the default read-control set plus camera commands."
+                t(
+                  "Remote `/invoke` allows the default read-control set plus camera commands.",
+                  "远程 `/invoke` 允许默认只读控制集，再加上相机命令。",
+                )
               localHostRemoteAccessWriteCommandsEnabled ->
-                "Remote `/invoke` allows the default read-control set plus write-capable commands, including bounded UI actions."
+                t(
+                  "Remote `/invoke` allows the default read-control set plus write-capable commands, including bounded UI actions.",
+                  "远程 `/invoke` 允许默认只读控制集，再加上可写命令，包括有边界的 UI 动作。",
+                )
               else ->
-                "Remote `/invoke` currently allows read-only device, location, notifications, contacts, calendar, photos, motion, call-log commands plus `system.notify`."
+                t(
+                  "Remote `/invoke` currently allows read-only device, location, notifications, contacts, calendar, photos, motion, call-log commands plus `system.notify`.",
+                  "远程 `/invoke` 当前允许只读的 device、location、notifications、contacts、calendar、photos、motion、call-log 命令，以及 `system.notify`。",
+                )
             },
             style = mobileCaption1,
             color = mobileTextSecondary,
@@ -785,7 +872,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               onClick = {
                 val parsedPort = remoteAccessPortInput.toIntOrNull()
                 if (parsedPort == null || parsedPort !in 1..65535) {
-                  validationText = "Remote access port must be between 1 and 65535."
+                  validationText = t("Remote access port must be between 1 and 65535.", "远程访问端口必须在 1 到 65535 之间。")
                 } else {
                   validationText = null
                   viewModel.setLocalHostRemoteAccessPort(parsedPort)
@@ -800,12 +887,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 ),
               border = BorderStroke(1.dp, mobileBorderStrong),
             ) {
-              Text("Apply port", style = mobileCaption1.copy(fontWeight = FontWeight.Bold))
+              Text(t("Apply port", "应用端口"), style = mobileCaption1.copy(fontWeight = FontWeight.Bold))
             }
 
             TextButton(onClick = { viewModel.regenerateLocalHostRemoteAccessToken() }) {
               Text(
-                "Regenerate token",
+                t("Regenerate token", "重新生成 token"),
                 style = mobileCallout.copy(fontWeight = FontWeight.SemiBold),
                 color = mobileAccent,
               )
@@ -840,7 +927,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             )
           }
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Endpoint", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text(t("Endpoint", "端点"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             Text(activeEndpoint, style = mobileBody.copy(fontFamily = FontFamily.Monospace), color = mobileText)
           }
         }
@@ -862,8 +949,8 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             )
           }
           Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Status", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
-            Text(statusText, style = mobileBody, color = if (isConnected) mobileSuccess else mobileText)
+            Text(t("Status", "状态"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text(localizedStatusText, style = mobileBody, color = if (isConnected) mobileSuccess else mobileText)
           }
         }
       }
@@ -887,7 +974,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
       ) {
         Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(modifier = Modifier.width(8.dp))
-        Text("Disconnect", style = mobileHeadline.copy(fontWeight = FontWeight.SemiBold))
+        Text(t("Disconnect", "断开连接"), style = mobileHeadline.copy(fontWeight = FontWeight.SemiBold))
       }
     } else {
       Button(
@@ -919,9 +1006,9 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           if (config == null) {
             validationText =
               if (inputMode == ConnectInputMode.SetupCode) {
-                "Paste a valid setup code to connect."
+                t("Paste a valid setup code to connect.", "请粘贴有效的 setup code 以建立连接。")
               } else {
-                "Enter a valid manual host and port to connect."
+                t("Enter a valid manual host and port to connect.", "请输入有效的手动 host 和 port 以建立连接。")
               }
             return@Button
           }
@@ -949,7 +1036,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           ),
       ) {
         Text(
-          if (connectionMode == GatewayConnectionMode.LocalHost) "Start Local Host" else "Connect Gateway",
+          if (connectionMode == GatewayConnectionMode.LocalHost) t("Start Local Host", "启动本机 Host") else t("Connect Gateway", "连接 Gateway"),
           style = mobileHeadline.copy(fontWeight = FontWeight.Bold),
         )
       }
@@ -968,12 +1055,12 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
         horizontalArrangement = Arrangement.SpaceBetween,
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-          Text("Advanced controls", style = mobileHeadline, color = mobileText)
-          Text("Setup code, endpoint, TLS, token, password, onboarding.", style = mobileCaption1, color = mobileTextSecondary)
+          Text(t("Advanced controls", "高级控制"), style = mobileHeadline, color = mobileText)
+          Text(t("Setup code, endpoint, TLS, token, password, onboarding.", "Setup code、端点、TLS、token、密码、onboarding。"), style = mobileCaption1, color = mobileTextSecondary)
         }
         Icon(
           imageVector = if (advancedOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-          contentDescription = if (advancedOpen) "Collapse advanced controls" else "Expand advanced controls",
+          contentDescription = if (advancedOpen) t("Collapse advanced controls", "收起高级控制") else t("Expand advanced controls", "展开高级控制"),
           tint = mobileTextSecondary,
         )
       }
@@ -991,44 +1078,47 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           if (connectionMode == GatewayConnectionMode.LocalHost) {
-            Text("Local host runs entirely on this phone.", style = mobileCallout, color = mobileTextSecondary)
+            Text(t("Local host runs entirely on this phone.", "本机 Host 完全运行在这台手机上。"), style = mobileCallout, color = mobileTextSecondary)
             Text(
-              "This mode reuses your Android app as the OpenClaw host. Remote access and native Codex login UI are the next steps.",
+              t(
+                "This mode reuses your Android app as the OpenClaw host. Remote access and native Codex login UI are the next steps.",
+                "这个模式会把你的 Android App 直接作为 OpenClaw host。下一步重点是远程访问和原生 Codex 登录 UI。",
+              ),
               style = mobileCaption1,
               color = mobileTextSecondary,
             )
             HorizontalDivider(color = mobileBorder)
             TextButton(onClick = { viewModel.setOnboardingCompleted(false) }) {
-              Text("Run onboarding again", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
+              Text(t("Run onboarding again", "重新运行 onboarding"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
             }
           } else {
-            Text("Connection method", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            Text(t("Connection method", "连接方式"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               MethodChip(
-                label = "Setup Code",
+                label = t("Setup Code", "Setup Code"),
                 active = inputMode == ConnectInputMode.SetupCode,
                 onClick = { inputMode = ConnectInputMode.SetupCode },
               )
               MethodChip(
-                label = "Manual",
+                label = t("Manual", "手动"),
                 active = inputMode == ConnectInputMode.Manual,
                 onClick = { inputMode = ConnectInputMode.Manual },
               )
             }
 
-            Text("Run these on the gateway host:", style = mobileCallout, color = mobileTextSecondary)
+            Text(t("Run these on the gateway host:", "在 gateway 主机上运行这些命令："), style = mobileCallout, color = mobileTextSecondary)
             CommandBlock("openclaw qr --setup-code-only")
             CommandBlock("openclaw qr --json")
 
             if (inputMode == ConnectInputMode.SetupCode) {
-              Text("Setup Code", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(t("Setup Code", "Setup Code"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = setupCode,
                 onValueChange = {
                   setupCode = it
                   validationText = null
                 },
-                placeholder = { Text("Paste setup code", style = mobileBody, color = mobileTextTertiary) },
+                placeholder = { Text(t("Paste setup code", "粘贴 setup code"), style = mobileBody, color = mobileTextTertiary) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
                 maxLines = 5,
@@ -1043,7 +1133,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             } else {
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickFillChip(
-                  label = "Android Emulator",
+                  label = t("Android Emulator", "Android 模拟器"),
                   onClick = {
                     manualHostInput = "10.0.2.2"
                     manualPortInput = "18789"
@@ -1052,7 +1142,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                   },
                 )
                 QuickFillChip(
-                  label = "Localhost",
+                  label = t("Localhost", "本机"),
                   onClick = {
                     manualHostInput = "127.0.0.1"
                     manualPortInput = "18789"
@@ -1062,7 +1152,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 )
               }
 
-              Text("Host", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(t("Host", "Host"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = manualHostInput,
                 onValueChange = {
@@ -1078,7 +1168,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 colors = outlinedColors(),
               )
 
-              Text("Port", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(t("Port", "端口"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = manualPortInput,
                 onValueChange = {
@@ -1100,8 +1190,8 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 horizontalArrangement = Arrangement.SpaceBetween,
               ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                  Text("Use TLS", style = mobileHeadline, color = mobileText)
-                  Text("Switch to secure websocket (`wss`).", style = mobileCallout, color = mobileTextSecondary)
+                  Text(t("Use TLS", "使用 TLS"), style = mobileHeadline, color = mobileText)
+                  Text(t("Switch to secure websocket (`wss`).", "切换到安全 websocket（`wss`）。"), style = mobileCallout, color = mobileTextSecondary)
                 }
                 Switch(
                   checked = manualTlsInput,
@@ -1119,11 +1209,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 )
               }
 
-              Text("Token (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(t("Token (optional)", "Token（可选）"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = gatewayToken,
                 onValueChange = { viewModel.setGatewayToken(it) },
-                placeholder = { Text("token", style = mobileBody, color = mobileTextTertiary) },
+                placeholder = { Text(t("token", "token"), style = mobileBody, color = mobileTextTertiary) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -1132,11 +1222,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 colors = outlinedColors(),
               )
 
-              Text("Password (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(t("Password (optional)", "Password（可选）"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = passwordInput,
                 onValueChange = { passwordInput = it },
-                placeholder = { Text("password", style = mobileBody, color = mobileTextTertiary) },
+                placeholder = { Text(t("password", "password"), style = mobileBody, color = mobileTextTertiary) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -1153,7 +1243,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             HorizontalDivider(color = mobileBorder)
 
             TextButton(onClick = { viewModel.setOnboardingCompleted(false) }) {
-              Text("Run onboarding again", style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
+              Text(t("Run onboarding again", "重新运行 onboarding"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileAccent)
             }
           }
         }
@@ -1232,9 +1322,10 @@ private fun CommandBlock(command: String) {
 
 @Composable
 private fun EndpointPreview(endpoint: String) {
+  val language = LocalAppLanguage.current
   Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     HorizontalDivider(color = mobileBorder)
-    Text("Resolved endpoint", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+    Text(language.pick("Resolved endpoint", "解析后的端点"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
     Text(endpoint, style = mobileCallout.copy(fontFamily = FontFamily.Monospace), color = mobileText)
     HorizontalDivider(color = mobileBorder)
   }
@@ -1251,3 +1342,118 @@ private fun outlinedColors() =
     unfocusedTextColor = mobileText,
     cursorColor = mobileAccent,
   )
+
+private fun uiAutomationStatusText(
+  language: AppLanguage,
+  status: LocalHostUiAutomationStatus,
+): String {
+  return when {
+    status.available -> language.pick("UI automation is ready.", "UI 自动化已就绪。")
+    status.enabled -> language.pick("UI automation is enabled and waiting for the service to bind.", "UI 自动化已启用，正在等待服务绑定。")
+    else -> language.pick("UI automation is off.", "UI 自动化已关闭。")
+  }
+}
+
+private fun uiAutomationDetailText(
+  language: AppLanguage,
+  status: LocalHostUiAutomationStatus,
+): String {
+  return when {
+    status.available ->
+      language.pick(
+        "OpenClaw can now expose accessibility-backed UI readiness for future cross-app control.",
+        "OpenClaw 现在可以暴露基于无障碍服务的 UI readiness，为后续跨 app 控制做准备。",
+      )
+    status.enabled ->
+      language.pick(
+        "Accessibility access is on, but OpenClaw has not yet observed a live service binding in this process.",
+        "无障碍权限已经打开，但 OpenClaw 还没有在当前进程里观察到活跃的服务绑定。",
+      )
+    else ->
+      language.pick(
+        "Enable the OpenClaw accessibility service to prepare `ui.state`, `ui.tap`, and other bounded phone-control actions.",
+        "启用 OpenClaw 无障碍服务，为 `ui.state`、`ui.tap` 等有边界的手机控制动作做准备。",
+      )
+  }
+}
+
+private fun codexAuthStatusText(
+  language: AppLanguage,
+  uiState: OpenAICodexAuthUiState,
+  hasCredential: Boolean,
+): String {
+  if (!uiState.errorText.isNullOrBlank()) {
+    return translateKnownCodexMessage(language, uiState.errorText!!)
+  }
+  if (!uiState.statusText.isNullOrBlank()) {
+    return translateKnownCodexMessage(language, uiState.statusText!!)
+  }
+  if (hasCredential && !uiState.signedInEmail.isNullOrBlank()) {
+    return language.pick(
+      "Signed in as ${uiState.signedInEmail}",
+      "已登录为 ${uiState.signedInEmail}",
+    )
+  }
+  if (hasCredential) {
+    return language.pick(
+      "OpenAI Codex OAuth is stored on this phone.",
+      "OpenAI Codex OAuth 已保存在这台手机上。",
+    )
+  }
+  return language.pick(
+    "Sign in once and local-host chat can call GPT through your Codex subscription.",
+    "登录一次后，本机 Host 聊天就可以通过你的 Codex 订阅调用 GPT。",
+  )
+}
+
+internal fun translateKnownCodexMessage(
+  language: AppLanguage,
+  message: String,
+): String {
+  val trimmed = message.trim()
+  return when {
+    trimmed.startsWith("OpenAI Codex OAuth failed (") && trimmed.endsWith(")") ->
+      language.pick(trimmed, "OpenAI Codex OAuth 失败（${trimmed.substringAfterLast("(").removeSuffix(")")}）")
+    trimmed.startsWith("Invalid OpenAI authorize URL: ") ->
+      language.pick(
+        trimmed,
+        "OpenAI authorize URL 无效：${trimmed.removePrefix("Invalid OpenAI authorize URL: ")}",
+      )
+    else ->
+      when (trimmed) {
+        "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below." ->
+          language.pick(
+            trimmed,
+            "浏览器已打开，请在其中完成登录。回调完成后 OpenClaw 应该会自动返回；如果没有，请使用浏览器页面里的 Return to OpenClaw，或者把回跳 URL / 授权码粘贴到下方。",
+          )
+        "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below." ->
+          language.pick(
+            trimmed,
+            "无法绑定 localhost 回调。请在浏览器中完成登录，然后把回跳 URL 或授权码粘贴到下方。",
+          )
+        "No browser is available for OpenAI sign-in." ->
+          language.pick(trimmed, "没有可用于 OpenAI 登录的浏览器。")
+        "No OpenAI sign-in is currently running." ->
+          language.pick(trimmed, "当前没有正在进行的 OpenAI 登录流程。")
+        "State mismatch. Start sign-in again and retry." ->
+          language.pick(trimmed, "state 不匹配。请重新开始登录后再重试。")
+        "Paste the redirect URL or authorization code from the browser." ->
+          language.pick(trimmed, "请粘贴浏览器中的回跳 URL 或授权码。")
+        "Exchanging authorization code…" ->
+          language.pick(trimmed, "正在交换授权码…")
+        "OpenAI Codex is connected." ->
+          language.pick(trimmed, "OpenAI Codex 已连接。")
+        "Failed to open the OpenAI sign-in page." ->
+          language.pick(trimmed, "无法打开 OpenAI 登录页面。")
+        "OpenAI Codex OAuth returned invalid JSON" ->
+          language.pick(trimmed, "OpenAI Codex OAuth 返回了无效 JSON。")
+        "OpenAI Codex OAuth response was missing required fields" ->
+          language.pick(trimmed, "OpenAI Codex OAuth 响应缺少必需字段。")
+        "Failed to extract accountId from token" ->
+          language.pick(trimmed, "无法从 token 中提取 accountId。")
+        "OpenAI sign-in failed." ->
+          language.pick(trimmed, "OpenAI 登录失败。")
+        else -> message
+      }
+  }
+}

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import ai.openclaw.app.MainViewModel
 import ai.openclaw.app.chat.ChatSessionEntry
 import ai.openclaw.app.chat.OutgoingAttachment
+import ai.openclaw.app.ui.LocalAppLanguage
 import ai.openclaw.app.ui.mobileAccent
 import ai.openclaw.app.ui.mobileAccentBorderStrong
 import ai.openclaw.app.ui.mobileBorder
@@ -44,6 +45,7 @@ import ai.openclaw.app.ui.mobileDanger
 import ai.openclaw.app.ui.mobileDangerSoft
 import ai.openclaw.app.ui.mobileText
 import ai.openclaw.app.ui.mobileTextSecondary
+import ai.openclaw.app.ui.pick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -190,6 +192,7 @@ private fun ChatThreadSelector(
 
 @Composable
 private fun ChatErrorRail(errorText: String) {
+  val language = LocalAppLanguage.current
   Surface(
     modifier = Modifier.fillMaxWidth(),
     color = mobileDangerSoft,
@@ -198,7 +201,7 @@ private fun ChatErrorRail(errorText: String) {
   ) {
     Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
       Text(
-        text = "CHAT ERROR",
+        text = language.pick("CHAT ERROR", "聊天错误"),
         style = mobileCaption2.copy(letterSpacing = 0.6.sp),
         color = mobileDanger,
       )

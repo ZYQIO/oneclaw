@@ -391,9 +391,10 @@ internal class OpenAICodexLoopbackServer private constructor(
 
 internal fun oauthSuccessHtml(message: String): String =
   renderOauthHtml(
-    title = "Authentication successful",
-    heading = "Authentication successful",
+    title = "Authentication successful | 授权成功",
+    heading = "Authentication successful / 授权成功",
     message = message,
+    localizedMessage = localizeOauthBrowserMessage(message),
     returnToAppUrl = buildOpenAICodexAppReturnUri(),
   )
 
@@ -402,9 +403,10 @@ internal fun oauthErrorHtml(
   details: String? = null,
 ): String =
   renderOauthHtml(
-    title = "Authentication failed",
-    heading = "Authentication failed",
+    title = "Authentication failed | 授权失败",
+    heading = "Authentication failed / 授权失败",
     message = message,
+    localizedMessage = localizeOauthBrowserMessage(message),
     details = details,
     returnToAppUrl = buildOpenAICodexAppReturnUri(),
   )
@@ -413,12 +415,14 @@ internal fun renderOauthHtml(
   title: String,
   heading: String,
   message: String,
+  localizedMessage: String? = null,
   details: String? = null,
   returnToAppUrl: String? = null,
 ): String {
   val safeTitle = escapeHtml(title)
   val safeHeading = escapeHtml(heading)
   val safeMessage = escapeHtml(message)
+  val safeLocalizedMessage = localizedMessage?.takeIf { it.isNotBlank() }?.let(::escapeHtml)
   val safeDetails = details?.let(::escapeHtml)
   val safeReturnToAppUrl = returnToAppUrl?.let(::escapeHtml)
   val safeReturnToAppJs = returnToAppUrl?.let(::escapeJsString)
@@ -446,6 +450,7 @@ internal fun renderOauthHtml(
         main { max-width: 520px; }
         h1 { margin-bottom: 10px; font-size: 28px; }
         p { margin: 0; color: #a1a1aa; line-height: 1.7; }
+        .localized-message { margin-top: 8px; }
         .hint { margin-top: 14px; }
         .actions { margin-top: 22px; }
         .button {
@@ -473,12 +478,13 @@ internal fun renderOauthHtml(
       <main>
         <h1>$safeHeading</h1>
         <p>$safeMessage</p>
+        ${safeLocalizedMessage?.let { "<p class=\"localized-message\">$it</p>" }.orEmpty()}
         ${safeDetails?.let { "<div class=\"details\">$it</div>" }.orEmpty()}
         ${
           if (safeReturnToAppUrl != null && safeReturnToAppJs != null) {
             """
-              <p class="hint">OpenClaw should reopen automatically. If nothing happens, tap the button below.</p>
-              <p class="actions"><a class="button" href="$safeReturnToAppUrl">Return to OpenClaw</a></p>
+              <p class="hint">OpenClaw should reopen automatically. If nothing happens, tap the button below.<br />OpenClaw 应该会自动返回；如果没有，请点击下方按钮。</p>
+              <p class="actions"><a class="button" href="$safeReturnToAppUrl">Return to OpenClaw / 返回 OpenClaw</a></p>
               <script>
                 window.setTimeout(function () {
                   window.location.href = '$safeReturnToAppJs';
@@ -493,6 +499,22 @@ internal fun renderOauthHtml(
     </body>
     </html>
   """.trimIndent()
+}
+
+private fun localizeOauthBrowserMessage(message: String): String? {
+  return when (message.trim()) {
+    "OpenAI authentication completed. You can close this window." ->
+      "OpenAI 授权已完成。你可以关闭这个窗口。"
+    "Only loopback callbacks are allowed." ->
+      "只允许 loopback 回调。"
+    "Callback route not found." ->
+      "未找到回调路由。"
+    "State mismatch." ->
+      "state 不匹配。"
+    "Missing authorization code." ->
+      "缺少授权码。"
+    else -> null
+  }
 }
 
 private fun escapeHtml(value: String): String {

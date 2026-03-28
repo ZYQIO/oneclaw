@@ -79,6 +79,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   val instanceId: StateFlow<String> = prefs.instanceId
   val displayName: StateFlow<String> = prefs.displayName
+  val appLanguage: StateFlow<AppLanguage> = prefs.appLanguage
   val cameraEnabled: StateFlow<Boolean> = prefs.cameraEnabled
   val locationMode: StateFlow<LocationMode> = prefs.locationMode
   val locationPreciseEnabled: StateFlow<Boolean> = prefs.locationPreciseEnabled
@@ -151,6 +152,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setDisplayName(value: String) {
     prefs.setDisplayName(value)
+  }
+
+  fun setAppLanguage(value: AppLanguage) {
+    prefs.setAppLanguage(value)
   }
 
   fun setCameraEnabled(value: Boolean) {

@@ -29,6 +29,7 @@ import ai.openclaw.app.chat.ChatMessage
 import ai.openclaw.app.chat.ChatMessageContent
 import ai.openclaw.app.chat.ChatPendingToolCall
 import ai.openclaw.app.tools.ToolDisplayRegistry
+import ai.openclaw.app.ui.LocalAppLanguage
 import ai.openclaw.app.ui.mobileAccent
 import ai.openclaw.app.ui.mobileAccentSoft
 import ai.openclaw.app.ui.mobileBorder
@@ -45,6 +46,7 @@ import ai.openclaw.app.ui.mobileText
 import ai.openclaw.app.ui.mobileTextSecondary
 import ai.openclaw.app.ui.mobileWarning
 import ai.openclaw.app.ui.mobileWarningSoft
+import ai.openclaw.app.ui.pick
 import java.util.Locale
 
 private data class ChatBubbleStyle(
@@ -58,6 +60,7 @@ private data class ChatBubbleStyle(
 fun ChatMessageBubble(message: ChatMessage) {
   val role = message.role.trim().lowercase(Locale.US)
   val style = bubbleStyle(role)
+  val language = LocalAppLanguage.current
 
   // Filter to only displayable content parts (text with content, or base64 images).
   val displayableContent =
@@ -70,7 +73,7 @@ fun ChatMessageBubble(message: ChatMessage) {
 
   if (displayableContent.isEmpty()) return
 
-  ChatBubbleContainer(style = style, roleLabel = roleLabel(role)) {
+  ChatBubbleContainer(style = style, roleLabel = roleLabel(role, language)) {
     ChatMessageBody(content = displayableContent, textColor = mobileText)
   }
 }
@@ -129,22 +132,24 @@ private fun ChatMessageBody(content: List<ChatMessageContent>, textColor: Color)
 
 @Composable
 fun ChatTypingIndicatorBubble() {
+  val language = LocalAppLanguage.current
   ChatBubbleContainer(
     style = bubbleStyle("assistant"),
-    roleLabel = roleLabel("assistant"),
+    roleLabel = roleLabel("assistant", language),
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       DotPulse(color = mobileTextSecondary)
-      Text("Thinking...", style = mobileCallout, color = mobileTextSecondary)
+      Text(language.pick("Thinking...", "思考中…"), style = mobileCallout, color = mobileTextSecondary)
     }
   }
 }
 
 @Composable
 fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
+  val language = LocalAppLanguage.current
   val context = LocalContext.current
   val displays =
     remember(toolCalls, context) {
@@ -153,10 +158,10 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
 
   ChatBubbleContainer(
     style = bubbleStyle("assistant"),
-    roleLabel = "Tools",
+    roleLabel = language.pick("Tools", "工具"),
   ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-      Text("Running tools...", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+      Text(language.pick("Running tools...", "正在运行工具…"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
       for (display in displays.take(6)) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
           Text(
@@ -177,7 +182,7 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
       }
       if (toolCalls.size > 6) {
         Text(
-          text = "... +${toolCalls.size - 6} more",
+          text = language.pick("... +${toolCalls.size - 6} more", "… 另有 ${toolCalls.size - 6} 项"),
           style = mobileCaption1,
           color = mobileTextSecondary,
         )
@@ -188,9 +193,10 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
 
 @Composable
 fun ChatStreamingAssistantBubble(text: String) {
+  val language = LocalAppLanguage.current
   ChatBubbleContainer(
     style = bubbleStyle("assistant").copy(borderColor = mobileAccent),
-    roleLabel = "OpenClaw · Live",
+    roleLabel = language.pick("OpenClaw · Live", "OpenClaw · 实时"),
   ) {
     ChatMarkdown(text = text, textColor = mobileText)
   }
@@ -225,16 +231,17 @@ private fun bubbleStyle(role: String): ChatBubbleStyle {
   }
 }
 
-private fun roleLabel(role: String): String {
+private fun roleLabel(role: String, language: ai.openclaw.app.AppLanguage): String {
   return when (role) {
-    "user" -> "You"
-    "system" -> "System"
+    "user" -> language.pick("You", "你")
+    "system" -> language.pick("System", "系统")
     else -> "OpenClaw"
   }
 }
 
 @Composable
 private fun ChatBase64Image(base64: String, mimeType: String?) {
+  val language = LocalAppLanguage.current
   val imageState = rememberBase64ImageState(base64)
   val image = imageState.image
 
@@ -247,13 +254,13 @@ private fun ChatBase64Image(base64: String, mimeType: String?) {
     ) {
       Image(
         bitmap = image!!,
-        contentDescription = mimeType ?: "attachment",
+        contentDescription = mimeType ?: language.pick("attachment", "附件"),
         contentScale = ContentScale.Fit,
         modifier = Modifier.fillMaxWidth(),
       )
     }
   } else if (imageState.failed) {
-    Text("Unsupported attachment", style = mobileCaption1, color = mobileTextSecondary)
+    Text(language.pick("Unsupported attachment", "不支持的附件"), style = mobileCaption1, color = mobileTextSecondary)
   }
 }
 
