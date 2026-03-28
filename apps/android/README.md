@@ -237,6 +237,27 @@ At the end it restores OpenClaw with adb, confirms recovery, and writes both a t
 - `classification=foregrounded_then_remote_unreachable` means the target package reached the foreground first, then remote `/status` later stopped answering before recovery.
 - On March 28, 2026, the default `com.android.settings` probe on the current OPPO / ColorOS phone produced `classification=foregrounded_host_reachable` with `targetTopCount=9`, `statusSuccessCount=10`, and `recovery.ok=true`.
 
+## Local Host Cross-App Sweep
+
+Use this when you want to measure whether the current phone stays reachable across longer cross-app windows instead of checking only one observation duration.
+
+USB + adb flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:ui:cross-app:sweep
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWEEP_WINDOWS_MS=5000,15000,30000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_STOP_ON_FIRST_NON_REACHABLE=true`
+
+The sweep reuses the cross-app probe for each observation window, stores every run in its own artifact directory, and writes a compact top-level `summary.json` plus `sweep.jsonl`.
+
+- On March 28, 2026, the default sweep on the current OPPO / ColorOS phone finished all three windows as reachable: `5000ms -> foregrounded_host_reachable`, `15000ms -> foregrounded_host_reachable`, `30000ms -> foregrounded_host_reachable`.
+- The same run therefore ended with `allWindowsReachable=true` and `firstNonReachableWindowMs=null`, so no background-freeze boundary was reproduced within 30 seconds on the current setup.
+
 ## Local Host Streaming Validation
 
 Use this when you want direct evidence that streaming deltas arrive before the final assistant message.
