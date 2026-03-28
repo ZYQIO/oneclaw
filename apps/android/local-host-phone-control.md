@@ -2,7 +2,7 @@
 
 Purpose / 用途: give the shortest high-confidence answer to “how should OpenClaw control the phone?” and point to the deeper docs for follow-up work. / 用最短、最高置信度的方式回答“OpenClaw 应该怎样操控手机？”，并把后续深入阅读的文档指到正确位置。
 
-Last updated / 最后更新: March 27, 2026 / 2026 年 3 月 27 日
+Last updated / 最后更新: March 28, 2026 / 2026 年 3 月 28 日
 
 ## Short Answer / 简短结论
 
@@ -18,6 +18,58 @@ ADB, Appium, `Open-AutoGLM`, and similar systems are useful references, but they
 - It matches the current product goal better than computer-driven harnesses such as Appium or UI Automator over ADB. / 和通过电脑驱动的 Appium 或 ADB 上的 UI Automator 相比，它更符合当前产品目标。
 - It keeps the core runtime on the phone instead of requiring a nearby laptop or a permanent remote controller. / 它让核心运行时留在手机上，而不是依赖一台近旁电脑或常驻远程控制端。
 - It also gives us a clean safety boundary: keep write actions behind explicit on-device enablement and the remote write tier. / 它还能提供清晰的安全边界：写动作继续放在显式设备侧开启和远端 write tier 门控之后。
+
+## Why Background Control Breaks / 为什么切到后台后会失效
+
+This is not just "AccessibilityService cannot control other apps." / 这不是简单的“AccessibilityService 不能控制别的 app”。
+
+The more precise answer is that Android background limits plus OEM power managers can starve or freeze the host process after it leaves the foreground. / 更准确地说，是 Android 的后台限制再叠加 OEM 电源管理，会在 Host 退到后台后让进程得不到足够的 CPU、网络或保活机会，甚至直接被冻结。
+
+- Android's official Doze and App Standby docs already say idle apps can lose background network access, and that restricted apps may stop running in the background as expected. / Android 官方的 Doze 与 App Standby 文档本身就说明：空闲 app 的后台网络会被延后，而被标成 restricted 的 app 可能无法像预期那样继续在后台运行。
+- Android's foreground-service docs also make background recovery harder on modern versions: starting or re-promoting a foreground service from the background is restricted on Android 12+. / Android 的前台服务文档还让后台恢复更难了：从 Android 12 开始，后台启动或重新拉起前台服务本身就受到限制。
+- On OPPO / ColorOS, GitHub reports are even more aggressive than AOSP defaults: some devices kill background services, including accessibility-related flows, unless users also lock the task in Recents, allow auto-start, disable battery optimization, and keep a persistent notification. / 在 OPPO / ColorOS 上，GitHub 上的实机报告比 AOSP 默认策略更激进：有些机型会直接杀掉后台服务，甚至影响无障碍相关流程，除非用户同时把任务锁在最近任务里、允许自启动、关闭电池优化，并保留常驻通知。
+- In our own project evidence, this is not an "instant background failure" on the current device: on March 28, 2026, `pnpm android:local-host:ui:cross-app:sweep` kept `foregrounded_host_reachable` through `5000ms`, `15000ms`, and `30000ms`. That means the current blocker is not "the app immediately dies in the background," but "the longer-lived control plane is still exposed to OEM background policy." / 结合我们自己的项目证据，这也不是“当前设备一切后台立刻失效”：2026 年 3 月 28 日，`pnpm android:local-host:ui:cross-app:sweep` 在 `5000ms`、`15000ms`、`30000ms` 三档都保持了 `foregrounded_host_reachable`。这说明当前真正的风险不是“只要退后台就立刻死掉”，而是“更长时长的控制面仍然暴露在 OEM 后台策略下”。
+
+## What Recent Research Suggests / 最近资料给出的解决方向
+
+The research and GitHub material point to four distinct solution classes. / 这轮资料和 GitHub 项目基本收敛到四类解决路线。
+
+1. Keepalive and recovery on the device / 设备内保活与恢复
+   - Foreground service, battery-optimization exemption, exact alarms, and user-visible recovery paths are still the official Android tools. / 前台服务、电池优化豁免、精确闹钟和面向用户的恢复入口，仍然是 Android 官方给出的主要工具。
+   - FCM high-priority wakeups are the official answer when the app must be nudged while idle; Android explicitly recommends FCM over maintaining your own persistent background connection where possible. / 当 app 在 idle 状态下仍需要被唤醒时，官方答案是 FCM 高优先级消息；Android 也明确更推荐这种方式，而不是每个 app 自己硬维持后台长连接。
+
+2. Reverse or outbound control plane / 反向或外连控制面
+   - `droidrun-portal` is the cleanest reference here: besides local HTTP/WebSocket servers, it also supports a reverse outbound WebSocket connection initiated by the device. / `droidrun-portal` 是这里最值得参考的项目：它除了本地 HTTP / WebSocket 服务，还支持由设备主动发起的 reverse outbound WebSocket 连接。
+   - Inference: for OpenClaw, a device-initiated reverse channel is likely more robust than assuming the backgrounded app can keep serving inbound LAN requests forever. / 推断：对 OpenClaw 来说，由设备主动发起的反向通道，很可能比假设后台 app 会永远稳定监听 LAN 入站请求更稳。
+
+3. External controller architectures / 外部主控架构
+   - `Open-AutoGLM`, `uiautomator2`, and Appium's UiAutomator2 driver all rely on an external controller over ADB or a device-side automation service, instead of requiring the target app itself to remain the sole long-lived automation runtime. / `Open-AutoGLM`、`uiautomator2`、Appium 的 UiAutomator2 driver 都依赖外部主控配合 ADB 或设备侧自动化服务，而不是要求目标 app 自己承担唯一的长时运行控制器。
+   - This is why those stacks are often more reliable for hostile OEMs: the automation executor is no longer only "the backgrounded app we are trying to keep alive." / 这也是它们在激进 OEM 上往往更稳的原因：自动化执行器不再只有“那个已经退到后台、还要设法活着的 app”。
+
+4. Managed-device mode / 受管设备模式
+   - Android's lock-task mode is the strongest official answer if the phone is a dedicated device and you can accept device-owner style management. / 如果手机就是 dedicated 设备，而且可以接受 device-owner 级管理，Android 的 lock-task mode 是最强的官方方案。
+   - This is not a generic consumer-phone fix, but it is a serious option for an idle-phone deployment SKU. / 这不是普通消费级手机都适用的修复，但对闲置手机部署形态来说，它是非常认真的一条路。
+
+## What Papers Actually Help With / 论文真正能解决什么
+
+Recent mobile-agent papers help much more with action quality than with Android process survival. / 最近的 mobile agent 论文，对“动作质量”的帮助远大于对“Android 进程存活”的帮助。
+
+- `AndroidWorld` is mainly about realistic and reproducible task evaluation. / `AndroidWorld` 主要解决的是现实任务的可重复评测。
+- `V-Droid`, `Mobile-Agent-v3`, and similar work improve planning, verification, and action reliability. / `V-Droid`、`Mobile-Agent-v3` 这类工作主要提升规划、校验和动作可靠性。
+- They do not provide a general way to bypass OEM background killing. / 它们并没有给出一条通用的“绕过 OEM 杀后台”的方案。
+
+So the paper-side takeaway is: use them to improve follow-up action quality and benchmark rigor, not to expect a model-layer fix for ColorOS background policy. / 所以论文侧真正有价值的结论是：用它们增强 follow-up action 质量和 benchmark 严谨性，而不是期待模型层自己解决 ColorOS 的后台策略。
+
+## Recommended Path For OpenClaw / 对 OpenClaw 最合理的处理路线
+
+For this project, the most realistic path is hybrid rather than ideological. / 对这个项目来说，最现实的处理方式不是单一路线信仰，而是分层组合。
+
+1. Keep the current in-app `AccessibilityService` runtime as the primary phone-control surface. / 继续把当前 app 内 `AccessibilityService` runtime 作为主手机操控面。
+2. Add a reverse outbound transport, so the device can initiate the control channel instead of only waiting for inbound LAN calls. / 增加 reverse outbound transport，让设备主动发起控制通道，而不是只等 LAN 入站请求。
+3. Keep the OPPO / ColorOS operator playbook explicit: battery exemption, keep the app locked in Recents, enable startup-related permissions where available, and never swipe the host away. / 把 OPPO / ColorOS 的操作手册继续写死：电池豁免、最近任务锁定、开启可能存在的自启动相关权限、绝对不要把 host 划掉。
+4. Treat exact alarms and watchdogs as recovery tools, not as the primary live control plane. / 把精确闹钟和 watchdog 视为恢复工具，而不是主要的实时控制面。
+5. If reliability on hostile OEMs becomes a hard requirement, add an external-controller lane based on ADB / UiAutomator2 rather than forcing the on-device host to solve every background policy alone. / 如果 hostile OEM 上的可靠性变成硬要求，就增加一条基于 ADB / UiAutomator2 的外部主控路线，而不是强迫设备内 host 单独扛下所有后台策略问题。
+6. If the deployment target is a dedicated phone rather than a normal personal phone, evaluate lock-task / dedicated-device mode instead of treating it as overkill. / 如果部署目标是 dedicated phone 而不是普通私人手机，就认真评估 lock-task / dedicated-device mode，不要把它一开始就当成过度设计。
 
 ## What Recent GitHub Work Changes / 最近 GitHub 开源给出的新信号
 

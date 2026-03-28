@@ -36,6 +36,7 @@ Move Android `Local Host` from "GPT can chat plus use curated device tools" towa
 - Researched Android-native UI automation routes plus existing GitHub projects that already solve similar problems. / 已调研 Android 原生 UI 自动化路径，以及 GitHub 上已解决类似问题的项目。
 - Reviewed Z.ai's recent GitHub open-source work to separate model-side references from Android-runtime references. / 已补看 Z.ai 最近在 GitHub 开源的项目，区分哪些更适合当模型参考、哪些更适合当 Android runtime 参考。
 - Reduced the architecture choice to a concrete direction instead of continuing vague scope expansion. / 已把架构选择收敛到明确方向，而不是继续模糊扩范围。
+- The latest background-control research now points to a hybrid runtime answer rather than a model-only answer: use official Android keepalive/recovery tools where possible, prefer a reverse outbound transport over a background LAN listener, and keep an external-controller fallback in mind for hostile OEMs. / 最新一轮后台操控调研已经把答案收敛成“混合 runtime”而不是“模型层自己解决”：能用 Android 官方保活 / 恢复工具的地方先用，控制面优先考虑 reverse outbound transport 而不是长期依赖后台 LAN 监听，同时为 hostile OEM 预留外部主控 fallback。
 
 ## Current Reality / 当前现实
 
@@ -198,6 +199,7 @@ Exit criteria / 退出标准:
 - Keep validating `ui.inputText` so tasks can move beyond navigation into form-like workflows, then decide whether IME-style fallbacks are actually needed. / 继续验证 `ui.inputText`，让任务从纯导航迈向表单类流程，然后再决定是否真的需要 IME 风格兜底。
 - Keep preferring bounded selectors, package scoping, and stable resource IDs over "freeform do anything." / 继续优先做有边界 selector、包名作用域和稳定资源 ID，而不是“无限制自由操作”。
 - Dedicated reachability probes now exist both as `apps/android/scripts/local-host-ui-cross-app-probe.sh` and `apps/android/scripts/local-host-ui-cross-app-sweep.sh`; because the sweep stayed healthy through 30 seconds, the next step is to layer `ui.inputText` or another follow-up action on top instead of prioritizing more short-to-medium reachability windows first. / 现在已经同时有 `apps/android/scripts/local-host-ui-cross-app-probe.sh` 和 `apps/android/scripts/local-host-ui-cross-app-sweep.sh` 两条 reachability probe；既然 sweep 已经在 30 秒内保持健康，下一步应优先叠加 `ui.inputText` 或其他 follow-up action，而不是继续优先扩短到中等长度的 reachability 窗口。
+- In parallel, start evaluating a reverse outbound control channel for the on-device host, because recent GitHub references suggest this is a more realistic long-lived transport than assuming a backgrounded app will keep serving inbound LAN traffic indefinitely. / 并行地开始评估设备内 host 的 reverse outbound 控制通道，因为最新 GitHub 参考更支持这是一条现实的长时控制面，而不是假设退到后台的 app 会无限期稳定提供 LAN 入站服务。
 
 Exit criteria / 退出标准:
 
