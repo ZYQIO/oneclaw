@@ -110,6 +110,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
   val micCooldown by viewModel.micCooldown.collectAsState()
   val speakerEnabled by viewModel.speakerEnabled.collectAsState()
   val micStatusText by viewModel.micStatusText.collectAsState()
+  val talkStatusText by viewModel.talkStatusText.collectAsState()
   val micLiveTranscript by viewModel.micLiveTranscript.collectAsState()
   val micQueuedMessages by viewModel.micQueuedMessages.collectAsState()
   val micConversation by viewModel.micConversation.collectAsState()
@@ -117,6 +118,7 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
   val micIsSending by viewModel.micIsSending.collectAsState()
   val localizedGatewayStatus = remember(language, gatewayStatus) { localizeConnectionStatus(language, gatewayStatus) }
   val localizedMicStatus = remember(language, micStatusText) { localizeMicCaptureStatus(language, micStatusText) }
+  val localizedTalkStatus = remember(language, talkStatusText) { localizeTalkModeStatus(language, talkStatusText) }
 
   val hasStreamingAssistant = micConversation.any { it.role == VoiceConversationRole.Assistant && it.isStreaming }
   val showThinkingBubble = micIsSending && !hasStreamingAssistant
@@ -370,6 +372,23 @@ fun VoiceTabScreen(viewModel: MainViewModel) {
           modifier = Modifier.fillMaxWidth(),
         )
       }
+      val showTalkStatus =
+        remember(talkStatusText) {
+          val trimmed = talkStatusText.trim()
+          trimmed.isNotEmpty() &&
+            !trimmed.equals("Off", ignoreCase = true) &&
+            !trimmed.equals("Ready", ignoreCase = true) &&
+            !trimmed.equals("Listening", ignoreCase = true)
+        }
+      if (showTalkStatus) {
+        Text(
+          t("Reply status", "回复状态") + " · " + localizedTalkStatus,
+          style = mobileCaption1,
+          color = talkStatusDetailColor(talkStatusText),
+          textAlign = TextAlign.Center,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      }
 
       if (!hasMicPermission) {
         val showRationale =
@@ -512,6 +531,25 @@ private fun micStatusDetailColor(statusText: String): Color {
     trimmed.contains("waiting for gateway", ignoreCase = true) -> mobileAccent
     trimmed.contains("queued", ignoreCase = true) -> mobileAccent
     trimmed.contains("sending", ignoreCase = true) -> mobileAccent
+    else -> mobileTextTertiary
+  }
+}
+
+@Composable
+private fun talkStatusDetailColor(statusText: String): Color {
+  val trimmed = statusText.trim()
+  return when {
+    trimmed.isEmpty() -> mobileTextTertiary
+    trimmed.startsWith("Talk failed:", ignoreCase = true) -> mobileWarning
+    trimmed.startsWith("Speak failed:", ignoreCase = true) -> mobileWarning
+    trimmed.startsWith("Start failed:", ignoreCase = true) -> mobileWarning
+    trimmed.contains("no reply", ignoreCase = true) -> mobileWarning
+    trimmed.contains("not connected", ignoreCase = true) -> mobileWarning
+    trimmed.contains("permission required", ignoreCase = true) -> mobileWarning
+    trimmed.contains("unavailable", ignoreCase = true) -> mobileWarning
+    trimmed.contains("thinking", ignoreCase = true) -> mobileAccent
+    trimmed.contains("listening", ignoreCase = true) -> mobileAccent
+    trimmed.contains("speaking", ignoreCase = true) -> mobileSuccess
     else -> mobileTextTertiary
   }
 }

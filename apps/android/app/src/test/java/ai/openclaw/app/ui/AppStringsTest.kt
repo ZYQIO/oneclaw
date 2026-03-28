@@ -154,4 +154,39 @@ class AppStringsTest {
   fun onboardingSmsPermissionTitle_translatesToChinese() {
     assertEquals("短信", onboardingSmsPermissionTitle(AppLanguage.SimplifiedChinese))
   }
+
+  @Test
+  fun localizeTalkModeStatus_translatesSystemSpeakingState() {
+    assertEquals(
+      "正在说话（系统）…",
+      localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Speaking (System)…"),
+    )
+  }
+
+  @Test
+  fun localizeTalkModeStatus_translatesTalkFailureReason() {
+    assertEquals(
+      "对话失败：系统 TTS 不可用",
+      localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Talk failed: system TTS unavailable"),
+    )
+  }
+
+  @Test
+  fun localizeTalkModeStatus_reusesChatErrorTranslation() {
+    assertEquals(
+      "播放失败：OpenAI Codex 请求失败（429）",
+      localizeTalkModeStatus(
+        AppLanguage.SimplifiedChinese,
+        "Speak failed: OpenAI Codex request failed (429)",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeTalkModeStatus_translatesGatewayDisconnectedState() {
+    assertEquals(
+      "Gateway 未连接",
+      localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Gateway not connected"),
+    )
+  }
 }

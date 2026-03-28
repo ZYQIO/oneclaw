@@ -310,6 +310,82 @@ internal fun onboardingPasswordPlaceholder(language: AppLanguage): String =
 internal fun onboardingSmsPermissionTitle(language: AppLanguage): String =
   language.pick("SMS", "短信")
 
+internal fun localizeTalkModeStatus(
+  language: AppLanguage,
+  statusText: String,
+): String {
+  val trimmed = statusText.trim()
+  return when {
+    trimmed.equals("Off", ignoreCase = true) -> language.pick("Off", "关闭")
+    trimmed.equals("Listening", ignoreCase = true) -> language.pick("Listening", "监听中")
+    trimmed.equals("Thinking…", ignoreCase = true) || trimmed.equals("Thinking...", ignoreCase = true) ->
+      language.pick("Thinking…", "思考中…")
+    trimmed.equals("Speaking…", ignoreCase = true) || trimmed.equals("Speaking...", ignoreCase = true) ->
+      language.pick("Speaking…", "正在说话…")
+    trimmed.equals("Speaking (System)…", ignoreCase = true) || trimmed.equals("Speaking (System)...", ignoreCase = true) ->
+      language.pick("Speaking (System)…", "正在说话（系统）…")
+    trimmed.equals("Ready", ignoreCase = true) -> language.pick("Ready", "就绪")
+    trimmed.equals("No reply", ignoreCase = true) -> language.pick("No reply", "没有回复")
+    trimmed.equals("Gateway not connected", ignoreCase = true) ->
+      language.pick("Gateway not connected", "Gateway 未连接")
+    trimmed.equals("Speech recognizer unavailable", ignoreCase = true) ->
+      language.pick("Speech recognizer unavailable", "语音识别器不可用")
+    trimmed.equals("Microphone permission required", ignoreCase = true) ->
+      language.pick("Microphone permission required", "需要麦克风权限")
+    trimmed.startsWith("Start failed: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "启动失败：${localizeTalkModeReason(language, trimmed.substringAfter(":").trim())}",
+      )
+    trimmed.startsWith("Talk failed: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "对话失败：${localizeTalkModeReason(language, trimmed.substringAfter(":").trim())}",
+      )
+    trimmed.startsWith("Speak failed: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "播放失败：${localizeTalkModeReason(language, trimmed.substringAfter(":").trim())}",
+      )
+    else -> trimmed
+  }
+}
+
+private fun localizeTalkModeReason(
+  language: AppLanguage,
+  reasonText: String,
+): String {
+  val trimmed = reasonText.trim()
+  localizeChatError(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  return when {
+    trimmed.equals("system TTS unavailable", ignoreCase = true) ->
+      language.pick(trimmed, "系统 TTS 不可用")
+    trimmed.equals("AudioTrack init failed", ignoreCase = true) ->
+      language.pick(trimmed, "AudioTrack 初始化失败")
+    trimmed.startsWith("AudioTrack buffer size invalid: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "AudioTrack 缓冲区大小无效：${trimmed.substringAfter(":").trim()}",
+      )
+    trimmed.startsWith("AudioTrack write failed: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "AudioTrack 写入失败：${trimmed.substringAfter(":").trim()}",
+      )
+    trimmed.startsWith("ElevenLabs failed: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "ElevenLabs 失败：${trimmed.substringAfter(":").trim()}",
+      )
+    trimmed.startsWith("ElevenLabs voices failed: ", ignoreCase = true) ->
+      language.pick(
+        english = trimmed,
+        simplifiedChinese = "ElevenLabs 音色列表获取失败：${trimmed.substringAfter(":").trim()}",
+      )
+    else -> trimmed
+  }
+}
+
 internal fun localizeChatError(
   language: AppLanguage,
   message: String,

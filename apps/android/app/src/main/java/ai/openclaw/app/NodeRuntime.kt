@@ -477,6 +477,9 @@ class NodeRuntime(
   val micStatusText: StateFlow<String>
     get() = micCapture.statusText
 
+  val talkStatusText: StateFlow<String>
+    get() = talkMode.statusText
+
   val micLiveTranscript: StateFlow<String?>
     get() = micCapture.liveTranscript
 
