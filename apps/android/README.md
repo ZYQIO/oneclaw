@@ -32,6 +32,9 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - When the device is close to ready, use `pnpm android:local-host:dedicated:device-owner` as a dry-run wrapper before attempting a real `adb shell dpm set-device-owner ...` provisioning step.
 - For the official factory-reset path, use `pnpm android:local-host:dedicated:testdpc-qr` to fetch the latest public `TestDPC` GitHub release, compute a checksum, and render a provisioning QR for setup wizard scanning.
 - After provisioning, use `pnpm android:local-host:dedicated:post-provision` to check owner state, lock-task allowlisting, launcher resolution, and OpenClaw's own dedicated/local-host flags in one place.
+- When TestDPC is already installed as `Device Owner`, use `pnpm android:local-host:dedicated:testdpc-kiosk` as the DPC-side kiosk dry-run or add `-- --apply` to enable TestDPC's `KioskModeActivity` for `ai.openclaw.app`.
+- The kiosk helper is intentionally conservative: on March 28, 2026, the current OPPO `PFEM10` dry-run correctly stopped at `TestDPC not installed` plus `not the active Device Owner`, even though OpenClaw itself was already dedicated-ready on the app side.
+- In apply mode, the helper makes TestDPC's kiosk activity the persistent HOME activity and keeps TestDPC itself in the kiosk backdoor package list, so treat it as a spare-phone-only action.
 - Once a DPC allowlists `ai.openclaw.app` for lock-task, `MainActivity` now advertises `android:lockTaskMode=\"if_whitelisted\"` and auto-enters lock-task on launch when dedicated deployment is enabled and the app is already onboarded in local-host mode.
 
 ### Rebuild Checklist
