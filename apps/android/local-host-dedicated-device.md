@@ -54,6 +54,7 @@ What it gives / 能带来的收益:
 - `lock-task` / dedicated-device mode
 - A managed launcher or managed entrypoint
 - Better alignment with "this phone exists mainly for OpenClaw"
+- OpenClaw can now auto-enter lock-task on launch once the DPC allowlists `ai.openclaw.app` and dedicated deployment is enabled
 
 What it does not give / 不能直接带来的东西:
 
@@ -138,6 +139,15 @@ Why / 原因:
 - On the welcome screen, tap 6 times to open the QR scanner
 - Scan the generated ASCII QR or use the emitted `payload.json` with another QR renderer
 - Follow setup wizard and finish the fully managed / dedicated-device flow
+- After provisioning, allowlist `ai.openclaw.app` in the DPC's lock-task policy so OpenClaw can auto-enter kiosk mode on launch
+
+### After Device Owner / Device Owner 完成后
+
+- Keep `ai.openclaw.app` installed and launchable as `ai.openclaw.app/.MainActivity`
+- Add `ai.openclaw.app` to the DPC lock-task allowlist
+- Keep OpenClaw dedicated deployment enabled inside the app
+- Relaunch OpenClaw; `MainActivity` now declares `android:lockTaskMode="if_whitelisted"` and calls `startLockTask()` only when dedicated mode, local-host mode, onboarding completion, and the DPC allowlist are all in place
+- Check `host.deployment.lockTaskPermitted`, `host.deployment.lockTaskAutoEnterReady`, and `host.deployment.lockTaskModeState` through the app or remote `/status`
 
 ### Before Root / 尝试 Root 前
 

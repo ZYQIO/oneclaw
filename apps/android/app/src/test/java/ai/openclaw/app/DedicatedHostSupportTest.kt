@@ -52,11 +52,25 @@ class DedicatedHostSupportTest {
     prefs.setLocalHostDedicatedDeploymentEnabled(true)
     prefs.setLocalHostRemoteAccessEnabled(true)
 
-    val snapshot = dedicatedHostDeploymentStatusSnapshot(context, prefs)
+    val snapshot =
+      dedicatedHostDeploymentStatusSnapshot(
+        context = context,
+        prefs = prefs,
+        batteryOptimizationIgnoredProvider = { false },
+        lockTaskPermittedProvider = { true },
+        lockTaskModeStateProvider = { DedicatedLockTaskModeState.Locked },
+        launcherActivityProvider = { true },
+        homeActivityProvider = { false },
+      )
 
     assertEquals("OPPO", snapshot.getValue("manufacturer").jsonPrimitive.content)
     assertTrue(snapshot.getValue("recentsSwipeForceStopRisk").jsonPrimitive.boolean)
     assertTrue(snapshot.getValue("taskLockRecommended").jsonPrimitive.boolean)
+    assertTrue(snapshot.getValue("lockTaskPermitted").jsonPrimitive.boolean)
+    assertEquals("locked", snapshot.getValue("lockTaskModeState").jsonPrimitive.content)
+    assertTrue(snapshot.getValue("lockTaskAutoEnterReady").jsonPrimitive.boolean)
+    assertTrue(snapshot.getValue("launcherActivityPresent").jsonPrimitive.boolean)
+    assertFalse(snapshot.getValue("homeActivityPresent").jsonPrimitive.boolean)
     assertTrue(snapshot.getValue("backgroundPolicyNote").jsonPrimitive.content.contains("force-stop"))
   }
 
@@ -66,12 +80,70 @@ class DedicatedHostSupportTest {
     val context = RuntimeEnvironment.getApplication()
     val prefs = securePrefs(context, name = "openclaw.node.secure.test.dedicated.generic")
 
-    val snapshot = dedicatedHostDeploymentStatusSnapshot(context, prefs)
+    val snapshot =
+      dedicatedHostDeploymentStatusSnapshot(
+        context = context,
+        prefs = prefs,
+        batteryOptimizationIgnoredProvider = { false },
+        lockTaskPermittedProvider = { false },
+        lockTaskModeStateProvider = { DedicatedLockTaskModeState.None },
+        launcherActivityProvider = { true },
+        homeActivityProvider = { false },
+      )
 
     assertEquals("Google", snapshot.getValue("manufacturer").jsonPrimitive.content)
     assertFalse(snapshot.getValue("recentsSwipeForceStopRisk").jsonPrimitive.boolean)
     assertFalse(snapshot.getValue("taskLockRecommended").jsonPrimitive.boolean)
+    assertFalse(snapshot.getValue("lockTaskPermitted").jsonPrimitive.boolean)
+    assertEquals("none", snapshot.getValue("lockTaskModeState").jsonPrimitive.content)
+    assertFalse(snapshot.getValue("lockTaskAutoEnterReady").jsonPrimitive.boolean)
+    assertTrue(snapshot.getValue("launcherActivityPresent").jsonPrimitive.boolean)
+    assertFalse(snapshot.getValue("homeActivityPresent").jsonPrimitive.boolean)
     assertFalse(snapshot.containsKey("backgroundPolicyNote"))
+  }
+
+  @Test
+  fun shouldAutoEnterDedicatedLockTask_requiresAllPreconditions() {
+    assertFalse(
+      shouldAutoEnterDedicatedLockTask(
+        dedicatedEnabled = false,
+        onboardingCompleted = true,
+        localHostMode = true,
+        lockTaskPermitted = true,
+      ),
+    )
+    assertFalse(
+      shouldAutoEnterDedicatedLockTask(
+        dedicatedEnabled = true,
+        onboardingCompleted = false,
+        localHostMode = true,
+        lockTaskPermitted = true,
+      ),
+    )
+    assertFalse(
+      shouldAutoEnterDedicatedLockTask(
+        dedicatedEnabled = true,
+        onboardingCompleted = true,
+        localHostMode = false,
+        lockTaskPermitted = true,
+      ),
+    )
+    assertFalse(
+      shouldAutoEnterDedicatedLockTask(
+        dedicatedEnabled = true,
+        onboardingCompleted = true,
+        localHostMode = true,
+        lockTaskPermitted = false,
+      ),
+    )
+    assertTrue(
+      shouldAutoEnterDedicatedLockTask(
+        dedicatedEnabled = true,
+        onboardingCompleted = true,
+        localHostMode = true,
+        lockTaskPermitted = true,
+      ),
+    )
   }
 
   private fun setBuildManufacturer(manufacturer: String, brand: String) {

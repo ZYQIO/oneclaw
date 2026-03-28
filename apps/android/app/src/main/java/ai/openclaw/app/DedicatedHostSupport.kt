@@ -1,9 +1,12 @@
 package ai.openclaw.app
 
+import android.app.ActivityManager
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -19,6 +22,12 @@ private const val dedicatedHostRecoveryDelayMs = 5_000L
 private const val dedicatedHostWatchdogAction = "ai.openclaw.app.action.DEDICATED_HOST_WATCHDOG"
 private const val dedicatedHostWatchdogRequestCode = 4108
 internal const val dedicatedHostWatchdogIntervalMs = AlarmManager.INTERVAL_FIFTEEN_MINUTES
+
+internal enum class DedicatedLockTaskModeState(val rawValue: String) {
+  None("none"),
+  Locked("locked"),
+  Pinned("pinned"),
+}
 
 internal fun isDedicatedHostBatteryOptimizationIgnored(context: Context): Boolean {
   val powerManager = context.getSystemService(PowerManager::class.java) ?: return false
@@ -64,6 +73,51 @@ internal fun dedicatedHostManufacturerLabel(): String {
     else -> "Android"
   }
 }
+
+internal fun isDedicatedHostLockTaskPermitted(context: Context): Boolean {
+  val devicePolicyManager = context.getSystemService(DevicePolicyManager::class.java) ?: return false
+  return devicePolicyManager.isLockTaskPermitted(context.packageName)
+}
+
+internal fun dedicatedHostLockTaskModeState(context: Context): DedicatedLockTaskModeState {
+  val activityManager = context.getSystemService(ActivityManager::class.java) ?: return DedicatedLockTaskModeState.None
+  return when (activityManager.lockTaskModeState) {
+    ActivityManager.LOCK_TASK_MODE_LOCKED -> DedicatedLockTaskModeState.Locked
+    ActivityManager.LOCK_TASK_MODE_PINNED -> DedicatedLockTaskModeState.Pinned
+    else -> DedicatedLockTaskModeState.None
+  }
+}
+
+internal fun dedicatedHostHasLauncherActivity(context: Context): Boolean {
+  val intent =
+    Intent(Intent.ACTION_MAIN)
+      .addCategory(Intent.CATEGORY_LAUNCHER)
+      .setPackage(context.packageName)
+  return queryIntentActivitiesCompat(context, intent).isNotEmpty()
+}
+
+internal fun dedicatedHostHasHomeActivity(context: Context): Boolean {
+  val intent =
+    Intent(Intent.ACTION_MAIN)
+      .addCategory(Intent.CATEGORY_HOME)
+      .setPackage(context.packageName)
+  return queryIntentActivitiesCompat(context, intent).isNotEmpty()
+}
+
+internal fun shouldAutoEnterDedicatedLockTask(
+  dedicatedEnabled: Boolean,
+  onboardingCompleted: Boolean,
+  localHostMode: Boolean,
+  lockTaskPermitted: Boolean,
+): Boolean = dedicatedEnabled && onboardingCompleted && localHostMode && lockTaskPermitted
+
+internal fun shouldAutoEnterDedicatedLockTask(context: Context, prefs: SecurePrefs): Boolean =
+  shouldAutoEnterDedicatedLockTask(
+    dedicatedEnabled = prefs.localHostDedicatedDeploymentEnabled.value,
+    onboardingCompleted = prefs.onboardingCompleted.value,
+    localHostMode = prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost,
+    lockTaskPermitted = isDedicatedHostLockTaskPermitted(context),
+  )
 
 private fun dedicatedHostAppSettingsIntent(context: Context) =
   Intent(
@@ -121,14 +175,33 @@ internal fun cancelDedicatedHostWatchdog(context: Context) {
   pendingIntent.cancel()
 }
 
-internal fun dedicatedHostDeploymentStatusSnapshot(context: Context, prefs: SecurePrefs) =
+internal fun dedicatedHostDeploymentStatusSnapshot(
+  context: Context,
+  prefs: SecurePrefs,
+  batteryOptimizationIgnoredProvider: (Context) -> Boolean = ::isDedicatedHostBatteryOptimizationIgnored,
+  lockTaskPermittedProvider: (Context) -> Boolean = ::isDedicatedHostLockTaskPermitted,
+  lockTaskModeStateProvider: (Context) -> DedicatedLockTaskModeState = ::dedicatedHostLockTaskModeState,
+  launcherActivityProvider: (Context) -> Boolean = ::dedicatedHostHasLauncherActivity,
+  homeActivityProvider: (Context) -> Boolean = ::dedicatedHostHasHomeActivity,
+) =
   buildJsonObject {
     val dedicatedEnabled = prefs.localHostDedicatedDeploymentEnabled.value
     val onboardingCompleted = prefs.onboardingCompleted.value
     val localHostMode = prefs.gatewayConnectionMode.value == GatewayConnectionMode.LocalHost
-    val batteryOptimizationIgnored = isDedicatedHostBatteryOptimizationIgnored(context)
+    val batteryOptimizationIgnored = batteryOptimizationIgnoredProvider(context)
+    val lockTaskPermitted = lockTaskPermittedProvider(context)
+    val lockTaskModeState = lockTaskModeStateProvider(context)
+    val launcherActivityPresent = launcherActivityProvider(context)
+    val homeActivityPresent = homeActivityProvider(context)
     val recentsSwipeForceStopRisk = dedicatedHostRecentsSwipeForceStopRisk()
     val backgroundPolicyNote = dedicatedHostBackgroundPolicyNote()
+    val lockTaskAutoEnterReady =
+      shouldAutoEnterDedicatedLockTask(
+        dedicatedEnabled = dedicatedEnabled,
+        onboardingCompleted = onboardingCompleted,
+        localHostMode = localHostMode,
+        lockTaskPermitted = lockTaskPermitted,
+      )
     put("dedicatedEnabled", JsonPrimitive(dedicatedEnabled))
     put("onboardingCompleted", JsonPrimitive(onboardingCompleted))
     put("connectionMode", JsonPrimitive(prefs.gatewayConnectionMode.value.rawValue))
@@ -138,11 +211,27 @@ internal fun dedicatedHostDeploymentStatusSnapshot(context: Context, prefs: Secu
     put("batteryOptimizationRecommended", JsonPrimitive(dedicatedEnabled && !batteryOptimizationIgnored))
     put("recentsSwipeForceStopRisk", JsonPrimitive(recentsSwipeForceStopRisk))
     put("taskLockRecommended", JsonPrimitive(recentsSwipeForceStopRisk))
+    put("lockTaskPermitted", JsonPrimitive(lockTaskPermitted))
+    put("lockTaskModeState", JsonPrimitive(lockTaskModeState.rawValue))
+    put("lockTaskAutoEnterReady", JsonPrimitive(lockTaskAutoEnterReady))
+    put("launcherActivityPresent", JsonPrimitive(launcherActivityPresent))
+    put("homeActivityPresent", JsonPrimitive(homeActivityPresent))
     put("remoteAccessEnabled", JsonPrimitive(prefs.localHostRemoteAccessEnabled.value))
     put("recoveryDelayMs", JsonPrimitive(dedicatedHostRecoveryDelayMs))
     put("watchdogIntervalMs", JsonPrimitive(dedicatedHostWatchdogIntervalMs))
     put("watchdogEnabled", JsonPrimitive(dedicatedEnabled && onboardingCompleted && localHostMode))
     backgroundPolicyNote?.let { put("backgroundPolicyNote", JsonPrimitive(it)) }
+  }
+
+private fun queryIntentActivitiesCompat(context: Context, intent: Intent) =
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    context.packageManager.queryIntentActivities(
+      intent,
+      PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+    )
+  } else {
+    @Suppress("DEPRECATION")
+    context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
   }
 
 private fun dedicatedHostRecoveryPendingIntent(context: Context, flags: Int): PendingIntent? {

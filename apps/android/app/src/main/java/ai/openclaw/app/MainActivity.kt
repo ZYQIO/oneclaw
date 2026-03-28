@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels()
+  private val prefs: SecurePrefs by lazy { (application as NodeApp).prefs }
   private lateinit var permissionRequester: PermissionRequester
   private var didAttachRuntimeUi = false
   private var didStartNodeService = false
@@ -66,8 +67,21 @@ class MainActivity : ComponentActivity() {
     viewModel.setForeground(true)
   }
 
+  override fun onResume() {
+    super.onResume()
+    maybeEnterDedicatedLockTask()
+  }
+
   override fun onStop() {
     viewModel.setForeground(false)
     super.onStop()
+  }
+
+  private fun maybeEnterDedicatedLockTask() {
+    if (!shouldAutoEnterDedicatedLockTask(context = this, prefs = prefs)) return
+    if (dedicatedHostLockTaskModeState(this) != DedicatedLockTaskModeState.None) return
+    runCatching {
+      startLockTask()
+    }
   }
 }
