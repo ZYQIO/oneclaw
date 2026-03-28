@@ -29,6 +29,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - The Local Host UI and readiness snapshot now surface this OEM background-policy risk so the idle-phone deployment story is explicit instead of implicit.
 - This is a keepalive layer for the current Android-native host. It is not yet the full desktop shell/browser/plugin runtime embedded in the APK.
 - For spare-phone deployment planning, use `pnpm android:local-host:dedicated:readiness` to decide whether the current device should go through the `Device Owner` lane first or whether root/systemize work is even worth considering yet.
+- When the device is close to ready, use `pnpm android:local-host:dedicated:device-owner` as a dry-run wrapper before attempting a real `adb shell dpm set-device-owner ...` provisioning step.
 
 ### Rebuild Checklist
 

@@ -19,6 +19,8 @@ The project should treat these as four separate deployment tiers, not one vague 
 
 The new readiness probe is `apps/android/scripts/local-host-dedicated-readiness.sh`, exposed as `pnpm android:local-host:dedicated:readiness`. / 新的 readiness 探针是 `apps/android/scripts/local-host-dedicated-readiness.sh`，并通过 `pnpm android:local-host:dedicated:readiness` 暴露出来。
 
+There is now also a `Device Owner` helper at `apps/android/scripts/local-host-dedicated-device-owner.sh`, exposed as `pnpm android:local-host:dedicated:device-owner`. It defaults to dry-run mode and only attempts `adb shell dpm set-device-owner ...` when `--apply` is passed explicitly. / 现在还多了一条 `Device Owner` helper：`apps/android/scripts/local-host-dedicated-device-owner.sh`，并通过 `pnpm android:local-host:dedicated:device-owner` 暴露出来。它默认只做 dry-run，只有显式传入 `--apply` 时才会尝试 `adb shell dpm set-device-owner ...`。
+
 Its March 28, 2026 run on the currently connected spare OPPO phone produced: / 2026 年 3 月 28 日它在当前接入的闲置 OPPO 手机上跑出的结果是：
 
 - `manufacturer=OPPO`, `model=PFEM10`, `android=15`, `sdk=35`
@@ -143,6 +145,18 @@ Dedicated readiness:
 
 ```bash
 pnpm android:local-host:dedicated:readiness
+```
+
+Device-owner dry-run:
+
+```bash
+pnpm android:local-host:dedicated:device-owner
+```
+
+Device-owner apply:
+
+```bash
+bash apps/android/scripts/local-host-dedicated-device-owner.sh --apply
 ```
 
 Optional DPC override:
