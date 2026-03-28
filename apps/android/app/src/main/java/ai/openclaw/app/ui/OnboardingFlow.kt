@@ -1154,7 +1154,7 @@ private fun GatewayStep(
           OutlinedTextField(
             value = gatewayToken,
             onValueChange = onTokenChange,
-            placeholder = { Text("token", color = onboardingTextTertiary, style = onboardingBodyStyle) },
+            placeholder = { Text(onboardingTokenPlaceholder(language), color = onboardingTextTertiary, style = onboardingBodyStyle) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -1168,7 +1168,7 @@ private fun GatewayStep(
           OutlinedTextField(
             value = gatewayPassword,
             onValueChange = onPasswordChange,
-            placeholder = { Text("password", color = onboardingTextTertiary, style = onboardingBodyStyle) },
+            placeholder = { Text(onboardingPasswordPlaceholder(language), color = onboardingTextTertiary, style = onboardingBodyStyle) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -1465,7 +1465,7 @@ private fun PermissionsStep(
     if (smsAvailable) {
       InlineDivider()
       PermissionToggleRow(
-        title = "SMS",
+        title = onboardingSmsPermissionTitle(language),
         subtitle = t("Send text messages via the gateway", "通过 gateway 发送短信"),
         checked = enableSms,
         granted = isPermissionGranted(context, Manifest.permission.SEND_SMS),

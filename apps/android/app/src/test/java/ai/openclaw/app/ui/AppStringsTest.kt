@@ -139,4 +139,19 @@ class AppStringsTest {
       ),
     )
   }
+
+  @Test
+  fun onboardingTokenPlaceholder_translatesToChinese() {
+    assertEquals("令牌", onboardingTokenPlaceholder(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
+  fun onboardingPasswordPlaceholder_translatesToChinese() {
+    assertEquals("密码", onboardingPasswordPlaceholder(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
+  fun onboardingSmsPermissionTitle_translatesToChinese() {
+    assertEquals("短信", onboardingSmsPermissionTitle(AppLanguage.SimplifiedChinese))
+  }
 }

@@ -25,6 +25,22 @@ class OpenAICodexAuthManagerTest {
   }
 
   @Test
+  fun oauthErrorHtml_includesLocalizedMissingAuthorizationCodeMessage() {
+    val html = oauthErrorHtml("Missing authorization code.")
+
+    assertTrue(html.contains("Missing authorization code."))
+    assertTrue(html.contains("缺少授权码。"))
+  }
+
+  @Test
+  fun oauthErrorHtml_includesLocalizedLoopbackOnlyMessage() {
+    val html = oauthErrorHtml("Only loopback callbacks are allowed.")
+
+    assertTrue(html.contains("Only loopback callbacks are allowed."))
+    assertTrue(html.contains("只允许 loopback 回调。"))
+  }
+
+  @Test
   fun mainActivity_resolvesOpenClawAuthCallbackDeepLink() {
     val context = RuntimeEnvironment.getApplication()
     val intent =

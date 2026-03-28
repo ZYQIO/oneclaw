@@ -301,6 +301,15 @@ internal fun localizeOnboardingError(
   }
 }
 
+internal fun onboardingTokenPlaceholder(language: AppLanguage): String =
+  language.pick("token", "令牌")
+
+internal fun onboardingPasswordPlaceholder(language: AppLanguage): String =
+  language.pick("password", "密码")
+
+internal fun onboardingSmsPermissionTitle(language: AppLanguage): String =
+  language.pick("SMS", "短信")
+
 internal fun localizeChatError(
   language: AppLanguage,
   message: String,
