@@ -90,4 +90,53 @@ class AppStringsTest {
       localizeMicCaptureStatus(AppLanguage.SimplifiedChinese, "Speech error (7)"),
     )
   }
+
+  @Test
+  fun localizeChatError_translatesGatewayHealthFailure() {
+    assertEquals(
+      "Gateway 当前不健康，无法发送。",
+      localizeChatError(AppLanguage.SimplifiedChinese, "Gateway health not OK; cannot send"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUsageLimitFailure() {
+    assertEquals(
+      "已达到使用额度上限（errorType=usage_limit_reached）",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "The usage limit has been reached | errorType=usage_limit_reached",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCodexRuntimeFailure() {
+    assertEquals(
+      "OpenAI Codex 没有返回响应体。",
+      localizeChatError(AppLanguage.SimplifiedChinese, "OpenAI Codex returned no response body"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCodexRequestFailureMetadata() {
+    assertEquals(
+      "OpenAI Codex 请求失败（429; requestId=req_123）",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "OpenAI Codex request failed (429; requestId=req_123)",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_reusesKnownGatewayTranslation() {
+    assertEquals(
+      "网关错误：未授权：gateway token 不匹配（提供 gateway auth token）",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "Gateway error: unauthorized: gateway token mismatch (provide gateway auth token)",
+      ),
+    )
+  }
 }

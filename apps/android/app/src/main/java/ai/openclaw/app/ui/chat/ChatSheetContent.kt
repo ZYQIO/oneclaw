@@ -33,6 +33,7 @@ import ai.openclaw.app.MainViewModel
 import ai.openclaw.app.chat.ChatSessionEntry
 import ai.openclaw.app.chat.OutgoingAttachment
 import ai.openclaw.app.ui.LocalAppLanguage
+import ai.openclaw.app.ui.localizeChatError
 import ai.openclaw.app.ui.mobileAccent
 import ai.openclaw.app.ui.mobileAccentBorderStrong
 import ai.openclaw.app.ui.mobileBorder
@@ -193,6 +194,7 @@ private fun ChatThreadSelector(
 @Composable
 private fun ChatErrorRail(errorText: String) {
   val language = LocalAppLanguage.current
+  val localizedErrorText = remember(language, errorText) { localizeChatError(language, errorText) }
   Surface(
     modifier = Modifier.fillMaxWidth(),
     color = mobileDangerSoft,
@@ -205,7 +207,7 @@ private fun ChatErrorRail(errorText: String) {
         style = mobileCaption2.copy(letterSpacing = 0.6.sp),
         color = mobileDanger,
       )
-      Text(text = errorText, style = mobileCallout, color = mobileText)
+      Text(text = localizedErrorText, style = mobileCallout, color = mobileText)
     }
   }
 }

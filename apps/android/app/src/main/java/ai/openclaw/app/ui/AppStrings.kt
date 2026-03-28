@@ -11,6 +11,8 @@ private val gatewayErrorRegex = Regex("""^Gateway error: (.+)$""", RegexOption.I
 private val gatewayClosedRegex = Regex("""^Gateway closed: (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayClosedWithCodeRegex = Regex("""^gateway closed \((\d+)\): (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayAuthHintRegex = Regex("""^unauthorized: gateway (token|password) (missing|mismatch) \((.+)\)$""", RegexOption.IGNORE_CASE)
+private val codexRequestFailedRegex = Regex("""^OpenAI Codex request failed \((.+)\)$""")
+private val usageLimitRegex = Regex("""^The usage limit has been reached(?:\s*\|\s*errorType=(.+))?$""", RegexOption.IGNORE_CASE)
 
 internal val LocalAppLanguage = staticCompositionLocalOf { AppLanguage.English }
 
@@ -295,6 +297,55 @@ internal fun localizeOnboardingError(
       language.pick(trimmed, "gateway URL 无效。")
     "Google Code Scanner could not start. Update Google Play services or use the setup code manually." ->
       language.pick(trimmed, "Google Code Scanner 无法启动。请更新 Google Play 服务，或改为手动输入 setup code。")
+    else -> trimmed
+  }
+}
+
+internal fun localizeChatError(
+  language: AppLanguage,
+  message: String,
+): String {
+  val trimmed = message.trim()
+  if (trimmed.isEmpty()) return message
+
+  localizeConnectionStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  localizeRemoteAccessStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
+
+  codexRequestFailedRegex.matchEntire(trimmed)?.let { match ->
+    return language.pick(trimmed, "OpenAI Codex 请求失败（${match.groupValues[1]}）")
+  }
+  usageLimitRegex.matchEntire(trimmed)?.let { match ->
+    val errorType = match.groupValues.getOrNull(1)?.trim().orEmpty()
+    return language.pick(
+      trimmed,
+      if (errorType.isNotEmpty()) "已达到使用额度上限（errorType=$errorType）" else "已达到使用额度上限。",
+    )
+  }
+
+  return when (trimmed) {
+    "Gateway health not OK; cannot send" ->
+      language.pick(trimmed, "Gateway 当前不健康，无法发送。")
+    "Event stream interrupted; try refreshing." ->
+      language.pick(trimmed, "事件流已中断；请刷新后重试。")
+    "Chat failed" ->
+      language.pick(trimmed, "聊天失败。")
+    "Timed out waiting for a reply; try again or refresh." ->
+      language.pick(trimmed, "等待回复超时；请重试或刷新。")
+    "OpenAI Codex login required" ->
+      language.pick(trimmed, "需要 OpenAI Codex 登录。")
+    "OpenAI Codex credential is missing accountId" ->
+      language.pick(trimmed, "OpenAI Codex 凭证缺少 accountId。")
+    "OpenAI Codex exceeded the local-host tool turn limit" ->
+      language.pick(trimmed, "OpenAI Codex 超出了本机 Host 工具轮次上限。")
+    "OpenAI Codex returned no final assistant text" ->
+      language.pick(trimmed, "OpenAI Codex 没有返回最终 assistant 文本。")
+    "OpenAI Codex returned no response body" ->
+      language.pick(trimmed, "OpenAI Codex 没有返回响应体。")
+    "OpenAI Codex request failed" ->
+      language.pick(trimmed, "OpenAI Codex 请求失败。")
+    "OpenAI Codex request was rate limited" ->
+      language.pick(trimmed, "OpenAI Codex 请求触发了速率限制。")
     else -> trimmed
   }
 }
