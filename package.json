@@ -506,6 +506,7 @@
     "android:local-host:dedicated:device-owner": "bash apps/android/scripts/local-host-dedicated-device-owner.sh",
     "android:local-host:dedicated:post-provision": "bash apps/android/scripts/local-host-dedicated-post-provision-check.sh",
     "android:local-host:dedicated:readiness": "bash apps/android/scripts/local-host-dedicated-readiness.sh",
+    "android:local-host:dedicated:testdpc-install": "bash apps/android/scripts/local-host-dedicated-testdpc-install.sh",
     "android:local-host:dedicated:testdpc-kiosk": "bash apps/android/scripts/local-host-dedicated-testdpc-kiosk.sh",
     "android:local-host:dedicated:testdpc-qr": "bash apps/android/scripts/local-host-dedicated-testdpc-qr.sh",
     "android:local-host:permissions": "bash apps/android/scripts/local-host-permission-smoke.sh",

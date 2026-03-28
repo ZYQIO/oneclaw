@@ -21,6 +21,8 @@ The new readiness probe is `apps/android/scripts/local-host-dedicated-readiness.
 
 There is now also a `Device Owner` helper at `apps/android/scripts/local-host-dedicated-device-owner.sh`, exposed as `pnpm android:local-host:dedicated:device-owner`. It defaults to dry-run mode and only attempts `adb shell dpm set-device-owner ...` when `--apply` is passed explicitly. / 现在还多了一条 `Device Owner` helper：`apps/android/scripts/local-host-dedicated-device-owner.sh`，并通过 `pnpm android:local-host:dedicated:device-owner` 暴露出来。它默认只做 dry-run，只有显式传入 `--apply` 时才会尝试 `adb shell dpm set-device-owner ...`。
 
+There is now also a TestDPC install helper at `apps/android/scripts/local-host-dedicated-testdpc-install.sh`, exposed as `pnpm android:local-host:dedicated:testdpc-install`. It fetches the latest public TestDPC release, downloads the APK locally, prints the exact `adb install -r -d ...` command in dry-run mode, and only installs onto the phone when `--apply` is passed explicitly. / 现在还新增了一条 TestDPC install helper：`apps/android/scripts/local-host-dedicated-testdpc-install.sh`，命令入口为 `pnpm android:local-host:dedicated:testdpc-install`。它会抓取最新公开 TestDPC release、把 APK 下载到本地，在 dry-run 模式下输出精确的 `adb install -r -d ...` 命令，只有显式传入 `--apply` 时才会真的安装到手机上。
+
 For the factory-reset path that Android officially prefers on dedicated devices, there is now also a provisioning-QR toolchain: `apps/android/scripts/local-host-dedicated-provisioning-qr.ts` plus the `TestDPC` wrapper `apps/android/scripts/local-host-dedicated-testdpc-qr.sh`, exposed as `pnpm android:local-host:dedicated:testdpc-qr`. / 对于 Android 官方更偏好的“恢复出厂后走 QR 入管”路径，现在还新增了一套 provisioning QR 工具链：底层生成器 `apps/android/scripts/local-host-dedicated-provisioning-qr.ts`，以及 `TestDPC` wrapper `apps/android/scripts/local-host-dedicated-testdpc-qr.sh`，命令入口为 `pnpm android:local-host:dedicated:testdpc-qr`。
 
 There is now also a post-provision checker at `apps/android/scripts/local-host-dedicated-post-provision-check.sh`, exposed as `pnpm android:local-host:dedicated:post-provision`. It inspects adb owner state, lock-task state, launcher resolution, and OpenClaw's plain `shared_prefs` via `run-as` when available, so the project can tell whether the remaining gap is still DPC provisioning or already inside the app. / 现在还新增了一条 post-provision checker：`apps/android/scripts/local-host-dedicated-post-provision-check.sh`，命令入口为 `pnpm android:local-host:dedicated:post-provision`。它会同时检查 adb 的 owner / lock-task 状态、launcher resolution，以及在可用时通过 `run-as` 读取 OpenClaw 的明文 `shared_prefs`，从而把“剩余差距还在 DPC provisioning”还是“已经进入 app 内部问题”区分开。
@@ -42,6 +44,7 @@ Meaning / 含义:
 
 - The phone is not ready for adb-based device-owner provisioning yet, because it still has configured accounts and no DPC installed. / 这台手机当前还不能直接走 adb 的 device-owner 配置，因为它还有账号，且没装 DPC。
 - The root / custom-ROM lane is currently higher friction than the device-owner lane, because the bootloader is still locked and OEM unlock support is not yet confirmed. / root / 自定义 ROM 路线当前比 device-owner 路线更难，因为 bootloader 还锁着，而且 OEM unlock 能不能走通还没确认。
+- The first March 28, 2026 dry-run of `pnpm android:local-host:dedicated:testdpc-install` on the same phone successfully fetched the latest public release `v9.0.12`, downloaded `TestDPC_9.0.12.apk`, and confirmed the connected phone still reports `installed=false`, `device_owner=false`. / 同一台手机上 2026 年 3 月 28 日第一次执行 `pnpm android:local-host:dedicated:testdpc-install` dry-run 已成功抓到最新公开 release `v9.0.12`，下载 `TestDPC_9.0.12.apk`，并确认当前接入手机仍然是 `installed=false`、`device_owner=false`。
 - The new post-provision check on the same phone already shows that OpenClaw itself is mostly ready: `dedicatedEnabled=true`, `onboardingCompleted=true`, `gatewayConnectionMode=localHost`, the launcher still resolves to `ai.openclaw.app/.MainActivity`, and the local APK manifest already reports `if_whitelisted`. The missing pieces are still `Device Owner` and the DPC lock-task allowlist. / 同一台手机上新的 post-provision 检查也表明 OpenClaw 自身其实已经基本 ready：`dedicatedEnabled=true`、`onboardingCompleted=true`、`gatewayConnectionMode=localHost`、launcher 仍然正确指向 `ai.openclaw.app/.MainActivity`，而且本地 APK manifest 已经是 `if_whitelisted`。真正缺的仍然是 `Device Owner` 和 DPC 的 lock-task allowlist。
 - The first March 28, 2026 dry-run of `pnpm android:local-host:dedicated:testdpc-kiosk` on the same phone also confirms the gap is still on the DPC side: `OpenClaw installed=true`, `readyForApply=false`, and the only blockers are `TestDPC is not installed` plus `TestDPC is not the active Device Owner`. / 同一台手机上 2026 年 3 月 28 日第一次执行 `pnpm android:local-host:dedicated:testdpc-kiosk` dry-run 也进一步确认，剩余差距仍在 DPC 侧：`OpenClaw installed=true`、`readyForApply=false`，而且唯一 blockers 就是 `TestDPC is not installed` 和 `TestDPC is not the active Device Owner`。
 
@@ -135,7 +138,7 @@ Why / 原因:
 - Confirm the phone really is a spare device
 - Export anything important off the phone
 - Remove existing accounts or plan for a factory reset
-- Install a DPC package
+- Install a DPC package, preferably through `pnpm android:local-host:dedicated:testdpc-install` if you want a repo-tracked TestDPC fetch/install step
 - Re-run `pnpm android:local-host:dedicated:readiness`
 
 ### Factory-reset QR path / 恢复出厂后的 QR 路径
@@ -180,6 +183,18 @@ Device-owner dry-run:
 
 ```bash
 pnpm android:local-host:dedicated:device-owner
+```
+
+Download the latest public TestDPC release and print the install command:
+
+```bash
+pnpm android:local-host:dedicated:testdpc-install
+```
+
+Install the latest public TestDPC release onto the connected phone:
+
+```bash
+pnpm android:local-host:dedicated:testdpc-install -- --apply
 ```
 
 Device-owner apply:
