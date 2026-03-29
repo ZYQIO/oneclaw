@@ -258,4 +258,20 @@ class AppStringsTest {
       localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Gateway not connected"),
     )
   }
+
+  @Test
+  fun localizeTalkModeStatus_translatesSpeechRecognizerNetworkError() {
+    assertEquals(
+      "网络错误",
+      localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Network error"),
+    )
+  }
+
+  @Test
+  fun localizeTalkModeStatus_translatesSpeechRecognizerErrorCode() {
+    assertEquals(
+      "语音错误（11）",
+      localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Speech error (11)"),
+    )
+  }
 }

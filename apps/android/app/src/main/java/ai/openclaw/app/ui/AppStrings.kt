@@ -219,6 +219,47 @@ private fun localizeRemoteAccessFailureReason(
   }
 }
 
+private fun localizeSpeechRecognizerStatus(
+  language: AppLanguage,
+  statusText: String,
+): String? {
+  val trimmed = statusText.trim()
+  speechErrorRegex.matchEntire(trimmed)?.let { match ->
+    val errorCode = match.groupValues[1]
+    return language.pick(
+      english = trimmed,
+      simplifiedChinese = "语音错误（$errorCode）",
+    )
+  }
+  return when {
+    trimmed.equals("Speech recognizer unavailable", ignoreCase = true) ->
+      language.pick("Speech recognizer unavailable", "语音识别器不可用")
+    trimmed.equals("Microphone permission required", ignoreCase = true) ->
+      language.pick("Microphone permission required", "需要麦克风权限")
+    trimmed.equals("Audio error", ignoreCase = true) ->
+      language.pick("Audio error", "音频错误")
+    trimmed.equals("Client error", ignoreCase = true) ->
+      language.pick("Client error", "客户端错误")
+    trimmed.equals("Network error", ignoreCase = true) ->
+      language.pick("Network error", "网络错误")
+    trimmed.equals("Network timeout", ignoreCase = true) ->
+      language.pick("Network timeout", "网络超时")
+    trimmed.equals("Recognizer busy", ignoreCase = true) ->
+      language.pick("Recognizer busy", "识别器忙碌")
+    trimmed.equals("Server error", ignoreCase = true) ->
+      language.pick("Server error", "服务端错误")
+    trimmed.equals("Language not supported on this device", ignoreCase = true) ->
+      language.pick("Language not supported on this device", "此设备不支持当前语言")
+    trimmed.equals("Language unavailable on this device", ignoreCase = true) ->
+      language.pick("Language unavailable on this device", "此设备当前语言暂不可用")
+    trimmed.equals("Speech service disconnected", ignoreCase = true) ->
+      language.pick("Speech service disconnected", "语音服务已断开")
+    trimmed.equals("Speech requests limited; retrying", ignoreCase = true) ->
+      language.pick("Speech requests limited; retrying", "语音请求受限；正在重试")
+    else -> null
+  }
+}
+
 internal fun localizeMicCaptureStatus(
   language: AppLanguage,
   statusText: String,
@@ -238,13 +279,7 @@ internal fun localizeMicCaptureStatus(
       simplifiedChinese = "$queuedCount 条排队中 · 等待网关",
     )
   }
-  speechErrorRegex.matchEntire(trimmed)?.let { match ->
-    val errorCode = match.groupValues[1]
-    return language.pick(
-      english = trimmed,
-      simplifiedChinese = "语音错误（$errorCode）",
-    )
-  }
+  localizeSpeechRecognizerStatus(language, trimmed)?.let { return it }
   return when {
     trimmed.equals("Mic off", ignoreCase = true) -> language.pick("Mic off", "麦克风关闭")
     trimmed.equals("Mic off · sending…", ignoreCase = true) || trimmed.equals("Mic off · sending...", ignoreCase = true) ->
@@ -254,26 +289,8 @@ internal fun localizeMicCaptureStatus(
       language.pick("Listening · sending queued voice", "监听中 · 正在发送排队语音")
     trimmed.equals("Sending queued voice", ignoreCase = true) ->
       language.pick("Sending queued voice", "正在发送排队语音")
-    trimmed.equals("Speech recognizer unavailable", ignoreCase = true) ->
-      language.pick("Speech recognizer unavailable", "语音识别器不可用")
-    trimmed.equals("Microphone permission required", ignoreCase = true) ->
-      language.pick("Microphone permission required", "需要麦克风权限")
     trimmed.equals("Voice reply timed out; retrying queued turn", ignoreCase = true) ->
       language.pick("Voice reply timed out; retrying queued turn", "语音回复超时；正在重试排队轮次")
-    trimmed.equals("Audio error", ignoreCase = true) -> language.pick("Audio error", "音频错误")
-    trimmed.equals("Client error", ignoreCase = true) -> language.pick("Client error", "客户端错误")
-    trimmed.equals("Network error", ignoreCase = true) -> language.pick("Network error", "网络错误")
-    trimmed.equals("Network timeout", ignoreCase = true) -> language.pick("Network timeout", "网络超时")
-    trimmed.equals("Recognizer busy", ignoreCase = true) -> language.pick("Recognizer busy", "识别器忙碌")
-    trimmed.equals("Server error", ignoreCase = true) -> language.pick("Server error", "服务端错误")
-    trimmed.equals("Language not supported on this device", ignoreCase = true) ->
-      language.pick("Language not supported on this device", "此设备不支持当前语言")
-    trimmed.equals("Language unavailable on this device", ignoreCase = true) ->
-      language.pick("Language unavailable on this device", "此设备当前语言暂不可用")
-    trimmed.equals("Speech service disconnected", ignoreCase = true) ->
-      language.pick("Speech service disconnected", "语音服务已断开")
-    trimmed.equals("Speech requests limited; retrying", ignoreCase = true) ->
-      language.pick("Speech requests limited; retrying", "语音请求受限；正在重试")
     trimmed.startsWith("Start failed: ", ignoreCase = true) ->
       language.pick(
         english = trimmed,
@@ -360,6 +377,11 @@ internal fun localizeTalkModeStatus(
   statusText: String,
 ): String {
   val trimmed = statusText.trim()
+  localizeSpeechRecognizerStatus(language, trimmed)?.let { localized ->
+    if (!trimmed.equals("Listening", ignoreCase = true)) {
+      return localized
+    }
+  }
   return when {
     trimmed.equals("Off", ignoreCase = true) -> language.pick("Off", "关闭")
     trimmed.equals("Listening", ignoreCase = true) -> language.pick("Listening", "监听中")
@@ -373,10 +395,6 @@ internal fun localizeTalkModeStatus(
     trimmed.equals("No reply", ignoreCase = true) -> language.pick("No reply", "没有回复")
     trimmed.equals("Gateway not connected", ignoreCase = true) ->
       language.pick("Gateway not connected", "Gateway 未连接")
-    trimmed.equals("Speech recognizer unavailable", ignoreCase = true) ->
-      language.pick("Speech recognizer unavailable", "语音识别器不可用")
-    trimmed.equals("Microphone permission required", ignoreCase = true) ->
-      language.pick("Microphone permission required", "需要麦克风权限")
     trimmed.startsWith("Start failed: ", ignoreCase = true) ->
       language.pick(
         english = trimmed,
