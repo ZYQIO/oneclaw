@@ -1,5 +1,6 @@
 package ai.openclaw.app.host
 
+import ai.openclaw.app.auth.OpenAICodexCredential
 import ai.openclaw.app.gateway.GatewaySession
 import java.net.HttpURLConnection
 import java.net.ServerSocket
@@ -373,6 +374,11 @@ class LocalHostRemoteAccessServerTest {
             put("configured", JsonPrimitive(true))
           }
         },
+        importCodexAuth = { _, _ ->
+          buildJsonObject {
+            put("imported", JsonPrimitive(true))
+          }
+        },
         refreshCodexAuth = {
           buildJsonObject {
             put("refreshed", JsonPrimitive(true))
@@ -393,6 +399,7 @@ class LocalHostRemoteAccessServerTest {
 
       assertEquals(200, response.statusCode)
       assertTrue(response.body.contains("\"auth-codex-status\""))
+      assertTrue(response.body.contains("\"auth-codex-import\""))
       assertTrue(response.body.contains("\"auth-codex-refresh\""))
       assertTrue(response.body.contains("\"status\""))
       assertTrue(response.body.contains("/api/local-host/v1/status"))
@@ -477,6 +484,99 @@ class LocalHostRemoteAccessServerTest {
       assertEquals(400, response.statusCode)
       assertTrue(response.body.contains("\"ok\":false"))
       assertTrue(response.body.contains("OpenAI Codex login required"))
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun codexAuthImport_savesCredentialPayloadAndReturnsMetadata() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val importedCredential = AtomicReference<OpenAICodexCredential?>(null)
+    val importedSource = AtomicReference<String?>(null)
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        importCodexAuth = { credential, source ->
+          importedCredential.set(credential)
+          importedSource.set(source)
+          buildJsonObject {
+            put("provider", JsonPrimitive("openai-codex"))
+            put("configured", JsonPrimitive(true))
+            put("imported", JsonPrimitive(true))
+            put("source", JsonPrimitive(source))
+            put("expiresAt", JsonPrimitive(credential.expires))
+          }
+        },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "POST",
+          path = "/api/local-host/v1/auth/codex/import",
+          token = "secret-token",
+          body =
+            """
+            {"access":"access-123","refresh":"refresh-123","expires":123456,"accountId":"acct_123","email":"person@example.com","source":"desktop-sync"}
+            """.trimIndent(),
+        )
+
+      assertEquals(200, response.statusCode)
+      assertTrue(response.body.contains("\"imported\":true"))
+      assertTrue(response.body.contains("\"source\":\"desktop-sync\""))
+      assertEquals("access-123", importedCredential.get()?.access)
+      assertEquals("refresh-123", importedCredential.get()?.refresh)
+      assertEquals(123456L, importedCredential.get()?.expires)
+      assertEquals("acct_123", importedCredential.get()?.accountId)
+      assertEquals("person@example.com", importedCredential.get()?.email)
+      assertEquals("desktop-sync", importedSource.get())
+    } finally {
+      server.stop()
+      scope.cancel()
+    }
+  }
+
+  @Test
+  fun codexAuthImport_rejectsInvalidBodyWithStructuredError() {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val port = reservePort()
+    val server =
+      LocalHostRemoteAccessServer(
+        scope = scope,
+        json = json,
+        handleLocalHostRequest = { _, _, _ -> """{"ok":true}""" },
+        handleInvoke = { _, _ -> GatewaySession.InvokeResult.ok(null) },
+        importCodexAuth = { _, _ ->
+          buildJsonObject {
+            put("ok", JsonPrimitive(true))
+          }
+        },
+      )
+
+    try {
+      server.start(port = port, token = "secret-token")
+
+      val response =
+        request(
+          port = port,
+          method = "POST",
+          path = "/api/local-host/v1/auth/codex/import",
+          token = "secret-token",
+          body = """{"refresh":"refresh-only"}""",
+        )
+
+      assertEquals(400, response.statusCode)
+      assertTrue(response.body.contains("\"ok\":false"))
+      assertTrue(response.body.contains("access is required"))
     } finally {
       server.stop()
       scope.cancel()

@@ -21,6 +21,7 @@ As of March 28, 2026, the MVP happy path is working, the streaming gate has dire
 - 高风险命令层在关闭时会被明确拒绝。Higher-risk command tiers are clearly rejected when disabled.
 - LAN 冒烟脚本已经成功。The LAN smoke script has succeeded.
 - `auth/codex/status` 和 `auth/codex/refresh` 已在真机验证成功。`auth/codex/status` and `auth/codex/refresh` have both been validated successfully on-device.
+- 仓库里现在还多了一条桌面侧补授权路径：`pnpm android:local-host:codex-sync` 会读取电脑当前优先的 `openai-codex` OAuth profile，探测手机 `/auth/codex/status`，并只在手机缺授权、已过期或已进入 refresh-warning 窗口时，才通过受保护的 `auth/codex/import` 把桌面凭证同步到手机；如果桌面凭证本身也接近过期，它还会跟着调用手机 `/auth/codex/refresh`。The repo now also has a desktop-side auth refill path: `pnpm android:local-host:codex-sync` reads the desktop's preferred `openai-codex` OAuth profile, checks the phone's `/auth/codex/status`, and only syncs desktop auth down through the guarded `auth/codex/import` route when the phone is missing auth, already expired, or already inside the refresh-warning window; if the desktop credential itself is near expiry, it follows with the phone's `/auth/codex/refresh`.
 - 权限缺失脚本已经在真机上成功覆盖四类失败。The permission-failure script has already covered four failure cases successfully on-device.
 - 2026 年 3 月 25 日已经补齐 streaming 真机直证：先确认当前网络下手机直连 `chatgpt.com` 会超时，再通过可信主机代理恢复外网出口；在补充 Codex 额度后，原始 `/events` 已看到同一条 run 持续产出 `chat state=delta` 并最终到达 `state=final`，随后 `pnpm android:local-host:streaming` 也以 `deltaCount=68`、`terminalState=final` 直接通过。On March 25, 2026, streaming direct evidence was completed on-device: after first confirming the phone timed out on direct `chatgpt.com` access on the current network, we restored external egress through a trusted host proxy; after Codex usage was topped up, raw `/events` showed repeated `chat state=delta` events for the same run and eventually reached `state=final`, and `pnpm android:local-host:streaming` then passed directly with `deltaCount=68` and `terminalState=final`.
 - 同一天更早的一次重试曾返回 `The usage limit has been reached | errorType=usage_limit_reached`；这个记录现在应被视为 account-quota 边界，而不是 Android streaming 回归。An earlier retry on the same day returned `The usage limit has been reached | errorType=usage_limit_reached`; that record should now be treated as an account-quota boundary rather than an Android streaming regression.
@@ -242,6 +243,7 @@ Read this section first when resuming later today. / 如果今天晚些时候继
 - `pnpm android:local-host:ui` 已经是稳定的 in-app 健康基线。
 - `pnpm android:local-host:ui:cross-app:sweep` 已证明当前设置下 30 秒内仍属于 `foregrounded_host_reachable`。
 - `pnpm android:local-host:ui:cross-app` 现在已经能承接可选 follow-up harness，但这条新路径还没有新增真机正证据。
+- `pnpm android:local-host:codex-sync` 现在已经是仓库内建命令，适合在 USB `adb forward` 或可信 LAN/tunnel 下补手机 Codex 授权，但这条能力目前还是“桌面主动推送同步”，还不是手机端自动从 Gateway/桌面拉取凭证。
 - app 内中英文切换已经覆盖 post-onboarding 主页面、onboarding、Chat / Voice 主界面、Voice 页 mic/runtime 细状态、Voice reply / TTS 细状态，以及一批已知 runtime / auth 状态文本；`Codex auth` 的默认 OAuth 错误文案、gateway auth/pairing 常见连接态、Chat 页常见失败提示、浏览器里的授权成功/失败页与回调错误页，以及 onboarding 手动配置里的 `token/password/SMS` 次级文案也开始纳入同一路径，并通过本地编译 + `AppStringsTest` + `ConnectTabScreenStringsTest` + `OpenAICodexAuthManagerTest` + `SecurePrefsTest` 复核。
 - OpenClaw app 一侧的 dedicated readiness 已基本到位，当前主要缺口在 DPC provisioning。
 - dedicated 相关仓库命令现在已经形成链路：`readiness -> testdpc-install -> testdpc-qr -> post-provision -> testdpc-kiosk`。
@@ -257,7 +259,8 @@ Read this section first when resuming later today. / 如果今天晚些时候继
 
 1. `pnpm android:local-host:ui`
 2. `pnpm android:local-host:dedicated:readiness`
-3. `pnpm android:local-host:dedicated:testdpc-install`
+3. `pnpm android:local-host:codex-sync -- --json`
+4. `pnpm android:local-host:dedicated:testdpc-install`
 4. 如果要推进跨 app follow-up，给 `pnpm android:local-host:ui:cross-app` 补上目标 app 的 wait/tap/inputText 环境变量后再跑一轮
 5. 如果确定要继续 dedicated 官方入管，再看 `pnpm android:local-host:dedicated:testdpc-qr`
 6. 如果手机已经完成 DPC provisioning，再看 `pnpm android:local-host:dedicated:post-provision` 和 `pnpm android:local-host:dedicated:testdpc-kiosk`

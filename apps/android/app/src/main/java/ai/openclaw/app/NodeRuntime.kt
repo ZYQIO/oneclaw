@@ -280,6 +280,9 @@ class NodeRuntime(
     codexAuthStatusProvider = {
       localHostRuntime.codexAuthStatusSnapshot()
     },
+    importCodexAuth = { credential, source ->
+      localHostRuntime.importCodexAuthSnapshot(credential = credential, source = source)
+    },
     refreshCodexAuth = {
       localHostRuntime.refreshCodexAuthSnapshot()
     },

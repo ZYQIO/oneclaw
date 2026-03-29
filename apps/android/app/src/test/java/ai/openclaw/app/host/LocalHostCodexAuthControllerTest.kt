@@ -115,6 +115,52 @@ class LocalHostCodexAuthControllerTest {
       }
     }
 
+  @Test
+  fun importSnapshot_persistsCredentialAndReturnsImportMetadata() {
+    val context = RuntimeEnvironment.getApplication()
+    val prefs = securePrefs(context, name = "openclaw.node.secure.test.localhost.auth.import")
+    prefs.saveOpenAICodexCredential(
+      OpenAICodexCredential(
+        access = "access-old",
+        refresh = "refresh-old",
+        expires = 45_000L,
+        accountId = "acct_old",
+        email = "old@example.com",
+      ),
+    )
+    val controller =
+      LocalHostCodexAuthController(
+        prefs = prefs,
+        oauthApi = OpenAICodexOAuthApi(json = json),
+        clock = { 30_000L },
+      )
+
+    val snapshot =
+      controller.importSnapshot(
+        credential =
+          OpenAICodexCredential(
+            access = " access-new ",
+            refresh = " refresh-new ",
+            expires = 180_000L,
+            accountId = " acct_new ",
+            email = " person@example.com ",
+          ),
+        source = "desktop-sync",
+      )
+    val stored = prefs.loadOpenAICodexCredential()
+
+    assertEquals(true, snapshot.getValue("imported").jsonPrimitive.boolean)
+    assertEquals(false, snapshot.getValue("refreshed").jsonPrimitive.boolean)
+    assertEquals("desktop-sync", snapshot.getValue("source").jsonPrimitive.content)
+    assertEquals(45_000L, snapshot.getValue("previousExpiresAt").jsonPrimitive.long)
+    assertEquals("p***n@example.com", snapshot.getValue("emailHint").jsonPrimitive.content)
+    assertEquals(180_000L, snapshot.getValue("expiresAt").jsonPrimitive.long)
+    assertEquals("access-new", stored?.access)
+    assertEquals("refresh-new", stored?.refresh)
+    assertEquals("acct_new", stored?.accountId)
+    assertEquals("person@example.com", stored?.email)
+  }
+
   private fun securePrefs(context: Context, name: String): SecurePrefs {
     val securePrefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
     securePrefs.edit().clear().commit()

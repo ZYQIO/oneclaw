@@ -1,6 +1,7 @@
 package ai.openclaw.app.host
 
 import android.net.Uri
+import ai.openclaw.app.auth.OpenAICodexCredential
 import ai.openclaw.app.gateway.GatewaySession
 import java.io.ByteArrayOutputStream
 import java.net.Inet4Address
@@ -158,6 +159,7 @@ class LocalHostRemoteAccessServer(
   private val allowWriteInvokeCommands: () -> Boolean = { false },
   private val statusSnapshotProvider: (() -> JsonObject)? = null,
   private val codexAuthStatusProvider: (() -> JsonObject)? = null,
+  private val importCodexAuth: (suspend (credential: OpenAICodexCredential, source: String?) -> JsonObject)? = null,
   private val refreshCodexAuth: (suspend () -> JsonObject)? = null,
 ) {
   companion object {
@@ -332,6 +334,7 @@ class LocalHostRemoteAccessServer(
       request.method == "GET" && uri.path == "$apiBasePath/status" -> statusResponse()
       request.method == "GET" && uri.path == "$apiBasePath/examples" -> examplesResponse()
       request.method == "GET" && uri.path == "$apiBasePath/auth/codex/status" -> codexAuthStatusResponse()
+      request.method == "POST" && uri.path == "$apiBasePath/auth/codex/import" -> codexAuthImportResponse(requireJsonBody(request))
       request.method == "POST" && uri.path == "$apiBasePath/auth/codex/refresh" -> codexAuthRefreshResponse()
       request.method == "GET" && uri.path == apiBasePath -> jsonResponse(
         statusCode = 200,
@@ -347,6 +350,9 @@ class LocalHostRemoteAccessServer(
                 add(JsonPrimitive("GET $apiBasePath/examples"))
                 if (codexAuthStatusProvider != null) {
                   add(JsonPrimitive("GET $apiBasePath/auth/codex/status"))
+                }
+                if (importCodexAuth != null) {
+                  add(JsonPrimitive("POST $apiBasePath/auth/codex/import"))
                 }
                 if (refreshCodexAuth != null) {
                   add(JsonPrimitive("POST $apiBasePath/auth/codex/refresh"))
@@ -556,6 +562,24 @@ class LocalHostRemoteAccessServer(
     return jsonResponse(statusCode = 200, body = provider().toString())
   }
 
+  private suspend fun codexAuthImportResponse(body: JsonObject): HttpResponse {
+    val importer = importCodexAuth ?: throw HttpRequestException(404, "Codex auth import is unavailable")
+    val credential = parseCodexCredential(body)
+    val source = body["source"].asStringOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+    return try {
+      jsonResponse(statusCode = 200, body = importer(credential, source).toString())
+    } catch (err: IllegalStateException) {
+      jsonResponse(
+        statusCode = 400,
+        body =
+          buildJsonObject {
+            put("ok", JsonPrimitive(false))
+            put("error", JsonPrimitive(err.message ?: "OpenAI Codex import failed"))
+          }.toString(),
+      )
+    }
+  }
+
   private suspend fun codexAuthRefreshResponse(): HttpResponse {
     val refresh = refreshCodexAuth ?: throw HttpRequestException(404, "Codex auth refresh is unavailable")
     return try {
@@ -637,6 +661,21 @@ class LocalHostRemoteAccessServer(
                       "curl",
                       JsonPrimitive(
                         "curl -H 'Authorization: Bearer $tokenPlaceholder' $baseUrl$apiBasePath/auth/codex/status",
+                      ),
+                    )
+                  },
+                )
+              }
+              if (importCodexAuth != null) {
+                add(
+                  buildJsonObject {
+                    put("name", JsonPrimitive("auth-codex-import"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/auth/codex/import"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/auth/codex/import -d '{\"access\":\"<access-token>\",\"refresh\":\"<refresh-token>\",\"expires\":1893456000000,\"accountId\":\"acct_123\",\"email\":\"user@example.com\",\"source\":\"desktop-sync\"}'",
                       ),
                     )
                   },
@@ -851,8 +890,41 @@ class LocalHostRemoteAccessServer(
     if (body.isEmpty()) {
       throw HttpRequestException(400, "JSON body is required")
     }
-    return json.parseToJsonElement(body).asObjectOrNull()
-      ?: throw HttpRequestException(400, "JSON object body is required")
+    return try {
+      json.parseToJsonElement(body).asObjectOrNull()
+        ?: throw HttpRequestException(400, "JSON object body is required")
+    } catch (err: HttpRequestException) {
+      throw err
+    } catch (_: Throwable) {
+      throw HttpRequestException(400, "Malformed JSON body")
+    }
+  }
+
+  private fun parseCodexCredential(body: JsonObject): OpenAICodexCredential {
+    val access = body["access"].asStringOrNull()?.trim().orEmpty()
+    if (access.isEmpty()) {
+      throw HttpRequestException(400, "access is required")
+    }
+    val refresh = body["refresh"].asStringOrNull()?.trim().orEmpty()
+    if (refresh.isEmpty()) {
+      throw HttpRequestException(400, "refresh is required")
+    }
+    val expires = body["expires"].asLongOrNull()
+      ?: throw HttpRequestException(400, "expires must be a positive integer")
+    if (expires <= 0L) {
+      throw HttpRequestException(400, "expires must be a positive integer")
+    }
+    val accountId = body["accountId"].asStringOrNull()?.trim().orEmpty()
+    if (accountId.isEmpty()) {
+      throw HttpRequestException(400, "accountId is required")
+    }
+    return OpenAICodexCredential(
+      access = access,
+      refresh = refresh,
+      expires = expires,
+      accountId = accountId,
+      email = body["email"].asStringOrNull()?.trim()?.takeIf { it.isNotEmpty() },
+    )
   }
 
   private fun readRequest(socket: Socket): HttpRequest? {

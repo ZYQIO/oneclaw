@@ -1,6 +1,7 @@
 package ai.openclaw.app.host
 
 import ai.openclaw.app.SecurePrefs
+import ai.openclaw.app.auth.OpenAICodexCredential
 import ai.openclaw.app.auth.OpenAICodexOAuthApi
 import ai.openclaw.app.chat.ChatMessageContent
 import java.util.UUID
@@ -150,6 +151,11 @@ class LocalHostRuntime(
   fun refreshNodeCanvasCapability(): String? = null
 
   fun codexAuthStatusSnapshot(): JsonObject = codexAuthController.statusSnapshot()
+
+  fun importCodexAuthSnapshot(
+    credential: OpenAICodexCredential,
+    source: String? = null,
+  ): JsonObject = codexAuthController.importSnapshot(credential = credential, source = source)
 
   suspend fun refreshCodexAuthSnapshot(): JsonObject = codexAuthController.refreshSnapshot()
 

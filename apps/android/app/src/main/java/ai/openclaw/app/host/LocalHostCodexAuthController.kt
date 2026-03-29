@@ -22,7 +22,26 @@ class LocalHostCodexAuthController(
     return credentialSnapshot(
       credential = prefs.loadOpenAICodexCredential(),
       refreshed = false,
+      imported = false,
       previousExpiresAt = null,
+      source = null,
+      nowMs = clock(),
+    )
+  }
+
+  fun importSnapshot(
+    credential: OpenAICodexCredential,
+    source: String? = null,
+  ): JsonObject {
+    val existing = prefs.loadOpenAICodexCredential()
+    val normalized = normalizeCredential(credential)
+    prefs.saveOpenAICodexCredential(normalized)
+    return credentialSnapshot(
+      credential = normalized,
+      refreshed = false,
+      imported = true,
+      previousExpiresAt = existing?.expires,
+      source = source?.trim()?.takeIf { it.isNotEmpty() },
       nowMs = clock(),
     )
   }
@@ -39,7 +58,9 @@ class LocalHostCodexAuthController(
       credentialSnapshot(
         credential = refreshed,
         refreshed = true,
+        imported = false,
         previousExpiresAt = existing.expires,
+        source = null,
         nowMs = clock(),
       )
     }
@@ -47,14 +68,18 @@ class LocalHostCodexAuthController(
   private fun credentialSnapshot(
     credential: OpenAICodexCredential?,
     refreshed: Boolean,
+    imported: Boolean,
     previousExpiresAt: Long?,
+    source: String?,
     nowMs: Long,
   ): JsonObject {
     return buildJsonObject {
       put("provider", JsonPrimitive("openai-codex"))
       put("configured", JsonPrimitive(credential != null))
       put("refreshed", JsonPrimitive(refreshed))
+      put("imported", JsonPrimitive(imported))
       previousExpiresAt?.let { put("previousExpiresAt", JsonPrimitive(it)) }
+      source?.let { put("source", JsonPrimitive(it)) }
       credential?.let { current ->
         put("accountIdPresent", JsonPrimitive(current.accountId.isNotBlank()))
         current.email
@@ -67,6 +92,23 @@ class LocalHostCodexAuthController(
         put("refreshRecommended", JsonPrimitive(current.expires <= nowMs + 30_000L))
       }
     }
+  }
+
+  private fun normalizeCredential(credential: OpenAICodexCredential): OpenAICodexCredential {
+    val access = credential.access.trim()
+    val refresh = credential.refresh.trim()
+    val accountId = credential.accountId.trim()
+    if (access.isEmpty()) throw IllegalStateException("access is required")
+    if (refresh.isEmpty()) throw IllegalStateException("refresh is required")
+    if (accountId.isEmpty()) throw IllegalStateException("accountId is required")
+    if (credential.expires <= 0L) throw IllegalStateException("expires must be a positive timestamp")
+    return OpenAICodexCredential(
+      access = access,
+      refresh = refresh,
+      expires = credential.expires,
+      accountId = accountId,
+      email = credential.email?.trim()?.takeIf { it.isNotEmpty() },
+    )
   }
 
   private fun maskEmail(value: String): String {

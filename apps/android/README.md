@@ -12,6 +12,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 ### Local Host Scope Today / 当前 Local Host 范围
 
 - `Local Host` currently provides on-device Codex-backed chat, a curated Android command surface, an app-private on-device workspace for text files with search/edit/copy/move support, and a dedicated idle-phone deployment mode that can keep the host service alive across app relaunches, package upgrades, and reboots.
+- When the phone is connected to a trusted desktop, the desktop can now inspect its own `openai-codex` OAuth state and push that credential into the phone's guarded local-host API so the phone can recover from missing / stale auth without another browser login.
 - The app now supports a settings-driven English / Simplified Chinese toggle across the tab bar, Connect tab, Settings tab, onboarding flow, Chat / Voice primary surfaces, Voice runtime/microphone status copy, Voice reply / TTS detail status copy, common gateway auth/pairing edge states, the browser-based Codex auth success/failure page, and several runtime/auth status strings. Some deeper secondary copy still remains to be localized.
 - It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
@@ -179,6 +180,35 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
 
 The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`, and `/invoke`, then prints a compact summary.
+
+## Local Host Codex Auth Sync
+
+Use this when the phone is already paired to a trusted desktop and the phone's Codex auth has gone missing, expired, or is close enough to expiry that you would rather reuse the desktop login than re-open the browser flow.
+
+USB + adb forward flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
+pnpm android:local-host:codex-sync
+```
+
+Direct LAN flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL='http://<phone-ip>:3945' \
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:codex-sync
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
+- `pnpm android:local-host:codex-sync -- --force`
+- `pnpm android:local-host:codex-sync -- --agent-dir /path/to/agent`
+- `pnpm android:local-host:codex-sync -- --json`
+
+The sync command reads the preferred desktop `openai-codex` OAuth credential from the auth-profile store, checks the phone's `/auth/codex/status`, and only pushes desktop auth down when the phone is missing auth, already expired, or already in the refresh-warning window. If the desktop credential itself is also close to expiry, the command follows the import with `/auth/codex/refresh` on the phone so the phone ends on a fresh token set. Treat this as a trusted-path feature only: it reuses the existing bearer-protected local-host API and should stay on `adb forward`, localhost, or a trusted LAN/tunnel.
 
 ## Local Host UI Automation Smoke
 
