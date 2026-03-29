@@ -172,9 +172,9 @@ classify_chat_error() {
   if [[ "$error_message" == *"failed to connect to"* && "$error_message" == *"after"* && "$error_message" == *"ms"* ]]; then
     chat_error_class="openai_connect_timeout"
     if [[ "$chat_error_address_family" == "ipv6" ]]; then
-      chat_hint="The phone reached local-host successfully, but outbound Codex traffic timed out on an IPv6 path. Check IPv6 reachability, VPN/proxy behavior, or force a working IPv4 route before retrying."
+      chat_hint="The phone reached local-host successfully, but outbound Codex traffic timed out on an IPv6 path. Run pnpm android:local-host:openai-network, then check IPv6 reachability, VPN/proxy behavior, or force a working IPv4 route before retrying."
     else
-      chat_hint="The phone reached local-host successfully, but outbound Codex traffic timed out before OpenAI responded. Check network reachability, VPN/proxy behavior, or firewall rules."
+      chat_hint="The phone reached local-host successfully, but outbound Codex traffic timed out before OpenAI responded. Run pnpm android:local-host:openai-network, then check network reachability, VPN/proxy behavior, or firewall rules."
     fi
     return 0
   fi

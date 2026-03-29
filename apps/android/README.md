@@ -201,7 +201,26 @@ The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`,
 
 - It now exits non-zero when `/chat/send-wait` returns `state=error`, times out, or when `/invoke` returns `ok=false`; successful `/status` alone no longer counts as a passing smoke.
 - Each run now writes `summary.json` and emits compact `chat.error_class`, `chat.error_host`, `chat.error_address_family`, and `chat.hint` fields when it can classify an upstream failure.
-- On March 29, 2026, a fresh adb-forward retest on the current OPPO / ColorOS device still reached `status.ok=true` plus `invoke.ok=true`, but `chat` classified as `openai_connect_timeout` with `chat.error_address_family=ipv6`; treat that as an outbound Codex network boundary rather than a local-host token or write-gate regression.
+- On March 29, 2026, a fresh adb-forward retest on the current OPPO / ColorOS device still reached `status.ok=true` plus `invoke.ok=true`, but `chat` classified as `openai_connect_timeout` with `chat.error_address_family=ipv6`; treat that as an outbound Codex network boundary rather than a local-host token or write-gate regression. A follow-up `pnpm android:local-host:openai-network` run then showed the deeper truth on the same device: both IPv4 and IPv6 `443` to `chatgpt.com` time out, while `auth.openai.com` still reaches both families successfully.
+
+## Local Host OpenAI Network Probe
+
+Use this when `pnpm android:local-host:smoke` or local-host chat reaches the phone successfully but still fails while contacting OpenAI/Codex upstream.
+
+```bash
+pnpm android:local-host:openai-network
+```
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb`
+- `OPENCLAW_ANDROID_LOCAL_HOST_OPENAI_NETWORK_HOSTS="chatgpt.com auth.openai.com"`
+- `OPENCLAW_ANDROID_LOCAL_HOST_OPENAI_NETWORK_PORT=443`
+- `OPENCLAW_ANDROID_LOCAL_HOST_OPENAI_NETWORK_TIMEOUT_SEC=5`
+
+The probe runs `toybox nc` on the phone itself over both IPv4 and IPv6 for each configured host, captures DNS-related `getprop` lines, and writes a `summary.json` with a classification such as `all_hosts_reachable`, `responses_host_unreachable`, or `responses_ipv6_unreachable`.
+
+- On March 29, 2026, the current OPPO / ColorOS device showed `chatgpt.com` timing out on both IPv4 and IPv6 while `auth.openai.com` still reached `443` successfully on both families, which narrows the current blocker to the Responses host path rather than the entire OpenAI domain.
 
 ## Local Host Codex Auth Sync
 
