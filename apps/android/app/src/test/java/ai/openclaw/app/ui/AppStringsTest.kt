@@ -473,6 +473,11 @@ class AppStringsTest {
   }
 
   @Test
+  fun onboardingGatewaySummaryLabel_translatesToChinese() {
+    assertEquals("网关", onboardingGatewaySummaryLabel(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
   fun localizeTalkModeStatus_translatesSystemSpeakingState() {
     assertEquals(
       "正在说话（系统）…",

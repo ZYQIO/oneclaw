@@ -378,7 +378,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
       if (enableContacts) enabled += t("Contacts", "联系人")
       if (enableCalendar) enabled += t("Calendar", "日历")
       if (enableMotion && motionAvailable) enabled += t("Motion", "运动")
-      if (smsAvailable && enableSms) enabled += "SMS"
+      if (smsAvailable && enableSms) enabled += onboardingSmsPermissionTitle(language)
       if (enableCallLog) enabled += t("Call Log", "通话记录")
       if (enabled.isEmpty()) t("None selected", "未选择") else enabled.joinToString(", ")
     }
@@ -1558,7 +1558,7 @@ private fun FinalStep(
     )
     SummaryCard(
       icon = Icons.Default.Cloud,
-      label = t("Gateway", "Gateway"),
+      label = onboardingGatewaySummaryLabel(language),
       value = parsedGateway?.displayUrl ?: t("Invalid gateway URL", "无效的 gateway URL"),
       accentColor = Color(0xFF7C5AC7),
     )

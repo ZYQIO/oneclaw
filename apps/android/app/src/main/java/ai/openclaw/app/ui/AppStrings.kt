@@ -378,6 +378,9 @@ internal fun gatewayAdvancedSetupHint(language: AppLanguage): String =
 internal fun onboardingSmsPermissionTitle(language: AppLanguage): String =
   language.pick("SMS", "短信")
 
+internal fun onboardingGatewaySummaryLabel(language: AppLanguage): String =
+  language.pick("Gateway", "网关")
+
 internal fun localizeTalkModeStatus(
   language: AppLanguage,
   statusText: String,
