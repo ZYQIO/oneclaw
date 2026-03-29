@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildGuardEnvFileContent,
   parseCli,
+  planGuardSetup,
   recommendGuardAction,
   resolveGuardLaunchdPlan,
 } from "../../../apps/android/scripts/local-host-codex-guard-launchd.js";
@@ -41,6 +42,17 @@ describe("parseCli", () => {
     ]);
 
     expect(options.command).toBe("write-env");
+    expect(options.token).toBe("secret-token");
+  });
+
+  it("parses setup token seeding", () => {
+    const options = parseCli([
+      "setup",
+      "--token",
+      "secret-token",
+    ]);
+
+    expect(options.command).toBe("setup");
     expect(options.token).toBe("secret-token");
   });
 });
@@ -199,5 +211,73 @@ describe("recommendGuardAction", () => {
         loaded: true,
       }),
     ).toBe("healthy");
+  });
+});
+
+describe("planGuardSetup", () => {
+  it("writes a template when env is missing and no token is provided", () => {
+    expect(
+      planGuardSetup({
+        envFileExists: false,
+        tokenConfigured: false,
+        installed: false,
+        loaded: false,
+        tokenProvided: false,
+      }),
+    ).toEqual({
+      setupActions: ["write-env-template"],
+      shouldWriteEnv: true,
+      writeEnvMode: "template",
+      shouldInstall: false,
+    });
+  });
+
+  it("writes a token and installs when token is provided for a fresh setup", () => {
+    expect(
+      planGuardSetup({
+        envFileExists: false,
+        tokenConfigured: false,
+        installed: false,
+        loaded: false,
+        tokenProvided: true,
+      }),
+    ).toEqual({
+      setupActions: ["write-env-token", "install"],
+      shouldWriteEnv: true,
+      writeEnvMode: "token",
+      shouldInstall: true,
+    });
+  });
+
+  it("repairs launchd when guard is ready but not loaded", () => {
+    expect(
+      planGuardSetup({
+        envFileExists: true,
+        tokenConfigured: true,
+        installed: true,
+        loaded: false,
+        tokenProvided: false,
+      }),
+    ).toEqual({
+      setupActions: ["install"],
+      shouldWriteEnv: false,
+      shouldInstall: true,
+    });
+  });
+
+  it("does nothing when guard is already healthy", () => {
+    expect(
+      planGuardSetup({
+        envFileExists: true,
+        tokenConfigured: true,
+        installed: true,
+        loaded: true,
+        tokenProvided: false,
+      }),
+    ).toEqual({
+      setupActions: ["noop"],
+      shouldWriteEnv: false,
+      shouldInstall: false,
+    });
   });
 });

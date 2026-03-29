@@ -6,7 +6,13 @@ import { parseArgs } from "node:util";
 import { buildLaunchAgentPlist } from "../../../src/daemon/launchd-plist.js";
 import { resolveHomeDir, resolveUserPathWithHome } from "../../../src/daemon/paths.js";
 
-export type GuardLaunchdCommand = "install" | "status" | "uninstall" | "write-env";
+export type GuardLaunchdCommand = "install" | "setup" | "status" | "uninstall" | "write-env";
+
+export type GuardSetupAction =
+  | "write-env-template"
+  | "write-env-token"
+  | "install"
+  | "noop";
 
 export type GuardLaunchdCliOptions = {
   command: GuardLaunchdCommand;
@@ -71,6 +77,10 @@ export type GuardLaunchdStatus = {
   latestArtifact?: unknown;
 };
 
+export type GuardSetupResult = GuardLaunchdStatus & {
+  setupActions: GuardSetupAction[];
+};
+
 const DEFAULT_PORT = 3945;
 const DEFAULT_LABEL = "ai.openclaw.android-local-host-codex-guard";
 const DEFAULT_STATE_DIR = "~/.openclaw/android-local-host-codex-guard";
@@ -92,6 +102,7 @@ function usage(): string {
   return [
     "Usage:",
     "  pnpm android:local-host:codex-guard:launchd -- [install] --env-file <path>",
+    "  pnpm android:local-host:codex-guard:launchd -- setup [--token <token>]",
     "  pnpm android:local-host:codex-guard:launchd -- status",
     "  pnpm android:local-host:codex-guard:launchd -- uninstall",
     "  pnpm android:local-host:codex-guard:launchd -- write-env [--token <token>]",
@@ -114,6 +125,7 @@ function usage(): string {
     "",
     "Notes:",
     "  - install requires an env file that exports OPENCLAW_ANDROID_LOCAL_HOST_TOKEN.",
+    "  - setup writes a default template when env is missing, seeds a token when provided, and installs launchd when the guard is ready.",
     "  - write-env creates or updates that env file, defaulting to ~/.openclaw/android-local-host-codex-guard/guard.env.",
     "  - default install mode uses adb forward + wait-for-device + watch.",
     "  - installed state lives under ~/.openclaw/android-local-host-codex-guard by default.",
@@ -185,6 +197,7 @@ export function parseCli(
   const commandRaw = parsed.positionals[0]?.trim() || "install";
   if (
     commandRaw !== "install" &&
+    commandRaw !== "setup" &&
     commandRaw !== "status" &&
     commandRaw !== "uninstall" &&
     commandRaw !== "write-env"
@@ -527,6 +540,58 @@ export function recommendGuardAction(params: {
   return "healthy";
 }
 
+export function planGuardSetup(params: {
+  envFileExists: boolean;
+  tokenConfigured: boolean;
+  installed: boolean;
+  loaded: boolean;
+  tokenProvided: boolean;
+}): {
+  setupActions: GuardSetupAction[];
+  shouldWriteEnv: boolean;
+  writeEnvMode?: "template" | "token";
+  shouldInstall: boolean;
+} {
+  const setupActions: GuardSetupAction[] = [];
+  let envFileExists = params.envFileExists;
+  let tokenConfigured = params.tokenConfigured;
+
+  let writeEnvMode: "template" | "token" | undefined;
+  if (params.tokenProvided) {
+    writeEnvMode = "token";
+    setupActions.push("write-env-token");
+    envFileExists = true;
+    tokenConfigured = true;
+  } else if (!envFileExists) {
+    writeEnvMode = "template";
+    setupActions.push("write-env-template");
+    envFileExists = true;
+    tokenConfigured = false;
+  }
+
+  const recommendedAction = recommendGuardAction({
+    envFileExists,
+    tokenConfigured,
+    installed: params.installed,
+    loaded: params.loaded,
+  });
+  const shouldInstall =
+    recommendedAction === "install" || recommendedAction === "check-launchagent";
+  if (shouldInstall) {
+    setupActions.push("install");
+  }
+  if (setupActions.length === 0) {
+    setupActions.push("noop");
+  }
+
+  return {
+    setupActions,
+    shouldWriteEnv: writeEnvMode != null,
+    ...(writeEnvMode ? { writeEnvMode } : {}),
+    shouldInstall,
+  };
+}
+
 async function writeGuardEnv(options: GuardLaunchdCliOptions): Promise<{
   envFile: string;
   tokenConfigured: boolean;
@@ -540,6 +605,30 @@ async function writeGuardEnv(options: GuardLaunchdCliOptions): Promise<{
   return {
     envFile: plan.envFile,
     tokenConfigured: trimOptional(options.token) != null,
+  };
+}
+
+async function setupGuard(options: GuardLaunchdCliOptions): Promise<GuardSetupResult> {
+  let status = await readGuardStatus(options);
+  const setupPlan = planGuardSetup({
+    envFileExists: status.envFileExists,
+    tokenConfigured: status.tokenConfigured,
+    installed: status.installed,
+    loaded: status.loaded,
+    tokenProvided: trimOptional(options.token) != null,
+  });
+
+  if (setupPlan.shouldWriteEnv) {
+    await writeGuardEnv(options);
+    status = await readGuardStatus(options);
+  }
+  if (setupPlan.shouldInstall) {
+    status = await installGuard(options);
+  }
+
+  return {
+    ...status,
+    setupActions: setupPlan.setupActions,
   };
 }
 
@@ -753,6 +842,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       return;
     }
     printInstallStatus(status);
+    return;
+  }
+  if (options.command === "setup") {
+    const result = await setupGuard(options);
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    printStatus(result);
+    console.log(`setup.actions=${result.setupActions.join(",")}`);
     return;
   }
   if (options.command === "uninstall") {
