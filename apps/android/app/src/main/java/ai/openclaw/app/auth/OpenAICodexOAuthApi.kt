@@ -1,5 +1,6 @@
 package ai.openclaw.app.auth
 
+import ai.openclaw.app.network.buildOpenAIHttpClient
 import android.util.Base64
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -19,7 +20,7 @@ data class OpenAICodexAuthorizationFlow(
 
 class OpenAICodexOAuthApi(
   private val json: Json,
-  private val client: OkHttpClient = OkHttpClient(),
+  private val client: OkHttpClient = buildOpenAIHttpClient(),
   private val authorizeUrl: String = defaultAuthorizeUrl,
   private val tokenUrl: String = defaultTokenUrl,
   private val redirectUri: String = defaultRedirectUri,

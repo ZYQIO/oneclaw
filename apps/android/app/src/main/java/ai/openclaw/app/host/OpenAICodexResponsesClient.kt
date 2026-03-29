@@ -6,6 +6,7 @@ import ai.openclaw.app.SecurePrefs
 import ai.openclaw.app.auth.OpenAICodexCredential
 import ai.openclaw.app.auth.OpenAICodexOAuthApi
 import ai.openclaw.app.chat.ChatMessageContent
+import ai.openclaw.app.network.buildOpenAIHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -39,7 +40,7 @@ interface LocalHostResponsesClient {
 class OpenAICodexResponsesClient(
   private val prefs: SecurePrefs,
   private val json: Json,
-  private val client: OkHttpClient = OkHttpClient(),
+  private val client: OkHttpClient = buildOpenAIHttpClient(),
   private val responsesUrl: String = defaultResponsesUrl,
   private val instructions: String = defaultInstructions,
   private val toolBridge: LocalHostToolBridge? = null,
