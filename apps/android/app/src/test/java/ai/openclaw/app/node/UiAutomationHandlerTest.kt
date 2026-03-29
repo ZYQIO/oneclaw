@@ -3,6 +3,8 @@ package ai.openclaw.app.node
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
 import ai.openclaw.app.accessibility.UiAutomationInputTextRequest
 import ai.openclaw.app.accessibility.UiAutomationInputTextResult
+import ai.openclaw.app.accessibility.UiAutomationSwipeRequest
+import ai.openclaw.app.accessibility.UiAutomationSwipeResult
 import ai.openclaw.app.accessibility.UiAutomationTapRequest
 import ai.openclaw.app.accessibility.UiAutomationTapResult
 import kotlinx.coroutines.test.runTest
@@ -510,6 +512,123 @@ class UiAutomationHandlerTest {
     assertFalse(result.ok)
     assertEquals("UI_TARGET_NOT_FOUND", result.error?.code)
     assertTrue(result.error?.message.orEmpty().contains("requested tap selector"))
+  }
+
+  @Test
+  fun handleSwipe_passesCoordinateRequestToInjectedAction() {
+    var capturedRequest: UiAutomationSwipeRequest? = null
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performSwipeAction = { request ->
+          capturedRequest = request
+          UiAutomationSwipeResult(
+            performed = true,
+            strategy = "gesture_swipe",
+            packageName = "com.example.app",
+            startX = request.startX,
+            startY = request.startY,
+            endX = request.endX,
+            endY = request.endY,
+            durationMs = request.durationMs,
+          )
+        },
+      )
+
+    val result =
+      handler.handleSwipe(
+        """{"startX":120,"startY":600,"endX":120,"endY":240,"durationMs":320,"packageName":"com.example.app"}""",
+      )
+
+    assertTrue(result.ok)
+    assertEquals(120.0, capturedRequest?.startX)
+    assertEquals(600.0, capturedRequest?.startY)
+    assertEquals(120.0, capturedRequest?.endX)
+    assertEquals(240.0, capturedRequest?.endY)
+    assertEquals(320L, capturedRequest?.durationMs)
+    assertEquals("com.example.app", capturedRequest?.packageName)
+    val payload = json.parseToJsonElement(result.payloadJson!!).jsonObject
+    assertEquals("swipe", payload.getValue("action").jsonPrimitive.content)
+    assertEquals(320, payload.getValue("durationMs").jsonPrimitive.content.toInt())
+  }
+
+  @Test
+  fun handleSwipe_requiresFullCoordinateSet() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+      )
+
+    val result = handler.handleSwipe("""{"startX":120,"startY":600,"endX":120}""")
+
+    assertFalse(result.ok)
+    assertEquals("INVALID_REQUEST", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("startX/startY/endX/endY"))
+  }
+
+  @Test
+  fun handleSwipe_rejectsZeroDistanceGesture() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+      )
+
+    val result =
+      handler.handleSwipe("""{"startX":120,"startY":600,"endX":120,"endY":600}""")
+
+    assertFalse(result.ok)
+    assertEquals("INVALID_REQUEST", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("distinct start and end coordinates"))
+  }
+
+  @Test
+  fun handleSwipe_surfacesGestureFailuresClearly() {
+    val handler =
+      UiAutomationHandler(
+        readinessSnapshot = {
+          LocalHostUiAutomationStatus(
+            enabled = true,
+            serviceConnected = true,
+            available = true,
+          )
+        },
+        activeWindowSnapshot = { null },
+        performSwipeAction = {
+          UiAutomationSwipeResult(
+            performed = false,
+            errorCode = "UI_ACTION_FAILED",
+            reason = "Accessibility service rejected the swipe gesture.",
+          )
+        },
+      )
+
+    val result =
+      handler.handleSwipe("""{"startX":120,"startY":600,"endX":120,"endY":240}""")
+
+    assertFalse(result.ok)
+    assertEquals("UI_ACTION_FAILED", result.error?.code)
+    assertTrue(result.error?.message.orEmpty().contains("swipe gesture"))
   }
 
   @Test

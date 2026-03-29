@@ -178,6 +178,7 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"ui.launchApp\""))
       assertTrue(response.body.contains("\"ui.inputText\""))
       assertTrue(response.body.contains("\"ui.tap\""))
+      assertTrue(response.body.contains("\"ui.swipe\""))
       assertTrue(response.body.contains("\"ui.back\""))
       assertTrue(response.body.contains("\"ui.home\""))
     } finally {
@@ -658,6 +659,8 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("ui.inputText"))
       assertTrue(response.body.contains("\"invoke-ui-tap\""))
       assertTrue(response.body.contains("ui.tap"))
+      assertTrue(response.body.contains("\"invoke-ui-swipe\""))
+      assertTrue(response.body.contains("ui.swipe"))
     } finally {
       server.stop()
       scope.cancel()

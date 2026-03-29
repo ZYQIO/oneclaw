@@ -39,6 +39,28 @@ data class UiAutomationTapResult(
   val y: Double? = null,
 )
 
+data class UiAutomationSwipeRequest(
+  val startX: Double,
+  val startY: Double,
+  val endX: Double,
+  val endY: Double,
+  val durationMs: Long = 250L,
+  val packageName: String? = null,
+)
+
+data class UiAutomationSwipeResult(
+  val performed: Boolean,
+  val errorCode: String? = null,
+  val strategy: String? = null,
+  val reason: String? = null,
+  val packageName: String? = null,
+  val startX: Double? = null,
+  val startY: Double? = null,
+  val endX: Double? = null,
+  val endY: Double? = null,
+  val durationMs: Long? = null,
+)
+
 data class UiAutomationInputTextRequest(
   val value: String,
   val text: String? = null,
@@ -116,6 +138,14 @@ class OpenClawAccessibilityService : AccessibilityService() {
     fun performTap(request: UiAutomationTapRequest): UiAutomationTapResult =
       activeService?.performTapInternal(request)
         ?: UiAutomationTapResult(
+          performed = false,
+          errorCode = "UI_AUTOMATION_UNAVAILABLE",
+          reason = "Accessibility service is enabled but not yet bound.",
+        )
+
+    fun performSwipe(request: UiAutomationSwipeRequest): UiAutomationSwipeResult =
+      activeService?.performSwipeInternal(request)
+        ?: UiAutomationSwipeResult(
           performed = false,
           errorCode = "UI_AUTOMATION_UNAVAILABLE",
           reason = "Accessibility service is enabled but not yet bound.",
@@ -327,6 +357,55 @@ class OpenClawAccessibilityService : AccessibilityService() {
       packageName = activePackageName,
       x = x,
       y = y,
+    )
+  }
+
+  private fun performSwipeInternal(
+    request: UiAutomationSwipeRequest,
+  ): UiAutomationSwipeResult {
+    val activePackageName = rootInActiveWindow?.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    if (
+      request.packageName != null &&
+      !request.packageName.equals(activePackageName, ignoreCase = true)
+    ) {
+      return UiAutomationSwipeResult(
+        performed = false,
+        errorCode = "UI_TARGET_MISMATCH",
+        reason =
+          "Active package `${activePackageName ?: "unknown"}` does not match `${request.packageName}`.",
+        packageName = activePackageName,
+      )
+    }
+    if (
+      !dispatchSwipeGesture(
+        startX = request.startX,
+        startY = request.startY,
+        endX = request.endX,
+        endY = request.endY,
+        durationMs = request.durationMs,
+      )
+    ) {
+      return UiAutomationSwipeResult(
+        performed = false,
+        errorCode = "UI_ACTION_FAILED",
+        reason = "Accessibility service rejected the swipe gesture.",
+        packageName = activePackageName,
+        startX = request.startX,
+        startY = request.startY,
+        endX = request.endX,
+        endY = request.endY,
+        durationMs = request.durationMs,
+      )
+    }
+    return UiAutomationSwipeResult(
+      performed = true,
+      strategy = "gesture_swipe",
+      packageName = activePackageName,
+      startX = request.startX,
+      startY = request.startY,
+      endX = request.endX,
+      endY = request.endY,
+      durationMs = request.durationMs,
     )
   }
 
@@ -599,6 +678,25 @@ class OpenClawAccessibilityService : AccessibilityService() {
     val gesture =
       GestureDescription.Builder()
         .addStroke(GestureDescription.StrokeDescription(path, 0L, 50L))
+        .build()
+    return dispatchGesture(gesture, null, null)
+  }
+
+  private fun dispatchSwipeGesture(
+    startX: Double,
+    startY: Double,
+    endX: Double,
+    endY: Double,
+    durationMs: Long,
+  ): Boolean {
+    val path =
+      Path().apply {
+        moveTo(startX.toFloat(), startY.toFloat())
+        lineTo(endX.toFloat(), endY.toFloat())
+      }
+    val gesture =
+      GestureDescription.Builder()
+        .addStroke(GestureDescription.StrokeDescription(path, 0L, durationMs))
         .build()
     return dispatchGesture(gesture, null, null)
   }

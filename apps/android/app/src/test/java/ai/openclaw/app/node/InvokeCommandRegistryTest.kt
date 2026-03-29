@@ -53,6 +53,7 @@ class InvokeCommandRegistryTest {
       OpenClawUiCommand.LaunchApp.rawValue,
       OpenClawUiCommand.InputText.rawValue,
       OpenClawUiCommand.Tap.rawValue,
+      OpenClawUiCommand.Swipe.rawValue,
       OpenClawUiCommand.Back.rawValue,
       OpenClawUiCommand.Home.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,

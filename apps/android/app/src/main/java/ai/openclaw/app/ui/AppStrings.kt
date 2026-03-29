@@ -589,10 +589,14 @@ private fun localizeUiAutomationDetail(
       language.pick(trimmed, "无障碍服务未接受 `ui.inputText`。")
     "ui.tap was not accepted by the accessibility service" ->
       language.pick(trimmed, "无障碍服务未接受 `ui.tap`。")
+    "ui.swipe was not accepted by the accessibility service" ->
+      language.pick(trimmed, "无障碍服务未接受 `ui.swipe`。")
     "ui.back was not accepted by the accessibility service" ->
       language.pick(trimmed, "无障碍服务未接受 `ui.back`。")
     "ui.home was not accepted by the accessibility service" ->
       language.pick(trimmed, "无障碍服务未接受 `ui.home`。")
+    "Accessibility service rejected the swipe gesture." ->
+      language.pick(trimmed, "无障碍服务拒绝了滑动手势。")
     "grant Calendar permission" -> language.pick(trimmed, "请授予日历权限")
     "grant Call Log permission" -> language.pick(trimmed, "请授予通话记录权限")
     "grant Contacts permission" -> language.pick(trimmed, "请授予联系人权限")
@@ -608,6 +612,8 @@ private fun localizeUiAutomationDetail(
       language.pick(trimmed, "需要包含 value 以及可选 text/contentDescription/resourceId/packageName/matchMode/ignoreCase/index 的 JSON 对象")
     "expected JSON object with x/y or text/contentDescription/resourceId and optional packageName/matchMode/ignoreCase/index" ->
       language.pick(trimmed, "需要包含 x/y 或 text/contentDescription/resourceId 以及可选 packageName/matchMode/ignoreCase/index 的 JSON 对象")
+    "expected JSON object with startX/startY/endX/endY and optional durationMs/packageName" ->
+      language.pick(trimmed, "需要包含 startX/startY/endX/endY 以及可选 durationMs/packageName 的 JSON 对象")
     "packageName is required" -> language.pick(trimmed, "需要提供 packageName")
     "text is required" -> language.pick(trimmed, "需要提供 text")
     "Tap coordinate x is missing." -> language.pick(trimmed, "缺少点击坐标 x。")
@@ -624,6 +630,12 @@ private fun localizeUiAutomationDetail(
       language.pick(trimmed, "`ui.tap` 的坐标必须为非负数")
     "ui.tap index must be zero or greater" ->
       language.pick(trimmed, "`ui.tap` 的 index 必须大于等于 0")
+    "ui.swipe requires startX/startY/endX/endY" ->
+      language.pick(trimmed, "`ui.swipe` 需要提供 startX/startY/endX/endY")
+    "ui.swipe coordinates must be non-negative" ->
+      language.pick(trimmed, "`ui.swipe` 的坐标必须为非负数")
+    "ui.swipe requires movement between distinct start and end coordinates" ->
+      language.pick(trimmed, "`ui.swipe` 需要不同的起点和终点坐标才能执行滑动")
     else -> null
   }
 }

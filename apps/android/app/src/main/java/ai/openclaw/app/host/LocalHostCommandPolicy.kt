@@ -68,6 +68,7 @@ internal object LocalHostCommandPolicy {
       OpenClawUiCommand.LaunchApp.rawValue,
       OpenClawUiCommand.InputText.rawValue,
       OpenClawUiCommand.Tap.rawValue,
+      OpenClawUiCommand.Swipe.rawValue,
       OpenClawUiCommand.Back.rawValue,
       OpenClawUiCommand.Home.rawValue,
     )

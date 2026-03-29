@@ -829,6 +829,19 @@ class LocalHostRemoteAccessServer(
                     )
                   },
                 )
+                add(
+                  buildJsonObject {
+                    put("name", JsonPrimitive("invoke-ui-swipe"))
+                    put("method", JsonPrimitive("POST"))
+                    put("path", JsonPrimitive("$apiBasePath/invoke"))
+                    put(
+                      "curl",
+                      JsonPrimitive(
+                        "curl -X POST -H 'Authorization: Bearer $tokenPlaceholder' -H 'Content-Type: application/json' $baseUrl$apiBasePath/invoke -d '{\"command\":\"ui.swipe\",\"params\":{\"startX\":540,\"startY\":1500,\"endX\":540,\"endY\":700,\"durationMs\":300}}'",
+                      ),
+                    )
+                  },
+                )
               }
             },
           )

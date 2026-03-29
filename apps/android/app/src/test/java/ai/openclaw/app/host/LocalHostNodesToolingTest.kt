@@ -43,6 +43,7 @@ class LocalHostNodesToolingTest {
     assertFalse("ui_launch_app" in actions)
     assertFalse("ui_input_text" in actions)
     assertFalse("ui_tap" in actions)
+    assertFalse("ui_swipe" in actions)
     assertFalse("ui_back" in actions)
     assertFalse("ui_home" in actions)
     assertFalse("sms_send" in actions)
@@ -241,11 +242,43 @@ class LocalHostNodesToolingTest {
         .map { it.jsonPrimitive.content }
 
     assertTrue("ui_tap" in actions)
+    assertTrue("ui_swipe" in actions)
     assertTrue("ui_back" in actions)
     assertTrue("ui_home" in actions)
     assertTrue("ui_launch_app" in actions)
     assertTrue("ui_input_text" in actions)
   }
+
+  @Test
+  fun uiSwipe_mapsCoordinateParamsForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.swipe", command)
+            assertTrue(paramsJson.orEmpty().contains("\"startX\":120"))
+            assertTrue(paramsJson.orEmpty().contains("\"startY\":600"))
+            assertTrue(paramsJson.orEmpty().contains("\"endX\":120"))
+            assertTrue(paramsJson.orEmpty().contains("\"endY\":240"))
+            assertTrue(paramsJson.orEmpty().contains("\"durationMs\":320"))
+            assertTrue(paramsJson.orEmpty().contains("\"packageName\":\"com.example.app\""))
+            GatewaySession.InvokeResult.ok("""{"ok":true,"action":"swipe","strategy":"gesture_swipe"}""")
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson =
+            """{"action":"ui_swipe","startX":120,"startY":600,"endX":120,"endY":240,"durationMs":320,"packageName":"com.example.app"}""",
+        )
+
+      assertTrue(result.outputText.contains("swipe"))
+    }
 
   @Test
   fun uiTap_mapsSelectorParamsForOperatorSessions() =

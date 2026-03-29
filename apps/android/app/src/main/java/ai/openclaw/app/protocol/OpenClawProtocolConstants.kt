@@ -154,6 +154,7 @@ enum class OpenClawUiCommand(val rawValue: String) {
   LaunchApp("ui.launchApp"),
   InputText("ui.inputText"),
   Tap("ui.tap"),
+  Swipe("ui.swipe"),
   Back("ui.back"),
   Home("ui.home"),
   ;

@@ -91,6 +91,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "ui_launch_app", command = OpenClawUiCommand.LaunchApp.rawValue),
       NodesActionSpec(name = "ui_input_text", command = OpenClawUiCommand.InputText.rawValue),
       NodesActionSpec(name = "ui_tap", command = OpenClawUiCommand.Tap.rawValue),
+      NodesActionSpec(name = "ui_swipe", command = OpenClawUiCommand.Swipe.rawValue),
       NodesActionSpec(name = "ui_back", command = OpenClawUiCommand.Back.rawValue),
       NodesActionSpec(name = "ui_home", command = OpenClawUiCommand.Home.rawValue),
       NodesActionSpec(name = "contacts_search", command = OpenClawContactsCommand.Search.rawValue),
@@ -237,6 +238,11 @@ internal class LocalHostNodesToolBridge(
           putNumberProperty("pollIntervalMs")
           putNumberProperty("x")
           putNumberProperty("y")
+          putNumberProperty("startX")
+          putNumberProperty("startY")
+          putNumberProperty("endX")
+          putNumberProperty("endY")
+          putNumberProperty("durationMs")
           putNumberProperty("index")
           putBooleanProperty("ignoreCase")
           putStringEnumProperty("matchMode", listOf("contains", "exact"))
@@ -339,6 +345,15 @@ internal class LocalHostNodesToolBridge(
           copyNumber(params, "index")
           copyBoolean(params, "ignoreCase")
           copyString(params, "matchMode")
+        }
+      "ui_swipe" ->
+        buildJsonObject {
+          copyNumber(params, "startX")
+          copyNumber(params, "startY")
+          copyNumber(params, "endX")
+          copyNumber(params, "endY")
+          copyNumber(params, "durationMs")
+          copyString(params, "packageName")
         }
       "ui_wait_for_text" ->
         buildJsonObject {

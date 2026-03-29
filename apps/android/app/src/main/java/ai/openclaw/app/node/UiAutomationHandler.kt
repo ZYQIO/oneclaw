@@ -7,6 +7,8 @@ import android.os.SystemClock
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
 import ai.openclaw.app.accessibility.UiAutomationInputTextRequest
 import ai.openclaw.app.accessibility.UiAutomationInputTextResult
+import ai.openclaw.app.accessibility.UiAutomationSwipeRequest
+import ai.openclaw.app.accessibility.UiAutomationSwipeResult
 import ai.openclaw.app.accessibility.UiAutomationTapRequest
 import ai.openclaw.app.accessibility.UiAutomationTapResult
 import ai.openclaw.app.gateway.GatewaySession
@@ -88,6 +90,15 @@ private data class TapRequest(
     get() = listOf(text, contentDescription, resourceId).any { !it.isNullOrEmpty() }
 }
 
+private data class SwipeRequest(
+  val startX: Double?,
+  val startY: Double?,
+  val endX: Double?,
+  val endY: Double?,
+  val durationMs: Long,
+  val packageName: String?,
+)
+
 data class UiAutomationLaunchAppResult(
   val launched: Boolean,
   val packageName: String,
@@ -120,6 +131,9 @@ class UiAutomationHandler(
   },
   private val performTapAction: (UiAutomationTapRequest) -> UiAutomationTapResult = { request ->
     ai.openclaw.app.accessibility.OpenClawAccessibilityService.performTap(request)
+  },
+  private val performSwipeAction: (UiAutomationSwipeRequest) -> UiAutomationSwipeResult = { request ->
+    ai.openclaw.app.accessibility.OpenClawAccessibilityService.performSwipe(request)
   },
 ) {
   companion object {
@@ -526,6 +540,93 @@ class UiAutomationHandler(
     return GatewaySession.InvokeResult.ok(payload.toString())
   }
 
+  fun handleSwipe(paramsJson: String?): GatewaySession.InvokeResult {
+    val request =
+      parseSwipeRequest(paramsJson)
+        ?: return GatewaySession.InvokeResult.error(
+          code = "INVALID_REQUEST",
+          message =
+            "INVALID_REQUEST: expected JSON object with startX/startY/endX/endY and optional durationMs/packageName",
+        )
+    if (
+      request.startX == null ||
+      request.startY == null ||
+      request.endX == null ||
+      request.endY == null
+    ) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.swipe requires startX/startY/endX/endY",
+      )
+    }
+    if (
+      request.startX < 0.0 ||
+      request.startY < 0.0 ||
+      request.endX < 0.0 ||
+      request.endY < 0.0
+    ) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.swipe coordinates must be non-negative",
+      )
+    }
+    if (request.startX == request.endX && request.startY == request.endY) {
+      return GatewaySession.InvokeResult.error(
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: ui.swipe requires movement between distinct start and end coordinates",
+      )
+    }
+
+    val readiness = readinessSnapshot()
+    if (!readiness.enabled) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_DISABLED",
+        message = "UI_AUTOMATION_DISABLED: enable the OpenClaw accessibility service first",
+      )
+    }
+    if (!readiness.serviceConnected) {
+      return GatewaySession.InvokeResult.error(
+        code = "UI_AUTOMATION_UNAVAILABLE",
+        message = "UI_AUTOMATION_UNAVAILABLE: accessibility service is enabled but not yet bound",
+      )
+    }
+
+    val result =
+      performSwipeAction(
+        UiAutomationSwipeRequest(
+          startX = request.startX,
+          startY = request.startY,
+          endX = request.endX,
+          endY = request.endY,
+          durationMs = request.durationMs,
+          packageName = request.packageName,
+        ),
+      )
+    if (!result.performed) {
+      val errorCode = result.errorCode ?: "UI_ACTION_FAILED"
+      val reason = result.reason ?: "ui.swipe was not accepted by the accessibility service"
+      return GatewaySession.InvokeResult.error(
+        code = errorCode,
+        message = "$errorCode: $reason",
+      )
+    }
+
+    val payload =
+      buildJsonObject {
+        put("ok", JsonPrimitive(true))
+        put("action", JsonPrimitive("swipe"))
+        put("performed", JsonPrimitive(true))
+        result.strategy?.let { put("strategy", JsonPrimitive(it)) }
+        result.packageName?.let { put("packageName", JsonPrimitive(it)) }
+        put("startX", JsonPrimitive(result.startX ?: request.startX))
+        put("startY", JsonPrimitive(result.startY ?: request.startY))
+        put("endX", JsonPrimitive(result.endX ?: request.endX))
+        put("endY", JsonPrimitive(result.endY ?: request.endY))
+        put("durationMs", JsonPrimitive(result.durationMs ?: request.durationMs))
+      }
+    return GatewaySession.InvokeResult.ok(payload.toString())
+  }
+
   private fun buildUiStatePayload(
     readiness: LocalHostUiAutomationStatus,
     activeWindow: JsonObject?,
@@ -609,6 +710,18 @@ class UiAutomationHandler(
       ignoreCase = parseJsonBooleanFlag(params, "ignoreCase") ?: true,
       matchMode = matchMode,
       index = parseJsonInt(params, "index") ?: 0,
+    )
+  }
+
+  private fun parseSwipeRequest(paramsJson: String?): SwipeRequest? {
+    val params = parseJsonParamsObject(paramsJson) ?: return null
+    return SwipeRequest(
+      startX = parseJsonDouble(params, "startX"),
+      startY = parseJsonDouble(params, "startY"),
+      endX = parseJsonDouble(params, "endX"),
+      endY = parseJsonDouble(params, "endY"),
+      durationMs = parseJsonInt(params, "durationMs")?.toLong()?.coerceIn(50L, 2_000L) ?: 250L,
+      packageName = parseJsonString(params, "packageName")?.trim()?.ifEmpty { null },
     )
   }
 

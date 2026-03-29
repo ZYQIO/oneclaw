@@ -524,12 +524,34 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesUiSwipeInvalidRequest() {
+    assertEquals(
+      "请求无效：`ui.swipe` 需要提供 startX/startY/endX/endY",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "INVALID_REQUEST: ui.swipe requires startX/startY/endX/endY",
+      ),
+    )
+  }
+
+  @Test
   fun localizeChatError_translatesUiActionFailureReason() {
     assertEquals(
       "操作失败：匹配到的节点同时拒绝了无障碍点击和后备点击手势。",
       localizeChatError(
         AppLanguage.SimplifiedChinese,
         "UI_ACTION_FAILED: Matched node rejected both accessibility click and fallback tap gesture.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiSwipeActionFailureReason() {
+    assertEquals(
+      "操作失败：无障碍服务拒绝了滑动手势。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_ACTION_FAILED: Accessibility service rejected the swipe gesture.",
       ),
     )
   }

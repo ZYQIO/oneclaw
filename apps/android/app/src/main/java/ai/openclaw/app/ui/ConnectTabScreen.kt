@@ -197,6 +197,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           append("-H 'Content-Type: application/json' ")
           append("$baseUrl/api/local-host/v1/invoke ")
           append("-d '{\"command\":\"ui.tap\",\"params\":{\"text\":\"$chatTabLabel\",\"matchMode\":\"exact\"}}'")
+          append("\n\n")
+          append("curl -X POST -H 'Authorization: Bearer <TOKEN>' ")
+          append("-H 'Content-Type: application/json' ")
+          append("$baseUrl/api/local-host/v1/invoke ")
+          append("-d '{\"command\":\"ui.swipe\",\"params\":{\"startX\":540,\"startY\":1500,\"endX\":540,\"endY\":700,\"durationMs\":300}}'")
         }
       }
     }
@@ -795,8 +800,8 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               Text(t("Write remote commands", "写入型远程命令"), style = mobileCallout.copy(fontWeight = FontWeight.SemiBold), color = mobileText)
               Text(
                 t(
-                  "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, `ui.launchApp`, `ui.inputText`, and bounded `ui.tap` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
-                  "允许远程 `sms.send`、`contacts.add`、`calendar.add`、`notifications.actions`、`ui.launchApp`、`ui.inputText` 以及有边界的 `ui.tap` / `ui.back` / `ui.home`。只应在你信任的网络和客户端上启用。",
+                  "Allow remote `sms.send`, `contacts.add`, `calendar.add`, `notifications.actions`, `ui.launchApp`, `ui.inputText`, and bounded `ui.tap` / `ui.swipe` / `ui.back` / `ui.home`. Enable this only on networks and clients you trust.",
+                  "允许远程 `sms.send`、`contacts.add`、`calendar.add`、`notifications.actions`、`ui.launchApp`、`ui.inputText` 以及有边界的 `ui.tap` / `ui.swipe` / `ui.back` / `ui.home`。只应在你信任的网络和客户端上启用。",
                 ),
                 style = mobileCaption1,
                 color = mobileTextSecondary,
