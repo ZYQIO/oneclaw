@@ -3,6 +3,7 @@ import type { AuthProfileStore, OAuthCredential } from "../../../src/agents/auth
 import {
   parseCli,
   planCodexSync,
+  runCodexSyncWatch,
   selectDesktopCodexProfile,
 } from "../../../apps/android/scripts/local-host-codex-sync.js";
 
@@ -85,5 +86,74 @@ describe("parseCli", () => {
 
     expect(options.token).toBe("secret-token");
     expect(options.baseUrl).toBe("http://127.0.0.1:3945");
+  });
+
+  it("parses watch settings", () => {
+    const options = parseCli([
+      "--token",
+      "secret-token",
+      "--watch",
+      "--watch-interval-ms",
+      "45000",
+      "--watch-max-runs",
+      "3",
+    ]);
+
+    expect(options.watch).toBe(true);
+    expect(options.watchIntervalMs).toBe(45_000);
+    expect(options.watchMaxRuns).toBe(3);
+  });
+});
+
+describe("runCodexSyncWatch", () => {
+  it("runs the requested number of watch iterations and only sleeps between them", async () => {
+    const seenIterations: number[] = [];
+    const sleepCalls: number[] = [];
+
+    await runCodexSyncWatch(
+      {
+        token: "secret-token",
+        baseUrl: "http://127.0.0.1:3945",
+        port: 3945,
+        useAdbForward: false,
+        watch: true,
+        watchIntervalMs: 12_000,
+        watchMaxRuns: 3,
+        force: false,
+        json: false,
+        source: "desktop-codex-sync",
+      },
+      {
+        async executeSync() {
+          return {
+            baseUrl: "http://127.0.0.1:3945",
+            adbForwarded: false,
+            desktop: {
+              profileId: "openai-codex:oauth",
+              expiresAt: 200_000,
+              refreshRecommended: false,
+            },
+            phoneBefore: {
+              configured: true,
+              expired: false,
+              refreshRecommended: false,
+            },
+            action: "skip",
+            reason: "phone-auth-healthy",
+            imported: false,
+            refreshedAfterImport: false,
+          };
+        },
+        async sleep(delayMs) {
+          sleepCalls.push(delayMs);
+        },
+        onIteration(summary) {
+          seenIterations.push(summary.iteration);
+        },
+      },
+    );
+
+    expect(seenIterations).toEqual([1, 2, 3]);
+    expect(sleepCalls).toEqual([12_000, 12_000]);
   });
 });

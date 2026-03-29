@@ -56,6 +56,7 @@ The current MVP does not aim to deliver all desktop Gateway features. / 当前 M
 - [x] 将远程命令拆分为只读、相机高级、写操作三级。Split remote commands into read, camera-advanced, and write-capable tiers.
 - [x] 验证真实远端客户端可以经网络驱动手机。Verify a real remote client can drive the phone over the network.
 - [x] 在可信桌面连接场景下补上 Codex 授权同步路径。Add a trusted-desktop Codex auth sync path for connected-phone recovery.
+- [x] 把桌面侧补授权扩成可持续 watch 守护模式。Extend desktop-side auth refill into a continuous watch mode.
 
 ### M4. Validation And Hardening / 验证与加固
 
@@ -73,6 +74,7 @@ Completed implementation highlights / 已完成实现要点:
 - `Local Host` 模式已经出现在 Connect tab，并作为一等运行模式暴露。`Local Host` mode exists in the Connect tab and is exposed as a first-class runtime option.
 - Codex OAuth 登录已经具备浏览器流程和手动粘贴回退。Codex OAuth login exists with browser flow and manual paste fallback.
 - 本机远控接口现在除 `auth/codex/status` 和 `auth/codex/refresh` 之外，还支持受保护的 `auth/codex/import`，可信桌面可把本机 `openai-codex` OAuth 凭证同步到手机，避免手机端授权失效后频繁重新走浏览器。The local-host remote API now supports a guarded `auth/codex/import` route in addition to `auth/codex/status` and `auth/codex/refresh`, allowing a trusted desktop to sync its `openai-codex` OAuth credential down to the phone so phone-side auth loss does not force repeated browser logins.
+- 桌面侧 `pnpm android:local-host:codex-sync` 现在还支持 `--watch`，因此在 USB `adb forward` 或可信 LAN/tunnel 持续连接时，电脑可以周期性探测手机授权状态，并在手机 Codex 授权 later 失效时自动补同步，而不需要每次手动再跑一次命令。Desktop-side `pnpm android:local-host:codex-sync` now also supports `--watch`, so while USB `adb forward` or a trusted LAN/tunnel stays connected, the desktop can periodically re-check phone auth and automatically refill it again when the phone's Codex auth later goes stale instead of requiring a fresh manual run every time.
 - 本机 Host 聊天已接到使用 `gpt-5.4` 的 Codex Responses。Local-host chat is wired to Codex Responses using `gpt-5.4`.
 - 当前本机 Host 聊天仍是“直接调用 Codex Responses”的形态，还没有接入桌面 Gateway 那套完整 agent/tool/plugin/runtime。The current local-host chat is still a direct Codex Responses flow and does not yet include the full desktop Gateway agent/tool/plugin/runtime stack.
 - 已开始第一段桌面对齐能力：Codex Responses 现在按设计接入本机 `nodes` function-calling 闭环，可把一组 Android 原生命令作为聊天工具使用；当前进一步往“手机独立可用”方向推进，优先补相机 / 相册这类不依赖电脑的原生能力，同时本机 `workspace` 已扩展到搜索、替换、复制、移动等随身工作区能力，并在当前机器上完成了 Android-SDK-backed 单测复核。The first desktop-parity slice is now underway: Codex Responses is wired toward a local `nodes` function-calling loop so chat can use a set of Android native commands as tools; the current follow-up explicitly pushes toward phone-independent use by prioritizing native camera/photo capabilities that do not depend on a nearby computer, while the local `workspace` has also been expanded with search, replace, copy, and move capabilities and has now been re-verified with Android-SDK-backed unit tests on the current machine.

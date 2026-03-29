@@ -12,6 +12,9 @@ export type SyncCliOptions = {
   token: string;
   port: number;
   useAdbForward: boolean;
+  watch: boolean;
+  watchIntervalMs: number;
+  watchMaxRuns?: number;
   force: boolean;
   json: boolean;
   source: string;
@@ -73,9 +76,16 @@ type SyncSummary = {
   phoneAfter?: PhoneCodexStatusSnapshot;
 };
 
+export type WatchIterationSummary = SyncSummary & {
+  iteration: number;
+  timestamp: string;
+};
+
 const DEFAULT_PORT = 3945;
 const DEFAULT_SOURCE = "desktop-codex-sync";
 const DESKTOP_REFRESH_WINDOW_MS = 30_000;
+const DEFAULT_WATCH_INTERVAL_MS = 30_000;
+const MIN_WATCH_INTERVAL_MS = 1_000;
 
 function usage(): string {
   return [
@@ -91,6 +101,9 @@ function usage(): string {
     "  --port <port>",
     "  --agent-dir <dir>",
     "  --use-adb-forward",
+    "  --watch",
+    "  --watch-interval-ms <ms>",
+    "  --watch-max-runs <count>",
     "  --force",
     "  --source <label>",
     "  --json",
@@ -100,6 +113,7 @@ function usage(): string {
     "  2. Checks the phone's /auth/codex/status snapshot",
     "  3. Imports desktop auth to the phone only when phone auth is missing/stale, or when --force is used",
     "  4. Optionally refreshes on-phone auth immediately when the desktop credential is already near expiry",
+    "  5. With --watch, keeps polling and auto-refills again whenever the phone auth later goes stale",
   ].join("\n");
 }
 
@@ -121,6 +135,34 @@ function parsePort(value: string | undefined): number {
     throw new Error(`Invalid port: ${value}`);
   }
   return parsed;
+}
+
+function parsePositiveInteger(
+  value: string | undefined,
+  label: string,
+  minimum = 1,
+): number {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    throw new Error(`Missing ${label}.`);
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isInteger(parsed) || parsed < minimum) {
+    throw new Error(`Invalid ${label}: ${value}`);
+  }
+  return parsed;
+}
+
+function parseOptionalPositiveInteger(
+  value: string | undefined,
+  label: string,
+  minimum = 1,
+): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return parsePositiveInteger(trimmed, label, minimum);
 }
 
 function trimOptional(value: string | undefined): string | undefined {
@@ -150,6 +192,9 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
       token: { type: "string" },
       port: { type: "string" },
       "use-adb-forward": { type: "boolean", default: false },
+      watch: { type: "boolean", default: false },
+      "watch-interval-ms": { type: "string" },
+      "watch-max-runs": { type: "string" },
       force: { type: "boolean", default: false },
       json: { type: "boolean", default: false },
       source: { type: "string" },
@@ -166,6 +211,18 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
   const port = parsePort(parsed.values.port ?? env.OPENCLAW_ANDROID_LOCAL_HOST_PORT);
   const useAdbForward =
     parsed.values["use-adb-forward"] || readBoolEnv(env.OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD);
+  const watch =
+    parsed.values.watch || readBoolEnv(env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_WATCH);
+  const watchIntervalMs = parseOptionalPositiveInteger(
+    parsed.values["watch-interval-ms"] ?? env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_INTERVAL_MS,
+    "--watch-interval-ms",
+    MIN_WATCH_INTERVAL_MS,
+  ) ?? DEFAULT_WATCH_INTERVAL_MS;
+  const watchMaxRuns = parseOptionalPositiveInteger(
+    parsed.values["watch-max-runs"] ?? env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_MAX_RUNS,
+    "--watch-max-runs",
+    1,
+  );
   const baseUrl = normalizeBaseUrl(
     trimOptional(parsed.values["base-url"] ?? env.OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL) ??
       `http://127.0.0.1:${port}`,
@@ -181,6 +238,9 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
     token,
     port,
     useAdbForward,
+    watch,
+    watchIntervalMs,
+    ...(watchMaxRuns != null ? { watchMaxRuns } : {}),
     force: parsed.values.force ?? false,
     json: parsed.values.json ?? false,
     source: trimOptional(parsed.values.source) ?? DEFAULT_SOURCE,
@@ -383,7 +443,20 @@ function safeJsonParse(text: string): unknown {
   }
 }
 
-function printSummary(summary: SyncSummary): void {
+function printSummary(
+  summary: SyncSummary,
+  options?: {
+    iteration?: number;
+    timestamp?: string;
+  },
+): void {
+  if (options?.iteration != null) {
+    const prefix =
+      options.timestamp != null
+        ? `watch.iteration=${options.iteration} timestamp=${options.timestamp}`
+        : `watch.iteration=${options.iteration}`;
+    console.log(prefix);
+  }
   console.log(`local_host.base_url=${summary.baseUrl}`);
   console.log(`desktop.profile=${summary.desktop.profileId}`);
   if (summary.desktop.emailHint) {
@@ -404,11 +477,13 @@ function printSummary(summary: SyncSummary): void {
   }
 }
 
-export async function runCodexSync(options: SyncCliOptions): Promise<SyncSummary> {
+function prepareTransport(options: SyncCliOptions): void {
   if (options.useAdbForward) {
     ensureAdbForward(options.port);
   }
+}
 
+async function executeCodexSync(options: SyncCliOptions): Promise<SyncSummary> {
   const cfg = loadConfig();
   const store = ensureAuthProfileStore(options.agentDir, { allowKeychainPrompt: false });
   const desktop = selectDesktopCodexProfile({ cfg, store });
@@ -474,8 +549,68 @@ export async function runCodexSync(options: SyncCliOptions): Promise<SyncSummary
   };
 }
 
+export async function runCodexSync(options: SyncCliOptions): Promise<SyncSummary> {
+  prepareTransport(options);
+  return await executeCodexSync(options);
+}
+
+async function sleepMs(delayMs: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+export async function runCodexSyncWatch(
+  options: SyncCliOptions,
+  deps: {
+    executeSync?: (options: SyncCliOptions) => Promise<SyncSummary>;
+    sleep?: (delayMs: number) => Promise<void>;
+    onIteration?: (summary: WatchIterationSummary) => void | Promise<void>;
+  } = {},
+): Promise<void> {
+  prepareTransport(options);
+  const executeSync = deps.executeSync ?? executeCodexSync;
+  const sleep = deps.sleep ?? sleepMs;
+  const watchMaxRuns = options.watchMaxRuns;
+  let iteration = 0;
+
+  while (true) {
+    iteration += 1;
+    const summary = await executeSync(options);
+    const iterationSummary: WatchIterationSummary = {
+      ...summary,
+      iteration,
+      timestamp: new Date().toISOString(),
+    };
+    await deps.onIteration?.(iterationSummary);
+
+    if (watchMaxRuns != null && iteration >= watchMaxRuns) {
+      return;
+    }
+    await sleep(options.watchIntervalMs);
+  }
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const options = parseCli(argv);
+  if (options.watch) {
+    if (!options.json) {
+      console.log(
+        `watch.enabled=true interval_ms=${options.watchIntervalMs} max_runs=${options.watchMaxRuns ?? "unbounded"}`,
+      );
+    }
+    await runCodexSyncWatch(options, {
+      onIteration(summary) {
+        if (options.json) {
+          console.log(JSON.stringify(summary));
+          return;
+        }
+        printSummary(summary, {
+          iteration: summary.iteration,
+          timestamp: summary.timestamp,
+        });
+      },
+    });
+    return;
+  }
   const summary = await runCodexSync(options);
   if (options.json) {
     console.log(JSON.stringify(summary, null, 2));
