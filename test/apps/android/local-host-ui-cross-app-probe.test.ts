@@ -50,6 +50,7 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up.preset")).toBe("<none>");
     expect(values.get("cross_app.follow_up_mode")).toBe("none");
     expect(values.get("cross_app.follow_up.swipe_coordinate_mode")).toBe("none");
+    expect(values.get("cross_app.target_reset_before_launch")).toBe("false");
     expect(values.get("cross_app.follow_up.foreground_timeout_ms")).toBe("5000");
     expect(values.get("cross_app.follow_up.foreground_poll_interval_ms")).toBe("250");
   });
@@ -138,6 +139,20 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up.swipe_duration_ms")).toBe("320");
   });
 
+  it("reports an opt-in target reset before launch when requested", () => {
+    const values = runDescribe({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET: "settings-home-swipe-up",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH: "true",
+    });
+
+    expect(values.get("cross_app.target_reset_before_launch")).toBe("true");
+    expect(
+      values.get(
+        "cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH",
+      ),
+    ).toBe("true");
+  });
+
   it("fails clearly when swipe coordinates are incomplete", () => {
     const result = runDescribeFailure({
       OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X: "720",
@@ -157,6 +172,18 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(
       "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO is required",
+    );
+  });
+
+  it("fails clearly when the target reset flag is not boolean", () => {
+    const result = runDescribeFailure({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH:
+        "sometimes",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH must be true or false",
     );
   });
 });

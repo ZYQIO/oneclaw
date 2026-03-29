@@ -39,6 +39,7 @@ FOLLOW_UP_SWIPE_DURATION_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DU
 FOLLOW_UP_FOREGROUND_TIMEOUT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS:-5000}"
 FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS:-250}"
 FOLLOW_UP_SETTLE_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS:-1000}"
+RESET_TARGET_BEFORE_LAUNCH="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH:-false}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-local-host-cross-app.XXXXXX)}"
 DESCRIBE_ONLY=false
 
@@ -82,6 +83,7 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO=0.5] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO=0.28] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS=350] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH=true] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS=5000] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS=250] \
   ./apps/android/scripts/local-host-ui-cross-app-probe.sh
@@ -100,6 +102,7 @@ Follow-up note:
   - The optional wait/tap/input selectors are app and OEM specific.
   - Swipe coordinates are also device specific unless you already validated them on the same screen.
   - Swipe ratios are resolved against the current target-window bounds and are safer across screen sizes.
+  - Target-state reset stays opt-in: use force-stop only when you intentionally want a clean app surface before launch.
   - Keep the current 30s reachability proof separate from follow-up-action proof.
   - Presets seed common follow-up envs but explicit env overrides still win.
 
@@ -216,6 +219,20 @@ validate_ratio_number() {
     exit 1
   fi
 }
+
+validate_boolean() {
+  local name=$1
+  local raw=$2
+  case "$raw" in
+    true | false) ;;
+    *)
+      echo "$name must be true or false." >&2
+      exit 1
+      ;;
+  esac
+}
+
+validate_boolean "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH" "$RESET_TARGET_BEFORE_LAUNCH"
 
 follow_up_wait_requested=false
 if [[ -n "$FOLLOW_UP_WAIT_TEXT" ]]; then
@@ -343,6 +360,7 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.observe_window_ms=%s\n' "$OBSERVE_WINDOW_MS"
   printf 'cross_app.poll_interval_ms=%s\n' "$POLL_INTERVAL_MS"
   printf 'cross_app.recovery_wait_ms=%s\n' "$RECOVERY_WAIT_MS"
+  printf 'cross_app.target_reset_before_launch=%s\n' "$RESET_TARGET_BEFORE_LAUNCH"
   printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_PORT=%s\n' "$PORT"
   printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE=%s\n' "$APP_PACKAGE"
   printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_COMPONENT=%s\n' "$APP_COMPONENT"
@@ -350,6 +368,7 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=%s\n' "$OBSERVE_WINDOW_MS"
   printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=%s\n' "$POLL_INTERVAL_MS"
   printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS=%s\n' "$RECOVERY_WAIT_MS"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH=%s\n' "$RESET_TARGET_BEFORE_LAUNCH"
   printf 'cross_app.follow_up.wait_requested=%s\n' "$follow_up_wait_requested"
   printf 'cross_app.follow_up.tap_requested=%s\n' "$follow_up_tap_requested"
   printf 'cross_app.follow_up.input_requested=%s\n' "$follow_up_input_requested"
@@ -438,6 +457,8 @@ RECOVERY_STATUS_JSON="$ARTIFACT_DIR/recovery-status.json"
 RECOVERY_STATUS_CODE="$ARTIFACT_DIR/recovery-status.code"
 RECOVERY_STATE_JSON="$ARTIFACT_DIR/recovery-state.json"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
+
+target_reset_applied=false
 
 sleep_seconds_from_ms() {
   local ms=$1
@@ -640,6 +661,11 @@ if ! jq -e --arg package "$APP_PACKAGE" '
   echo "ui.launchApp failed to foreground OpenClaw before the cross-app probe." >&2
   jq '.' "$LAUNCH_SELF_JSON" >&2
   exit 1
+fi
+
+if [[ "$RESET_TARGET_BEFORE_LAUNCH" == "true" ]]; then
+  adb shell am force-stop "$TARGET_PACKAGE" >/dev/null
+  target_reset_applied=true
 fi
 
 invoke_command "ui.launchApp" "$(jq -cn --arg packageName "$TARGET_PACKAGE" '{packageName:$packageName}')" "$LAUNCH_TARGET_JSON"
@@ -971,6 +997,8 @@ jq -n \
   --arg appPackage "$APP_PACKAGE" \
   --arg targetPackage "$TARGET_PACKAGE" \
   --arg classification "$classification" \
+  --argjson targetResetBeforeLaunch "$( [[ "$RESET_TARGET_BEFORE_LAUNCH" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson targetResetApplied "$( [[ "$target_reset_applied" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson observeWindowMs "$OBSERVE_WINDOW_MS" \
   --argjson pollIntervalMs "$POLL_INTERVAL_MS" \
   --argjson rounds "$rounds" \
@@ -1026,6 +1054,8 @@ jq -n \
     appPackage: $appPackage,
     targetPackage: $targetPackage,
     classification: $classification,
+    targetResetBeforeLaunch: $targetResetBeforeLaunch,
+    targetResetApplied: $targetResetApplied,
     observeWindowMs: $observeWindowMs,
     pollIntervalMs: $pollIntervalMs,
     rounds: $rounds,
