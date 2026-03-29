@@ -223,7 +223,7 @@ describe("buildRecommendedCommand", () => {
         envFile: "/tmp/openclaw guard.env",
       }),
     ).toBe(
-      "pnpm android:local-host:codex-guard:launchd -- write-env --env-file '/tmp/openclaw guard.env'",
+      "pnpm android:local-host:codex-guard:write-env -- --env-file '/tmp/openclaw guard.env'",
     );
   });
 
@@ -234,7 +234,7 @@ describe("buildRecommendedCommand", () => {
         envFile: "/tmp/guard.env",
       }),
     ).toBe(
-      "pnpm android:local-host:codex-guard:launchd -- setup --env-file '/tmp/guard.env' --token '<token-from-connect-tab>'",
+      "pnpm android:local-host:codex-guard:setup -- --env-file '/tmp/guard.env' --token '<token-from-connect-tab>'",
     );
   });
 
@@ -245,7 +245,7 @@ describe("buildRecommendedCommand", () => {
         envFile: "/tmp/guard.env",
       }),
     ).toBe(
-      "pnpm android:local-host:codex-guard:launchd -- setup --env-file '/tmp/guard.env'",
+      "pnpm android:local-host:codex-guard:setup -- --env-file '/tmp/guard.env'",
     );
     expect(
       buildRecommendedCommand({
@@ -253,7 +253,7 @@ describe("buildRecommendedCommand", () => {
         envFile: "/tmp/guard.env",
       }),
     ).toBe(
-      "pnpm android:local-host:codex-guard:launchd -- setup --env-file '/tmp/guard.env'",
+      "pnpm android:local-host:codex-guard:setup -- --env-file '/tmp/guard.env'",
     );
   });
 

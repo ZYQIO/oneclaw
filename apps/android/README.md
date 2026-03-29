@@ -234,22 +234,22 @@ If you also pass `--artifact-dir`, the guard writes durable files under that dir
 On macOS, if you want the guard to survive terminal restarts and login sessions more naturally, there is now also a LaunchAgent helper:
 
 ```bash
-pnpm android:local-host:codex-guard:launchd -- setup
+pnpm android:local-host:codex-guard:setup
 # edit ~/.openclaw/android-local-host-codex-guard/guard.env and replace the placeholder token
-pnpm android:local-host:codex-guard:launchd -- setup
-pnpm android:local-host:codex-guard:launchd -- status
+pnpm android:local-host:codex-guard:setup
+pnpm android:local-host:codex-guard:status
 ```
 
 You can also seed the env file directly from the current shell or a pasted token:
 
 ```bash
 OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
-pnpm android:local-host:codex-guard:launchd -- setup
+pnpm android:local-host:codex-guard:setup
 
-pnpm android:local-host:codex-guard:launchd -- setup --token '<token-from-connect-tab>'
+pnpm android:local-host:codex-guard:setup -- --token '<token-from-connect-tab>'
 ```
 
-`setup` is now the preferred first-run entrypoint: when the env file is missing it writes a template, when a token is provided it seeds the env file, and once the guard is ready it installs or repairs the LaunchAgent automatically. The helper keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. `status` also reports whether that env file exists, whether it still contains only the placeholder token, a `recommendedAction` field that tells you whether the next step is `write-env`, `configure-token`, `install`, or `check-launchagent`, and a `recommendedCommand` string you can run directly. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at setup or install time so the generated wrapper pins an absolute binary path.
+`setup` is now the preferred first-run entrypoint: when the env file is missing it writes a template, when a token is provided it seeds the env file, and once the guard is ready it installs or repairs the LaunchAgent automatically. Common launchd operations now also have shorter repo wrappers such as `pnpm android:local-host:codex-guard:setup`, `pnpm android:local-host:codex-guard:status`, and `pnpm android:local-host:codex-guard:write-env`, while `pnpm android:local-host:codex-guard:launchd` remains the lower-level escape hatch. The helper keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. `status` also reports whether that env file exists, whether it still contains only the placeholder token, a `recommendedAction` field that tells you whether the next step is `write-env`, `configure-token`, `install`, or `check-launchagent`, and a `recommendedCommand` string you can run directly. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at setup or install time so the generated wrapper pins an absolute binary path.
 
 ## Local Host UI Automation Smoke
 

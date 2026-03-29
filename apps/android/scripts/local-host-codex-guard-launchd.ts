@@ -548,12 +548,12 @@ export function buildRecommendedCommand(params: {
   const envFileArg = `--env-file ${shellQuote(params.envFile)}`;
   switch (params.action) {
     case "write-env":
-      return `pnpm android:local-host:codex-guard:launchd -- write-env ${envFileArg}`;
+      return `pnpm android:local-host:codex-guard:write-env -- ${envFileArg}`;
     case "configure-token":
-      return `pnpm android:local-host:codex-guard:launchd -- setup ${envFileArg} --token '<token-from-connect-tab>'`;
+      return `pnpm android:local-host:codex-guard:setup -- ${envFileArg} --token '<token-from-connect-tab>'`;
     case "install":
     case "check-launchagent":
-      return `pnpm android:local-host:codex-guard:launchd -- setup ${envFileArg}`;
+      return `pnpm android:local-host:codex-guard:setup -- ${envFileArg}`;
     case "healthy":
       return undefined;
   }
@@ -664,7 +664,7 @@ async function installGuard(options: GuardLaunchdCliOptions): Promise<GuardLaunc
   const envVars = await readEnvFile(plan.envFile);
   if (!trimOptional(envVars[REQUIRED_ENV_KEY])) {
     throw new Error(
-      `Env file must define ${REQUIRED_ENV_KEY}. Run \`pnpm android:local-host:codex-guard:launchd -- write-env --env-file ${shellQuote(plan.envFile)}\` first.`,
+      `Env file must define ${REQUIRED_ENV_KEY}. Run \`pnpm android:local-host:codex-guard:write-env -- --env-file ${shellQuote(plan.envFile)}\` first.`,
     );
   }
   if (!hasConfiguredToken(envVars)) {
