@@ -522,6 +522,7 @@
     "android:local-host:streaming": "bash apps/android/scripts/local-host-streaming-smoke.sh",
     "android:local-host:ui": "bash apps/android/scripts/local-host-ui-smoke.sh",
     "android:local-host:ui:cross-app": "bash apps/android/scripts/local-host-ui-cross-app-probe.sh",
+    "android:local-host:ui:cross-app:next": "bash apps/android/scripts/local-host-ui-cross-app-next.sh",
     "android:local-host:ui:cross-app:sweep": "bash apps/android/scripts/local-host-ui-cross-app-sweep.sh",
     "android:run": "cd apps/android && ./gradlew :app:installDebug && adb shell am start -n ai.openclaw.app/.MainActivity",
     "android:test": "cd apps/android && ./gradlew :app:testDebugUnitTest",

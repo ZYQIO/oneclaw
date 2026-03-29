@@ -294,6 +294,15 @@ The UI smoke script verifies `/status` plus `/invoke/capabilities`, foregrounds 
 
 Use this when you want a ground-truth probe for the current cross-app boundary, not just the in-app smoke.
 
+If you want the repo's default follow-up entrypoint instead of hand-assembling env vars first, start with:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:ui:cross-app:next
+```
+
+That wrapper defaults the current repo preset `settings-search-input`, keeps explicit env overrides intact, and writes a wrapper-level `next-summary.json` alongside the underlying probe or sweep artifacts. Add `-- --sweep` when you want the same preset to flow into the multi-window sweep.
+
 USB + adb flow:
 
 ```bash
