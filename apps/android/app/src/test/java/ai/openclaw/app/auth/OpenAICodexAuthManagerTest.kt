@@ -15,6 +15,32 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class OpenAICodexAuthManagerTest {
   @Test
+  fun localizeOpenAICodexAuthCopy_translatesLoginStatusCopy() {
+    assertEquals(
+      "浏览器已打开，请在浏览器中完成登录。回调后 OpenClaw 应该会自动返回。如果没有返回，请在浏览器页点击“返回 OpenClaw”或在下方粘贴重定向 URL 或代码。",
+      localizeOpenAICodexAuthCopy(
+        "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeOpenAICodexAuthCopy_translatesAuthFailureCopy() {
+    assertEquals(
+      "当前没有可用的浏览器来完成 OpenAI 登录。",
+      localizeOpenAICodexAuthCopy("No browser is available for OpenAI sign-in."),
+    )
+    assertEquals(
+      "正在交换授权码…",
+      localizeOpenAICodexAuthCopy("Exchanging authorization code…"),
+    )
+    assertEquals(
+      "OpenAI Codex 已连接。",
+      localizeOpenAICodexAuthCopy("OpenAI Codex is connected."),
+    )
+  }
+
+  @Test
   fun oauthSuccessHtml_includesReturnToOpenClawCta() {
     val html = oauthSuccessHtml("OpenAI authentication completed. You can close this window.")
 
@@ -38,6 +64,14 @@ class OpenAICodexAuthManagerTest {
 
     assertTrue(html.contains("Only loopback callbacks are allowed."))
     assertTrue(html.contains("只允许 loopback 回调。"))
+  }
+
+  @Test
+  fun oauthErrorHtml_includesLocalizedCallbackRouteNotFoundMessage() {
+    val html = oauthErrorHtml("Callback route not found.")
+
+    assertTrue(html.contains("Callback route not found."))
+    assertTrue(html.contains("未找到回调路由。"))
   }
 
   @Test

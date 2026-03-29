@@ -84,9 +84,13 @@ internal class OpenAICodexAuthManager(
         manualInputEnabled = true,
         statusText =
           if (server.isBound) {
-            "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below."
+            localizeOpenAICodexAuthCopy(
+              "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below.",
+            )
           } else {
-            "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below."
+            localizeOpenAICodexAuthCopy(
+              "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below.",
+            )
           },
         signedInEmail = prefs.loadOpenAICodexCredential()?.email,
       )
@@ -98,7 +102,9 @@ internal class OpenAICodexAuthManager(
       activeLogin = null
       _uiState.value =
         OpenAICodexAuthUiState(
-          errorText = "No browser is available for OpenAI sign-in.",
+          errorText = localizeOpenAICodexAuthCopy(
+            "No browser is available for OpenAI sign-in.",
+          ),
           signedInEmail = prefs.loadOpenAICodexCredential()?.email,
         )
       return
@@ -107,7 +113,9 @@ internal class OpenAICodexAuthManager(
       activeLogin = null
       _uiState.value =
         OpenAICodexAuthUiState(
-          errorText = err.message ?: "Failed to open the OpenAI sign-in page.",
+          errorText = localizeOpenAICodexAuthCopy(
+            err.message ?: "Failed to open the OpenAI sign-in page.",
+          ),
           signedInEmail = prefs.loadOpenAICodexCredential()?.email,
         )
       return
@@ -124,7 +132,9 @@ internal class OpenAICodexAuthManager(
     val active = activeLogin ?: run {
       _uiState.value =
         OpenAICodexAuthUiState(
-          errorText = "No OpenAI sign-in is currently running.",
+          errorText = localizeOpenAICodexAuthCopy(
+            "No OpenAI sign-in is currently running.",
+          ),
           signedInEmail = prefs.loadOpenAICodexCredential()?.email,
         )
       return
@@ -133,7 +143,9 @@ internal class OpenAICodexAuthManager(
     if (!parsed.state.isNullOrBlank() && parsed.state != active.state) {
       _uiState.value =
         _uiState.value.copy(
-          errorText = "State mismatch. Start sign-in again and retry.",
+          errorText = localizeOpenAICodexAuthCopy(
+            "State mismatch. Start sign-in again and retry.",
+          ),
         )
       return
     }
@@ -141,7 +153,9 @@ internal class OpenAICodexAuthManager(
     if (code.isEmpty()) {
       _uiState.value =
         _uiState.value.copy(
-          errorText = "Paste the redirect URL or authorization code from the browser.",
+          errorText = localizeOpenAICodexAuthCopy(
+            "Paste the redirect URL or authorization code from the browser.",
+          ),
         )
       return
     }
@@ -175,7 +189,7 @@ internal class OpenAICodexAuthManager(
     _uiState.value =
       _uiState.value.copy(
         errorText = null,
-        statusText = "Exchanging authorization code…",
+        statusText = localizeOpenAICodexAuthCopy("Exchanging authorization code…"),
       )
 
     try {
@@ -188,7 +202,7 @@ internal class OpenAICodexAuthManager(
       clearActiveLogin(active)
       _uiState.value =
         OpenAICodexAuthUiState(
-          statusText = "OpenAI Codex is connected.",
+          statusText = localizeOpenAICodexAuthCopy("OpenAI Codex is connected."),
           signedInEmail = credential.email,
         )
     } catch (_: CancellationException) {
@@ -200,7 +214,9 @@ internal class OpenAICodexAuthManager(
       clearActiveLogin(active)
       _uiState.value =
         OpenAICodexAuthUiState(
-          errorText = err.message ?: "OpenAI sign-in failed.",
+          errorText = localizeOpenAICodexAuthCopy(
+            err.message ?: "OpenAI sign-in failed.",
+          ),
           signedInEmail = prefs.loadOpenAICodexCredential()?.email,
         )
     }
@@ -502,7 +518,31 @@ internal fun renderOauthHtml(
 }
 
 private fun localizeOauthBrowserMessage(message: String): String? {
+  return localizeOpenAICodexAuthCopy(message)
+}
+
+internal fun localizeOpenAICodexAuthCopy(message: String): String? {
   return when (message.trim()) {
+    "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below." ->
+      "浏览器已打开，请在浏览器中完成登录。回调后 OpenClaw 应该会自动返回。如果没有返回，请在浏览器页点击“返回 OpenClaw”或在下方粘贴重定向 URL 或代码。"
+    "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below." ->
+      "无法绑定本地回调。请在浏览器中完成登录，然后粘贴重定向 URL 或代码。"
+    "No browser is available for OpenAI sign-in." ->
+      "当前没有可用的浏览器来完成 OpenAI 登录。"
+    "Failed to open the OpenAI sign-in page." ->
+      "无法打开 OpenAI 登录页面。"
+    "No OpenAI sign-in is currently running." ->
+      "当前没有正在进行的 OpenAI 登录。"
+    "State mismatch. Start sign-in again and retry." ->
+      "state 不匹配，请重新开始登录后再试。"
+    "Paste the redirect URL or authorization code from the browser." ->
+      "请粘贴浏览器中的重定向 URL 或授权码。"
+    "Exchanging authorization code…" ->
+      "正在交换授权码…"
+    "OpenAI Codex is connected." ->
+      "OpenAI Codex 已连接。"
+    "OpenAI sign-in failed." ->
+      "OpenAI 登录失败。"
     "OpenAI authentication completed. You can close this window." ->
       "OpenAI 授权已完成。你可以关闭这个窗口。"
     "Only loopback callbacks are allowed." ->
