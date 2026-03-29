@@ -203,6 +203,19 @@ The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`,
 - Each run now writes `summary.json` and emits compact `chat.error_class`, `chat.error_host`, `chat.error_address_family`, and `chat.hint` fields when it can classify an upstream failure.
 - On March 29, 2026, a fresh adb-forward retest on the current OPPO / ColorOS device still reached `status.ok=true` plus `invoke.ok=true`, but `chat` classified as `openai_connect_timeout` with `chat.error_address_family=ipv6`; treat that as an outbound Codex network boundary rather than a local-host token or write-gate regression. A follow-up `pnpm android:local-host:openai-network` run then showed the deeper truth on the same device: both IPv4 and IPv6 `443` to `chatgpt.com` time out, while `auth.openai.com` still reaches both families successfully.
 
+## Local Host Doctor
+
+Use this when you want one repo command to bootstrap the debug token, rerun smoke, and automatically fall through to the OpenAI network probe only when the failure really looks like upstream Codex connectivity.
+
+```bash
+pnpm android:local-host:doctor
+pnpm android:local-host:doctor -- --json
+```
+
+The wrapper reuses `OPENCLAW_ANDROID_LOCAL_HOST_TOKEN` when you already provided one; otherwise it bootstraps the debug token over trusted adb, runs `pnpm android:local-host:smoke`, and automatically runs `pnpm android:local-host:openai-network` when smoke lands at `openai_connect_timeout`.
+
+- On March 29, 2026, the new `doctor` command already reproduced the current OPPO / ColorOS device state end-to-end: token bootstrap succeeded, smoke failed only on `chat`, and the follow-up network probe classified the device as `responses_host_unreachable`.
+
 ## Local Host OpenAI Network Probe
 
 Use this when `pnpm android:local-host:smoke` or local-host chat reaches the phone successfully but still fails while contacting OpenAI/Codex upstream.

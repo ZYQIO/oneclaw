@@ -25,6 +25,8 @@ As of March 29, 2026, the MVP happy path is working, the streaming gate has dire
 - 2026 年 3 月 29 日在当前 OPPO / ColorOS 真机上的最新 adb-forward 复跑再次表明：`/status` 与 `device.status` 都正常，但 chat 仍会落到 `chat.error_class=openai_connect_timeout`、`chat.error_host=chatgpt.com`、`chat.error_address_family=ipv6`。这说明当前真实 blocker 是手机到 `chatgpt.com` 的上游出站路径，不是 bearer token、写权限开关或本机 Host 基础链路回归。The latest adb-forward rerun on March 29, 2026 on the current OPPO / ColorOS device again showed that `/status` and `device.status` are both healthy, but chat still lands at `chat.error_class=openai_connect_timeout`, `chat.error_host=chatgpt.com`, and `chat.error_address_family=ipv6`. That means the real blocker is the phone's outbound path to `chatgpt.com`, not the bearer token, write gating, or a local-host transport regression.
 - 现在仓库里还多了一条设备侧 OpenAI 网络探针：`pnpm android:local-host:openai-network`。它会直接在手机上通过 `toybox nc -4/-6` 探测 `chatgpt.com` 和 `auth.openai.com` 的 `443` 出站连通性，并把 DNS 相关 `getprop` 与分类结果写入 `summary.json`。There is now also a device-side OpenAI network probe in the repo as `pnpm android:local-host:openai-network`. It runs `toybox nc -4/-6` on the phone itself to probe outbound `443` reachability for `chatgpt.com` and `auth.openai.com`, then writes both the DNS-related `getprop` lines and the classification into `summary.json`.
 - 它在当前 OPPO / ColorOS 真机上的第一轮结果进一步缩小了问题面：`chatgpt.com` 的 IPv4、IPv6 `443` 都 timeout，但 `auth.openai.com` 的 IPv4、IPv6 `443` 都 reachable，因此当前网络边界不是“整个 OpenAI 域都坏了”，而是“Responses host path 不通”。Its first run on the current OPPO / ColorOS device narrowed the problem down even further: both IPv4 and IPv6 `443` to `chatgpt.com` time out, while both IPv4 and IPv6 `443` to `auth.openai.com` are reachable, so the boundary is not “the whole OpenAI domain is broken” but specifically “the Responses host path is unavailable.”
+- 现在还多了一条更顺手的一键诊断入口：`pnpm android:local-host:doctor`。它会优先复用已有 token；如果没有 token，就通过 trusted adb 自动 bootstrap debug token，然后跑 `smoke`，并只在 `openai_connect_timeout` 时自动继续跑 `openai-network`。There is now also a more convenient one-command diagnosis entrypoint as `pnpm android:local-host:doctor`. It prefers an existing token when present; otherwise it bootstraps the debug token automatically over trusted adb, then runs `smoke`, and only continues into `openai-network` when the failure is specifically `openai_connect_timeout`.
+- 这条 `doctor` 已经在当前 OPPO / ColorOS 真机上验证通过：token bootstrap 成功，smoke 只在 `chat` 段失败，随后自动 network probe 把顶层结果收敛成 `responses_host_unreachable`。That `doctor` command is already validated on the current OPPO / ColorOS device: token bootstrap succeeds, smoke fails only on the `chat` leg, and the automatic network probe then collapses the top-level result to `responses_host_unreachable`.
 - `auth/codex/status` 和 `auth/codex/refresh` 已在真机验证成功。`auth/codex/status` and `auth/codex/refresh` have both been validated successfully on-device.
 - 仓库里现在还多了一条桌面侧补授权路径：`pnpm android:local-host:codex-sync` 会读取电脑当前优先的 `openai-codex` OAuth profile，探测手机 `/auth/codex/status`，并只在手机缺授权、已过期或已进入 refresh-warning 窗口时，才通过受保护的 `auth/codex/import` 把桌面凭证同步到手机；如果桌面凭证本身也接近过期，它还会跟着调用手机 `/auth/codex/refresh`。The repo now also has a desktop-side auth refill path: `pnpm android:local-host:codex-sync` reads the desktop's preferred `openai-codex` OAuth profile, checks the phone's `/auth/codex/status`, and only syncs desktop auth down through the guarded `auth/codex/import` route when the phone is missing auth, already expired, or already inside the refresh-warning window; if the desktop credential itself is near expiry, it follows with the phone's `/auth/codex/refresh`.
 - 这条桌面侧补授权路径现在还支持 `--watch`：在 USB `adb forward` 或可信 LAN/tunnel 持续存在时，它会周期性重跑同一条探测+补同步逻辑，因此手机授权后续再次过期时，电脑可以继续自动回补，而不是只做一次性同步。That desktop-side auth refill path now also supports `--watch`: while USB `adb forward` or a trusted LAN/tunnel remains up, it periodically reruns the same detect-and-refill logic so the desktop can keep refilling the phone again if phone auth later expires instead of only doing a one-shot sync.
@@ -277,6 +279,7 @@ Read this section first when resuming later today. / 如果今天晚些时候继
 - `pnpm android:local-host:codex-sync` 现在已经是仓库内建命令，适合在 USB `adb forward` 或可信 LAN/tunnel 下补手机 Codex 授权；`--watch` + `--wait-for-device` 则把它推进成更接近“电脑检测到连接后持续守护”的模式，但这条能力目前仍然是“桌面主动推送同步”，还不是手机端自动从 Gateway/桌面拉取凭证。
 - `pnpm android:local-host:codex-guard` 现在已经是更顺手的默认守护入口；如果只是日常把手机接到电脑上并希望持续保授权，优先用它，而不是每次手工补完整参数。
 - `pnpm android:local-host:token -- --json` 现在已经是远端调试的最快起手式；如果只是为了重跑 smoke、cross-app 或别的 local-host 桌面脚本，不必再回 Connect 页抄 bearer token。
+- `pnpm android:local-host:doctor` 现在已经是更推荐的真值入口；如果只是想知道“当前这台手机到底是 token、smoke 还是上游网络哪一段坏了”，优先跑它。
 - `pnpm android:local-host:openai-network` 现在已经是 `openai_connect_timeout` 的标准下一步；如果 smoke 已经证明 token、`/status` 和 `/invoke` 都没问题，就用它直接分辨是 `chatgpt.com`、`auth.openai.com`，还是特定 IPv4/IPv6 路径出了问题。
 - `pnpm android:local-host:codex-guard -- --artifact-dir <dir> --json` 现在已经能同时给人和外层守护器用：stdout 是结构化事件流，目录里还有稳定文件落盘。
 - macOS 长驻入口现在优先用更短 wrapper：`pnpm android:local-host:codex-guard:setup|status|write-env|uninstall`；底层 `pnpm android:local-host:codex-guard:launchd` 仍保留给需要更细粒度参数时使用。
@@ -298,16 +301,14 @@ Read this section first when resuming later today. / 如果今天晚些时候继
 ### First Commands To Run Tonight / 今晚恢复时先跑这些命令
 
 1. `pnpm android:local-host:ui`
-2. `pnpm android:local-host:token -- --json`
-3. `pnpm android:local-host:smoke`
-4. 如果 `pnpm android:local-host:smoke` 落到 `openai_connect_timeout`，立刻跑 `pnpm android:local-host:openai-network`
-5. `pnpm android:local-host:dedicated:readiness`
-6. `pnpm android:local-host:codex-guard -- --json`
-7. `pnpm android:local-host:dedicated:testdpc-install`
-8. 如果要推进跨 app follow-up，给 `pnpm android:local-host:ui:cross-app` 补上目标 app 的 wait/tap/inputText 环境变量后再跑一轮
-9. 如果确定要继续 dedicated 官方入管，再看 `pnpm android:local-host:dedicated:testdpc-qr`
-10. 如果手机已经完成 DPC provisioning，再优先看 `pnpm android:local-host:dedicated:post-provision:next`，必要时再下钻到 `pnpm android:local-host:dedicated:post-provision` 和 `pnpm android:local-host:dedicated:testdpc-kiosk`
-11. 如果要继续双语工作，下一步直接扫剩余的深层 runtime / auth 错误文本、较少见的 gateway/control-ui 边缘态和次级页面，不要回头重做已经接好的 `Settings -> Language` 主流程。
+2. `pnpm android:local-host:doctor`
+3. `pnpm android:local-host:dedicated:readiness`
+4. `pnpm android:local-host:codex-guard -- --json`
+5. `pnpm android:local-host:dedicated:testdpc-install`
+6. 如果要推进跨 app follow-up，给 `pnpm android:local-host:ui:cross-app` 补上目标 app 的 wait/tap/inputText 环境变量后再跑一轮
+7. 如果确定要继续 dedicated 官方入管，再看 `pnpm android:local-host:dedicated:testdpc-qr`
+8. 如果手机已经完成 DPC provisioning，再优先看 `pnpm android:local-host:dedicated:post-provision:next`，必要时再下钻到 `pnpm android:local-host:dedicated:post-provision` 和 `pnpm android:local-host:dedicated:testdpc-kiosk`
+9. 如果要继续双语工作，下一步直接扫剩余的深层 runtime / auth 错误文本、较少见的 gateway/control-ui 边缘态和次级页面，不要回头重做已经接好的 `Settings -> Language` 主流程。
 
 ## Next Tasks / 接下来要做的事
 
