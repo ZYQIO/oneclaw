@@ -1,6 +1,7 @@
 package ai.openclaw.app
 
 import android.app.Application
+import android.content.BroadcastReceiver
 import android.os.StrictMode
 import ai.openclaw.app.auth.OpenAICodexAuthManager
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 class NodeApp : Application() {
   val prefs: SecurePrefs by lazy { SecurePrefs(this) }
   private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+  private var debugLocalHostTokenReceiver: BroadcastReceiver? = null
   internal val openAICodexAuthManager: OpenAICodexAuthManager by lazy {
     OpenAICodexAuthManager(
       appContext = this,
@@ -44,6 +46,9 @@ class NodeApp : Application() {
           .penaltyLog()
           .build(),
       )
+      if (debugLocalHostTokenReceiver == null) {
+        debugLocalHostTokenReceiver = DebugLocalHostTokenExporter.register(this, prefs)
+      }
     }
   }
 }

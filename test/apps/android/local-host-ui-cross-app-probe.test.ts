@@ -40,17 +40,23 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up_mode")).toBe("none");
   });
 
-  it("expands the settings-search-input preset into a wait+tap+input flow", () => {
+  it("expands the settings-search-input preset into a resource-id tap+input flow", () => {
     const values = runDescribe({
       OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET: "settings-search-input",
     });
 
     expect(values.get("cross_app.preset")).toBe("preset:settings-search-input");
     expect(values.get("cross_app.target_package")).toBe("com.android.settings");
-    expect(values.get("cross_app.follow_up_mode")).toBe("wait+tap+input");
-    expect(values.get("cross_app.follow_up.wait_text")).toBe("Settings");
-    expect(values.get("cross_app.follow_up.tap_text")).toBe("Search");
+    expect(values.get("cross_app.follow_up_mode")).toBe("tap+input");
+    expect(values.get("cross_app.follow_up.wait_text")).toBe("<empty>");
+    expect(values.get("cross_app.follow_up.tap_text")).toBe("<empty>");
+    expect(values.get("cross_app.follow_up.tap_resource_id")).toBe(
+      "com.android.settings:id/searchView",
+    );
     expect(values.get("cross_app.follow_up.input_value")).toBe("openclaw");
+    expect(values.get("cross_app.follow_up.input_resource_id")).toBe(
+      "com.android.settings:id/search_src_text",
+    );
     expect(values.get("cross_app.rerun_hint")).toContain(
       "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=settings-search-input",
     );
@@ -64,6 +70,7 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     });
 
     expect(values.get("cross_app.follow_up.tap_text")).toBe("Search settings");
+    expect(values.get("cross_app.follow_up.tap_resource_id")).toBe("<empty>");
     expect(values.get("cross_app.follow_up.input_value")).toBe("codex");
   });
 });

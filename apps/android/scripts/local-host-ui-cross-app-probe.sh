@@ -110,14 +110,14 @@ apply_follow_up_preset() {
       ;;
     settings-search-input)
       TARGET_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE:-com.android.settings}"
-      if [[ -z "$FOLLOW_UP_WAIT_TEXT_RAW" ]]; then
-        FOLLOW_UP_WAIT_TEXT="Settings"
-      fi
       if [[ -z "$FOLLOW_UP_TAP_TEXT_RAW$FOLLOW_UP_TAP_CONTENT_DESCRIPTION_RAW$FOLLOW_UP_TAP_RESOURCE_ID_RAW" ]]; then
-        FOLLOW_UP_TAP_TEXT="Search"
+        FOLLOW_UP_TAP_RESOURCE_ID="com.android.settings:id/searchView"
       fi
       if [[ -z "$FOLLOW_UP_INPUT_VALUE_RAW" ]]; then
         FOLLOW_UP_INPUT_VALUE="openclaw"
+      fi
+      if [[ -z "$FOLLOW_UP_INPUT_TEXT_RAW$FOLLOW_UP_INPUT_CONTENT_DESCRIPTION_RAW$FOLLOW_UP_INPUT_RESOURCE_ID_RAW" ]]; then
+        FOLLOW_UP_INPUT_RESOURCE_ID="com.android.settings:id/search_src_text"
       fi
       ;;
     *)
@@ -226,7 +226,9 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.follow_up.settle_ms=%s\n' "$FOLLOW_UP_SETTLE_MS"
   printf 'cross_app.follow_up.wait_text=%s\n' "${FOLLOW_UP_WAIT_TEXT:-<empty>}"
   printf 'cross_app.follow_up.tap_text=%s\n' "${FOLLOW_UP_TAP_TEXT:-<empty>}"
+  printf 'cross_app.follow_up.tap_resource_id=%s\n' "${FOLLOW_UP_TAP_RESOURCE_ID:-<empty>}"
   printf 'cross_app.follow_up.input_value=%s\n' "${FOLLOW_UP_INPUT_VALUE:-<empty>}"
+  printf 'cross_app.follow_up.input_resource_id=%s\n' "${FOLLOW_UP_INPUT_RESOURCE_ID:-<empty>}"
   if [[ -n "$FOLLOW_UP_PRESET" ]]; then
     printf 'cross_app.rerun_hint=%s\n' "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=$FOLLOW_UP_PRESET ./apps/android/scripts/local-host-ui-cross-app-probe.sh"
   else

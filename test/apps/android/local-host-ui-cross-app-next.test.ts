@@ -35,7 +35,10 @@ describe("local-host-ui-cross-app-next --describe", () => {
       "pnpm android:local-host:ui:cross-app:next",
     );
     expect(summary.probeDescribe["cross_app.preset"]).toBe("preset:settings-search-input");
-    expect(summary.probeDescribe["cross_app.follow_up_mode"]).toBe("wait+tap+input");
+    expect(summary.probeDescribe["cross_app.follow_up_mode"]).toBe("tap+input");
+    expect(summary.probeDescribe["cross_app.follow_up.tap_resource_id"]).toBe(
+      "com.android.settings:id/searchView",
+    );
   });
 
   it("preserves explicit env overrides while keeping the default preset", () => {

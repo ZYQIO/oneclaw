@@ -155,6 +155,20 @@ pnpm android:run
 
 If `adb devices -l` shows `unauthorized`, re-plug and accept the trust prompt again.
 
+## Local Host Token Bootstrap
+
+When the phone is already on a debug build, you can now fetch the current local-host bearer token over trusted adb without manually re-reading the Connect tab every time:
+
+```bash
+pnpm android:local-host:token
+pnpm android:local-host:token -- --export
+pnpm android:local-host:token -- --json
+```
+
+- This helper is intentionally debug-only: it launches the app, triggers a debug-only adb bridge inside the app process, and reads the exported token back through `run-as`.
+- The default output is the raw token so it works with shell substitution; `-- --export` prints `OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='...'` instead.
+- On release builds, or if the app process is not running a debug-capable package, `run-as` access will fail and you should keep using the Connect tab directly.
+
 ## Local Host Remote Smoke
 
 Use this after the app is already running in `Local Host` mode and remote access is enabled.
@@ -304,6 +318,8 @@ pnpm android:local-host:ui:cross-app:next
 ```
 
 That wrapper defaults the current repo preset `settings-search-input`, keeps explicit env overrides intact, and writes a wrapper-level `next-summary.json` alongside the underlying probe or sweep artifacts. Add `-- --sweep` when you want the same preset to flow into the multi-window sweep.
+
+The current `settings-search-input` preset is tuned for OEM and locale variance: instead of assuming English `Settings / Search` copy, it now defaults to the stable Settings `resourceId` selectors `com.android.settings:id/searchView` and `com.android.settings:id/search_src_text`, then runs a bounded tap+input flow with `openclaw`. Explicit env overrides still win when a device needs different selectors.
 
 USB + adb flow:
 
