@@ -36,6 +36,60 @@ require_cmd() {
   fi
 }
 
+bool_json() {
+  if [[ "${1:-false}" == "true" ]]; then
+    printf 'true'
+  else
+    printf 'false'
+  fi
+}
+
+recommend_dedicated_action() {
+  local has_device_owner=$1
+  local device_owner_via_adb_ready=$2
+  local dpc_installed=$3
+
+  if [[ "$has_device_owner" == "true" ]]; then
+    printf 'post-provision'
+    return
+  fi
+
+  if [[ "$device_owner_via_adb_ready" == "true" ]]; then
+    if [[ "$dpc_installed" == "true" ]]; then
+      printf 'device-owner'
+    else
+      printf 'testdpc-install'
+    fi
+    return
+  fi
+
+  if [[ "$dpc_installed" == "true" ]]; then
+    printf 'testdpc-qr'
+  else
+    printf 'testdpc-install'
+  fi
+}
+
+build_recommended_command() {
+  case "${1:-}" in
+    device-owner)
+      printf 'pnpm android:local-host:dedicated:device-owner'
+      ;;
+    testdpc-install)
+      printf 'pnpm android:local-host:dedicated:testdpc-install'
+      ;;
+    testdpc-qr)
+      printf 'pnpm android:local-host:dedicated:testdpc-qr'
+      ;;
+    post-provision)
+      printf 'pnpm android:local-host:dedicated:post-provision'
+      ;;
+    *)
+      printf ''
+      ;;
+  esac
+}
+
 require_cmd adb
 require_cmd jq
 
@@ -136,6 +190,9 @@ fi
 recommendations_json="$(jq -cn --argjson prev "$recommendations_json" '$prev + ["treat root/systemize as the second lane, not the first, on this locked OPPO phone"]')"
 recommendations_json="$(jq -cn --argjson prev "$recommendations_json" '$prev + ["treat custom-ROM priv-app preload and true system_server integration as later-stage experiments"]')"
 
+recommended_action="$(recommend_dedicated_action "$has_device_owner" "$device_owner_via_adb_ready" "$dpc_installed")"
+recommended_command="$(build_recommended_command "$recommended_action")"
+
 jq -n \
   --arg manufacturer "$manufacturer" \
   --arg brand "$brand" \
@@ -162,6 +219,8 @@ jq -n \
   --argjson customBuildRequiredForSystemService "$( [[ "$custom_build_required_for_system_service" == "true" ]] && printf 'true' || printf 'false' )" \
   --arg preferredPath "$preferred_path" \
   --arg rootLaneFriction "$root_lane_friction" \
+  --arg recommendedAction "$recommended_action" \
+  --arg recommendedCommand "$recommended_command" \
   --argjson deviceOwnerBlockers "$device_owner_blockers_json" \
   --argjson recommendations "$recommendations_json" \
   '{
@@ -195,6 +254,8 @@ jq -n \
       preferredPath: $preferredPath,
       rootLaneFriction: $rootLaneFriction
     },
+    recommendedAction: $recommendedAction,
+    recommendedCommand: (if $recommendedCommand == "" then null else $recommendedCommand end),
     raw: {
       users: $usersOutput,
       owners: $ownersOutput
@@ -208,4 +269,8 @@ printf 'dedicated.owner_via_adb_ready=%s accounts=%s users=%s dpc_installed=%s\n
   "$device_owner_via_adb_ready" "$accounts_count" "$user_count" "$dpc_installed"
 printf 'dedicated.bootloader_locked=%s verified_boot=%s preferred_path=%s root_lane_friction=%s\n' \
   "${bootloader_locked:-unknown}" "${verified_boot_state:-unknown}" "$preferred_path" "$root_lane_friction"
+printf 'dedicated.recommended_action=%s\n' "$recommended_action"
+if [[ -n "$recommended_command" ]]; then
+  printf 'dedicated.recommended_command=%s\n' "$recommended_command"
+fi
 echo "artifacts.summary=$SUMMARY_JSON"
