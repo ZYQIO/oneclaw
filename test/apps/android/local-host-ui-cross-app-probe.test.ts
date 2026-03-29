@@ -1,0 +1,69 @@
+import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../..",
+);
+const scriptPath = path.join(
+  repoRoot,
+  "apps/android/scripts/local-host-ui-cross-app-probe.sh",
+);
+
+function runDescribe(env: NodeJS.ProcessEnv = {}) {
+  const result = spawnSync("bash", [scriptPath, "--describe"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env,
+    },
+  });
+  expect(result.status).toBe(0);
+  const values = new Map<string, string>();
+  for (const line of result.stdout.trim().split("\n")) {
+    const separator = line.indexOf("=");
+    if (separator <= 0) {continue;}
+    values.set(line.slice(0, separator), line.slice(separator + 1));
+  }
+  return values;
+}
+
+describe("local-host-ui-cross-app-probe --describe", () => {
+  it("reports the base preset when no follow-up is configured", () => {
+    const values = runDescribe();
+
+    expect(values.get("cross_app.preset")).toBe("base");
+    expect(values.get("cross_app.follow_up.preset")).toBe("<none>");
+    expect(values.get("cross_app.follow_up_mode")).toBe("none");
+  });
+
+  it("expands the settings-search-input preset into a wait+tap+input flow", () => {
+    const values = runDescribe({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET: "settings-search-input",
+    });
+
+    expect(values.get("cross_app.preset")).toBe("preset:settings-search-input");
+    expect(values.get("cross_app.target_package")).toBe("com.android.settings");
+    expect(values.get("cross_app.follow_up_mode")).toBe("wait+tap+input");
+    expect(values.get("cross_app.follow_up.wait_text")).toBe("Settings");
+    expect(values.get("cross_app.follow_up.tap_text")).toBe("Search");
+    expect(values.get("cross_app.follow_up.input_value")).toBe("openclaw");
+    expect(values.get("cross_app.rerun_hint")).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=settings-search-input",
+    );
+  });
+
+  it("keeps explicit env overrides ahead of the preset defaults", () => {
+    const values = runDescribe({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET: "settings-search-input",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE: "codex",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT: "Search settings",
+    });
+
+    expect(values.get("cross_app.follow_up.tap_text")).toBe("Search settings");
+    expect(values.get("cross_app.follow_up.input_value")).toBe("codex");
+  });
+});
