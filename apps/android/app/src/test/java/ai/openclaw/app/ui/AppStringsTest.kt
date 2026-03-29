@@ -406,6 +406,47 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesCameraDisabledSetting() {
+    assertEquals(
+      "相机已关闭：请在设置中启用相机",
+      localizeChatError(AppLanguage.SimplifiedChinese, "CAMERA_DISABLED: enable Camera in Settings"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesLocationDisabledSetting() {
+    assertEquals(
+      "位置已关闭：请在设置中启用位置",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "LOCATION_DISABLED: enable Location in Settings",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiAutomationDisabledState() {
+    assertEquals(
+      "UI 自动化已关闭：请先启用 OpenClaw 无障碍服务",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_AUTOMATION_DISABLED: enable the OpenClaw accessibility service first",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCommandDisabledState() {
+    assertEquals(
+      "命令已禁用：此会话未启用 camera.snap",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "COMMAND_DISABLED: camera.snap is not enabled for this session",
+      ),
+    )
+  }
+
+  @Test
   fun localizeVoiceConversationText_translatesDefaultFailure() {
     assertEquals(
       "语音请求失败。",

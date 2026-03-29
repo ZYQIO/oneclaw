@@ -484,12 +484,15 @@ private fun localizeRuntimeErrorCode(
     "ACTION_UNAVAILABLE" -> language.pick(trimmed, "操作不可用")
     "A2UI_HOST_UNAVAILABLE" -> language.pick(trimmed, "A2UI Host 不可用")
     "CALENDAR_UNAVAILABLE" -> language.pick(trimmed, "日历不可用")
+    "CAMERA_DISABLED" -> language.pick(trimmed, "相机已关闭")
     "CAMERA_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要相机权限")
     "CAMERA_TOO_LARGE" -> language.pick(trimmed, "相机内容过大")
     "CALL_LOG_UNAVAILABLE" -> language.pick(trimmed, "通话记录不可用")
+    "COMMAND_DISABLED" -> language.pick(trimmed, "命令已禁用")
     "CONTACTS_UNAVAILABLE" -> language.pick(trimmed, "联系人不可用")
     "INVALID_REQUEST" -> language.pick(trimmed, "请求无效")
     "LOCATION_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台定位不可用")
+    "LOCATION_DISABLED" -> language.pick(trimmed, "位置已关闭")
     "LOCATION_UNAVAILABLE" -> language.pick(trimmed, "位置不可用")
     "MIC_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要麦克风权限")
     "MOTION_UNAVAILABLE" -> language.pick(trimmed, "运动不可用")
@@ -503,6 +506,7 @@ private fun localizeRuntimeErrorCode(
     "PEDOMETER_UNAVAILABLE" -> language.pick(trimmed, "计步器不可用")
     "PHOTOS_UNAVAILABLE" -> language.pick(trimmed, "照片不可用")
     "SMS_UNAVAILABLE" -> language.pick(trimmed, "短信不可用")
+    "UI_AUTOMATION_DISABLED" -> language.pick(trimmed, "UI 自动化已关闭")
     "UI_AUTOMATION_UNAVAILABLE" -> language.pick(trimmed, "UI 自动化不可用")
     "UNAVAILABLE" -> language.pick(trimmed, "不可用")
     else -> trimmed
@@ -527,6 +531,10 @@ private fun localizeRuntimeErrorDetail(
     "camera not ready" -> language.pick(trimmed, "相机尚未就绪")
     "camera snap failed" -> language.pick(trimmed, "相机拍照失败")
     "dismiss failed" -> language.pick(trimmed, "清除失败")
+    "enable Camera in Settings" -> language.pick(trimmed, "请在设置中启用相机")
+    "enable Location in Settings" -> language.pick(trimmed, "请在设置中启用位置")
+    "enable the OpenClaw accessibility service first" ->
+      language.pick(trimmed, "请先启用 OpenClaw 无障碍服务")
     "enable notification access in system Settings" ->
       language.pick(trimmed, "请在系统设置中启用通知访问权限")
     "failed to decode captured image" -> language.pick(trimmed, "无法解码拍摄图像")
@@ -567,6 +575,11 @@ private fun localizeRuntimeErrorDetail(
           )
         trimmed.equals("expected JSON object", ignoreCase = true) ->
           language.pick(trimmed, "需要 JSON 对象")
+        trimmed.endsWith(" is not enabled for this session", ignoreCase = true) ->
+          language.pick(
+            trimmed,
+            "此会话未启用 ${trimmed.substringBefore(" is not enabled for this session").trim()}",
+          )
         trimmed.startsWith("unknown camera deviceId ", ignoreCase = true) ->
           language.pick(trimmed, "未知相机 ${trimmed.substringAfter("unknown ").trim()}")
         else -> trimmed
