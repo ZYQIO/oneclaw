@@ -66,6 +66,7 @@ export type GuardLaunchdStatus = {
     | "install"
     | "check-launchagent"
     | "healthy";
+  recommendedCommand?: string;
   installed: boolean;
   loaded: boolean;
   runtime?: {
@@ -540,6 +541,24 @@ export function recommendGuardAction(params: {
   return "healthy";
 }
 
+export function buildRecommendedCommand(params: {
+  action: GuardLaunchdStatus["recommendedAction"];
+  envFile: string;
+}): string | undefined {
+  const envFileArg = `--env-file ${shellQuote(params.envFile)}`;
+  switch (params.action) {
+    case "write-env":
+      return `pnpm android:local-host:codex-guard:launchd -- write-env ${envFileArg}`;
+    case "configure-token":
+      return `pnpm android:local-host:codex-guard:launchd -- setup ${envFileArg} --token '<token-from-connect-tab>'`;
+    case "install":
+    case "check-launchagent":
+      return `pnpm android:local-host:codex-guard:launchd -- setup ${envFileArg}`;
+    case "healthy":
+      return undefined;
+  }
+}
+
 export function planGuardSetup(params: {
   envFileExists: boolean;
   tokenConfigured: boolean;
@@ -750,6 +769,12 @@ async function readGuardStatusFromPlan(plan: GuardLaunchdPlan): Promise<GuardLau
   const print = spawnLaunchctl(["print", `${resolveGuiDomain()}/${plan.label}`]);
   const runtime = print.status === 0 ? parseLaunchctlPrint(print.stdout) : undefined;
   const latestArtifact = await readLatestArtifact(path.join(plan.artifactDir, "latest.json"));
+  const recommendedAction = recommendGuardAction({
+    envFileExists,
+    tokenConfigured,
+    installed,
+    loaded,
+  });
 
   return {
     label: plan.label,
@@ -760,12 +785,18 @@ async function readGuardStatusFromPlan(plan: GuardLaunchdPlan): Promise<GuardLau
     envFile: plan.envFile,
     envFileExists,
     tokenConfigured,
-    recommendedAction: recommendGuardAction({
-      envFileExists,
-      tokenConfigured,
-      installed,
-      loaded,
-    }),
+    recommendedAction,
+    ...(buildRecommendedCommand({
+      action: recommendedAction,
+      envFile: plan.envFile,
+    })
+      ? {
+          recommendedCommand: buildRecommendedCommand({
+            action: recommendedAction,
+            envFile: plan.envFile,
+          }),
+        }
+      : {}),
     installed,
     loaded,
     ...(runtime && Object.keys(runtime).length > 0 ? { runtime } : {}),
@@ -790,6 +821,9 @@ function printInstallStatus(status: GuardLaunchdStatus): void {
   console.log(`env.exists=${String(status.envFileExists)}`);
   console.log(`env.token_configured=${String(status.tokenConfigured)}`);
   console.log(`recommended.action=${status.recommendedAction}`);
+  if (status.recommendedCommand) {
+    console.log(`recommended.command=${status.recommendedCommand}`);
+  }
   if (status.runtime?.state) {
     console.log(`runtime.state=${status.runtime.state}`);
   }

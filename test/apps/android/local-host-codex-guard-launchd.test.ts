@@ -2,6 +2,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildGuardEnvFileContent,
+  buildRecommendedCommand,
   parseCli,
   planGuardSetup,
   recommendGuardAction,
@@ -211,6 +212,58 @@ describe("recommendGuardAction", () => {
         loaded: true,
       }),
     ).toBe("healthy");
+  });
+});
+
+describe("buildRecommendedCommand", () => {
+  it("points missing env files at write-env", () => {
+    expect(
+      buildRecommendedCommand({
+        action: "write-env",
+        envFile: "/tmp/openclaw guard.env",
+      }),
+    ).toBe(
+      "pnpm android:local-host:codex-guard:launchd -- write-env --env-file '/tmp/openclaw guard.env'",
+    );
+  });
+
+  it("points placeholder env files at setup with a token placeholder", () => {
+    expect(
+      buildRecommendedCommand({
+        action: "configure-token",
+        envFile: "/tmp/guard.env",
+      }),
+    ).toBe(
+      "pnpm android:local-host:codex-guard:launchd -- setup --env-file '/tmp/guard.env' --token '<token-from-connect-tab>'",
+    );
+  });
+
+  it("points install and repair states at setup", () => {
+    expect(
+      buildRecommendedCommand({
+        action: "install",
+        envFile: "/tmp/guard.env",
+      }),
+    ).toBe(
+      "pnpm android:local-host:codex-guard:launchd -- setup --env-file '/tmp/guard.env'",
+    );
+    expect(
+      buildRecommendedCommand({
+        action: "check-launchagent",
+        envFile: "/tmp/guard.env",
+      }),
+    ).toBe(
+      "pnpm android:local-host:codex-guard:launchd -- setup --env-file '/tmp/guard.env'",
+    );
+  });
+
+  it("omits a command when guard is already healthy", () => {
+    expect(
+      buildRecommendedCommand({
+        action: "healthy",
+        envFile: "/tmp/guard.env",
+      }),
+    ).toBeUndefined();
   });
 });
 
