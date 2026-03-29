@@ -74,6 +74,27 @@ describe("local-host-ui-cross-app-next --describe", () => {
     );
   });
 
+  it("describes the calculator preset through the wrapper", () => {
+    const summary = runDescribe([], {
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET:
+        "calculator-home-open-conversion",
+    });
+
+    expect(summary.preset).toBe("calculator-home-open-conversion");
+    expect(summary.probeDescribe["cross_app.preset"]).toBe(
+      "preset:calculator-home-open-conversion",
+    );
+    expect(summary.probeDescribe["cross_app.target_package"]).toBe(
+      "com.coloros.calculator",
+    );
+    expect(summary.probeDescribe["cross_app.follow_up.tap_resource_id"]).toBe(
+      "com.coloros.calculator:id/item_open_conversion",
+    );
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=calculator-home-open-conversion",
+    );
+  });
+
   it("switches into sweep mode when requested", () => {
     const summary = runDescribe(["--sweep"], {
       OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWEEP_WINDOWS_MS: "4000,9000",

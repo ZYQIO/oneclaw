@@ -172,6 +172,15 @@ apply_follow_up_preset() {
         FOLLOW_UP_SWIPE_DURATION_MS="350"
       fi
       ;;
+    calculator-home-open-conversion)
+      TARGET_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE:-com.coloros.calculator}"
+      if [[ -z "$FOLLOW_UP_TAP_TEXT_RAW$FOLLOW_UP_TAP_CONTENT_DESCRIPTION_RAW$FOLLOW_UP_TAP_RESOURCE_ID_RAW" ]]; then
+        FOLLOW_UP_TAP_RESOURCE_ID="com.coloros.calculator:id/item_open_conversion"
+      fi
+      if [[ -z "${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_MATCH_MODE:-}" ]]; then
+        FOLLOW_UP_TAP_MATCH_MODE="exact"
+      fi
+      ;;
     *)
       echo "Unsupported cross-app preset: $FOLLOW_UP_PRESET" >&2
       exit 1
@@ -778,6 +787,7 @@ follow_up_foreground_attempts=0
 follow_up_foreground_package=""
 follow_up_state_ok=false
 follow_up_state_package=""
+follow_up_state_visible_text_json='null'
 
 wait_for_follow_up_target_foreground() {
   local max_attempts
@@ -976,6 +986,7 @@ if [[ "$follow_up_requested" == "true" ]]; then
   fi
   follow_up_state_ok=true
   follow_up_state_package="$(jq -r '.payload.packageName // ""' "$FOLLOW_UP_STATE_JSON" 2>/dev/null || printf '%s' "")"
+  follow_up_state_visible_text_json="$(extract_visible_text_sample_json "$FOLLOW_UP_STATE_JSON")"
   if [[ "$follow_up_swipe_requested" == "true" ]]; then
     follow_up_swipe_after_visible_text_json="$(extract_visible_text_sample_json "$FOLLOW_UP_STATE_JSON")"
     follow_up_swipe_visible_text_changed_json="$(
@@ -1097,6 +1108,7 @@ jq -n \
   --arg followUpInputStrategy "$follow_up_input_strategy" \
   --arg followUpForegroundPackage "$follow_up_foreground_package" \
   --arg followUpStatePackage "$follow_up_state_package" \
+  --argjson followUpStateVisibleText "$follow_up_state_visible_text_json" \
   --arg followUpMode "$follow_up_mode" \
   --argjson followUpRequested "$( [[ "$follow_up_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpWaitRequested "$( [[ "$follow_up_wait_requested" == "true" ]] && printf 'true' || printf 'false' )" \
@@ -1178,7 +1190,8 @@ jq -n \
       inputValueLength: (if $followUpInputRequested then $followUpInputValueLength else null end),
       inputOk: $followUpInputOk,
       stateOk: $followUpStateOk,
-      statePackage: (if $followUpStatePackage == "" then null else $followUpStatePackage end)
+      statePackage: (if $followUpStatePackage == "" then null else $followUpStatePackage end),
+      stateVisibleText: (if $followUpStateOk then $followUpStateVisibleText else null end)
     },
     recovery: {
       httpCode: $recoveryHttpCode,

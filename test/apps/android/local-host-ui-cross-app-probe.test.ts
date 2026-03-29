@@ -129,6 +129,28 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up.swipe_duration_ms")).toBe("350");
   });
 
+  it("expands the calculator preset into a resource-id tap flow", () => {
+    const values = runDescribe({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET:
+        "calculator-home-open-conversion",
+    });
+
+    expect(values.get("cross_app.preset")).toBe(
+      "preset:calculator-home-open-conversion",
+    );
+    expect(values.get("cross_app.target_package")).toBe(
+      "com.coloros.calculator",
+    );
+    expect(values.get("cross_app.follow_up_mode")).toBe("tap");
+    expect(values.get("cross_app.follow_up.tap_resource_id")).toBe(
+      "com.coloros.calculator:id/item_open_conversion",
+    );
+    expect(values.get("cross_app.follow_up.tap_match_mode")).toBe("exact");
+    expect(values.get("cross_app.rerun_hint")).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=calculator-home-open-conversion",
+    );
+  });
+
   it("keeps explicit swipe coordinates ahead of the swipe preset defaults", () => {
     const values = runDescribe({
       OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET: "settings-home-swipe-up",
