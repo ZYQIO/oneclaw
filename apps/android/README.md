@@ -330,6 +330,7 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE=ai.openclaw.app`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CONNECT_LABEL=Connect`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_LABEL=Chat`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_CONTENT_DESCRIPTION=Chat`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_READY_TEXT="Select thinking level"`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_EDITOR_HINT_TEXT="Type a message"`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_DRAFT_VALUE="UI smoke draft"`
@@ -337,10 +338,11 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_POLL_INTERVAL_MS=250`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=com.android.settings`
 
-The UI smoke script verifies `/status` plus `/invoke/capabilities`, foregrounds OpenClaw with `ui.launchApp`, moves into the Chat tab with `ui.tap`, waits for a known Chat-ready text with `ui.waitForText`, focuses the composer, writes a temporary unsent draft through `ui.inputText`, then clears it again and verifies the editor hint returns. By default it stays inside OpenClaw so the result is repeatable and side-effect free.
+The UI smoke script verifies `/status` plus `/invoke/capabilities`, foregrounds OpenClaw with `ui.launchApp`, moves into the Chat tab with `ui.tap(contentDescription=Chat)`, waits for a known Chat-ready text with `ui.waitForText`, focuses the composer, writes a temporary unsent draft through `ui.inputText`, then clears it again and verifies the editor hint returns. By default it stays inside OpenClaw so the result is repeatable and side-effect free.
 
 - Use `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=...` only when you also want an optional follow-up probe for the current cross-app freeze boundary.
 - On March 28, 2026, the dedicated 5-second cross-app probe against `com.android.settings` classified as `foregrounded_host_reachable`: the target package reached the true foreground, all 10 `/status` probes still succeeded, and adb recovery brought OpenClaw cleanly back. Treat any later timeouts after a longer background stay as a separate OEM boundary, not as evidence that the in-app smoke regressed.
+- On March 29, 2026, the same in-app smoke needed one selector hardening on the current OPPO / ColorOS phone: tapping the bottom-nav `text=Chat` label stopped switching tabs reliably, while `contentDescription=Chat` remained stable. The repo baseline now uses that selector so `pnpm android:local-host:ui` stays green on-device.
 
 ## Local Host Cross-App Probe
 
@@ -356,6 +358,8 @@ pnpm android:local-host:ui:cross-app:next
 That wrapper defaults the current repo preset `settings-search-input`, keeps explicit env overrides intact, and writes a wrapper-level `next-summary.json` alongside the underlying probe or sweep artifacts. Add `-- --sweep` when you want the same preset to flow into the multi-window sweep.
 
 The current `settings-search-input` preset is tuned for OEM and locale variance: instead of assuming English `Settings / Search` copy, it now defaults to the stable Settings `resourceId` selectors `com.android.settings:id/searchView` and `com.android.settings:id/search_src_text`, then runs a bounded tap+input flow with `openclaw`. Explicit env overrides still win when a device needs different selectors.
+
+There is now also a second repo preset, `settings-home-swipe-up`: it seeds a guarded Settings-homepage swipe with ratio-based coordinates rather than hard-coded pixels, so the same flow can resolve against the active window bounds on different screen sizes before issuing `ui.swipe`.
 
 USB + adb flow:
 
@@ -376,6 +380,10 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO=0.5`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO=0.81`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO=0.5`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO=0.28`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS=250`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=...`
@@ -389,14 +397,15 @@ The cross-app probe calls `ui.launchApp` for the target package, then polls two 
 - ADB foreground-activity state, using `topResumedActivity` and current focus
 - Remote `/status`, to see whether OpenClaw stays reachable while another app is supposed to be on top
 
-When the optional follow-up env vars are set, the same probe first waits for `ui.state` to report that the target package really became the active window, then it can run `ui.waitForText`, `ui.swipe`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Treat those selectors and swipe coordinates as app- and OEM-specific until the corresponding real-device proof is captured.
+When the optional follow-up env vars are set, the same probe first waits for `ui.state` to report that the target package really became the active window, then it can run `ui.waitForText`, `ui.swipe`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Absolute swipe coordinates remain app- and OEM-specific, while swipe ratios are resolved against the target-window bounds and are therefore safer across screen sizes.
 
 - On March 29, 2026, that target-foreground wait closed a real race on the current OPPO / ColorOS phone: without it, `ui.launchApp(com.android.settings)` could still leave `ai.openclaw.app` as the active package for a short window and cause an immediate `UI_TARGET_MISMATCH`; with it, the default `pnpm android:local-host:ui:cross-app:next` path again completed with `foreground_ready=true`, `tap_ok=true`, `input_ok=true`, and `state_ok=true`.
 - On the same phone, the first direct `ui.swipe` proof now also exists on the Settings homepage: a guarded upward swipe kept `packageName=com.android.settings` while shifting visible rows from `WLAN` / `蓝牙` / `移动网络` into lower entries such as `通知与控制中心` / `密码与安全` / `隐私` / `应用` / `电池`.
 - Later on March 29, 2026, the repo-side swipe follow-up also passed on that phone with env-provided coordinates, producing `swipe_ok=true`, `swipe_text_changed=true`, and a non-empty `summary.json` that now records both `followUp.swipeVisibleTextBefore` and `followUp.swipeVisibleTextAfter`.
+- Later the same day, the new `settings-home-swipe-up` preset also passed on-device through `pnpm android:local-host:ui:cross-app:next`: it resolved ratios against the live Settings window bounds, recorded `swipeCoordinateMode=ratio`, and again produced `swipe_ok=true`, `swipe_text_changed=true`, and `classification=foregrounded_host_reachable`.
 - If you want to replay that Settings-homepage swipe proof after a previous `settings-search-input` run, first reset Settings back to the homepage with `adb shell am force-stop com.android.settings`; the probe intentionally does not erase target-app state on your behalf.
 
-At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON. Swipe runs additionally persist before/after `visibleText` samples plus `followUp.swipeVisibleTextChanged`, and the summary file now stays non-empty even when optional string fields are unset.
+At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON. Swipe runs additionally persist before/after `visibleText` samples plus `followUp.swipeVisibleTextChanged`; the summary now also carries `followUp.swipeCoordinateMode` and resolved swipe bounds, and the file stays non-empty even when optional string fields are unset.
 
 - `classification=launch_accepted_not_foregrounded` means Android accepted the launch intent but the target package never became the true foreground app during the observation window.
 - `classification=foregrounded_host_reachable` means the target package reached the foreground and OpenClaw stayed reachable throughout the probe window.

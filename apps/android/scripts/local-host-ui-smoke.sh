@@ -8,6 +8,7 @@ PORT="${OPENCLAW_ANDROID_LOCAL_HOST_PORT:-3945}"
 APP_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE:-ai.openclaw.app}"
 CONNECT_LABEL="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CONNECT_LABEL:-Connect}"
 CHAT_LABEL="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_LABEL:-Chat}"
+CHAT_CONTENT_DESCRIPTION="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_CONTENT_DESCRIPTION:-$CHAT_LABEL}"
 CHAT_READY_TEXT="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_READY_TEXT:-Select thinking level}"
 EDITOR_HINT_TEXT="${OPENCLAW_ANDROID_LOCAL_HOST_UI_EDITOR_HINT_TEXT:-Type a message}"
 DRAFT_VALUE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_DRAFT_VALUE:-UI smoke draft}"
@@ -29,6 +30,7 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE=ai.openclaw.app] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CONNECT_LABEL=Connect] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_LABEL=Chat] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_CONTENT_DESCRIPTION=Chat] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CHAT_READY_TEXT="Select thinking level"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_EDITOR_HINT_TEXT="Type a message"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_DRAFT_VALUE="UI smoke draft"] \
@@ -255,7 +257,7 @@ echo "ui.wait.connect=true"
 
 invoke_command \
   "ui.tap" \
-  "$(jq -cn --arg text "$CHAT_LABEL" --arg packageName "$APP_PACKAGE" --arg matchMode "$MATCH_MODE" '{text:$text, packageName:$packageName, matchMode:$matchMode}')" \
+  "$(jq -cn --arg contentDescription "$CHAT_CONTENT_DESCRIPTION" --arg packageName "$APP_PACKAGE" --arg matchMode "$MATCH_MODE" '{contentDescription:$contentDescription, packageName:$packageName, matchMode:$matchMode}')" \
   "$TAP_CHAT_JSON"
 if ! jq -e --arg package "$APP_PACKAGE" '
   .ok == true and

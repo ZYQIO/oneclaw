@@ -31,6 +31,10 @@ FOLLOW_UP_SWIPE_START_X="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_
 FOLLOW_UP_SWIPE_START_Y="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y:-}"
 FOLLOW_UP_SWIPE_END_X="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X:-}"
 FOLLOW_UP_SWIPE_END_Y="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y:-}"
+FOLLOW_UP_SWIPE_START_X_RATIO="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO:-}"
+FOLLOW_UP_SWIPE_START_Y_RATIO="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO:-}"
+FOLLOW_UP_SWIPE_END_X_RATIO="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO:-}"
+FOLLOW_UP_SWIPE_END_Y_RATIO="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO:-}"
 FOLLOW_UP_SWIPE_DURATION_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS:-250}"
 FOLLOW_UP_FOREGROUND_TIMEOUT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS:-5000}"
 FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS:-250}"
@@ -46,6 +50,15 @@ FOLLOW_UP_INPUT_VALUE_RAW="$FOLLOW_UP_INPUT_VALUE"
 FOLLOW_UP_INPUT_TEXT_RAW="$FOLLOW_UP_INPUT_TEXT"
 FOLLOW_UP_INPUT_CONTENT_DESCRIPTION_RAW="$FOLLOW_UP_INPUT_CONTENT_DESCRIPTION"
 FOLLOW_UP_INPUT_RESOURCE_ID_RAW="$FOLLOW_UP_INPUT_RESOURCE_ID"
+FOLLOW_UP_SWIPE_START_X_RAW="$FOLLOW_UP_SWIPE_START_X"
+FOLLOW_UP_SWIPE_START_Y_RAW="$FOLLOW_UP_SWIPE_START_Y"
+FOLLOW_UP_SWIPE_END_X_RAW="$FOLLOW_UP_SWIPE_END_X"
+FOLLOW_UP_SWIPE_END_Y_RAW="$FOLLOW_UP_SWIPE_END_Y"
+FOLLOW_UP_SWIPE_START_X_RATIO_RAW="$FOLLOW_UP_SWIPE_START_X_RATIO"
+FOLLOW_UP_SWIPE_START_Y_RATIO_RAW="$FOLLOW_UP_SWIPE_START_Y_RATIO"
+FOLLOW_UP_SWIPE_END_X_RATIO_RAW="$FOLLOW_UP_SWIPE_END_X_RATIO"
+FOLLOW_UP_SWIPE_END_Y_RATIO_RAW="$FOLLOW_UP_SWIPE_END_Y_RATIO"
+FOLLOW_UP_SWIPE_DURATION_MS_RAW="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS:-}"
 
 usage() {
   cat <<'EOF'
@@ -64,6 +77,10 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y=2600] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X=720] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y=900] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO=0.5] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO=0.81] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO=0.5] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO=0.28] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS=350] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS=5000] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS=250] \
@@ -82,6 +99,7 @@ What it does:
 Follow-up note:
   - The optional wait/tap/input selectors are app and OEM specific.
   - Swipe coordinates are also device specific unless you already validated them on the same screen.
+  - Swipe ratios are resolved against the current target-window bounds and are safer across screen sizes.
   - Keep the current 30s reachability proof separate from follow-up-action proof.
   - Presets seed common follow-up envs but explicit env overrides still win.
 
@@ -135,6 +153,18 @@ apply_follow_up_preset() {
         FOLLOW_UP_INPUT_RESOURCE_ID="com.android.settings:id/search_src_text"
       fi
       ;;
+    settings-home-swipe-up)
+      TARGET_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE:-com.android.settings}"
+      if [[ -z "$FOLLOW_UP_SWIPE_START_X_RAW$FOLLOW_UP_SWIPE_START_Y_RAW$FOLLOW_UP_SWIPE_END_X_RAW$FOLLOW_UP_SWIPE_END_Y_RAW$FOLLOW_UP_SWIPE_START_X_RATIO_RAW$FOLLOW_UP_SWIPE_START_Y_RATIO_RAW$FOLLOW_UP_SWIPE_END_X_RATIO_RAW$FOLLOW_UP_SWIPE_END_Y_RATIO_RAW" ]]; then
+        FOLLOW_UP_SWIPE_START_X_RATIO="0.5"
+        FOLLOW_UP_SWIPE_START_Y_RATIO="0.81"
+        FOLLOW_UP_SWIPE_END_X_RATIO="0.5"
+        FOLLOW_UP_SWIPE_END_Y_RATIO="0.28"
+      fi
+      if [[ -z "$FOLLOW_UP_SWIPE_DURATION_MS_RAW" ]]; then
+        FOLLOW_UP_SWIPE_DURATION_MS="350"
+      fi
+      ;;
     *)
       echo "Unsupported cross-app preset: $FOLLOW_UP_PRESET" >&2
       exit 1
@@ -178,6 +208,15 @@ validate_non_negative_integer() {
   fi
 }
 
+validate_ratio_number() {
+  local name=$1
+  local raw=$2
+  if ! jq -en --arg value "$raw" '$value | tonumber | if . < 0 or . > 1 then error("range") else . end' >/dev/null 2>&1; then
+    echo "$name must be a number between 0 and 1." >&2
+    exit 1
+  fi
+}
+
 follow_up_wait_requested=false
 if [[ -n "$FOLLOW_UP_WAIT_TEXT" ]]; then
   follow_up_wait_requested=true
@@ -199,8 +238,15 @@ if [[ -n "$FOLLOW_UP_INPUT_VALUE" || "$follow_up_input_selector_requested" == "t
 fi
 
 follow_up_swipe_requested=false
-if [[ -n "$FOLLOW_UP_SWIPE_START_X$FOLLOW_UP_SWIPE_START_Y$FOLLOW_UP_SWIPE_END_X$FOLLOW_UP_SWIPE_END_Y" ]]; then
+if [[ -n "$FOLLOW_UP_SWIPE_START_X$FOLLOW_UP_SWIPE_START_Y$FOLLOW_UP_SWIPE_END_X$FOLLOW_UP_SWIPE_END_Y$FOLLOW_UP_SWIPE_START_X_RATIO$FOLLOW_UP_SWIPE_START_Y_RATIO$FOLLOW_UP_SWIPE_END_X_RATIO$FOLLOW_UP_SWIPE_END_Y_RATIO" ]]; then
   follow_up_swipe_requested=true
+fi
+
+follow_up_swipe_coordinate_mode="none"
+if [[ -n "$FOLLOW_UP_SWIPE_START_X$FOLLOW_UP_SWIPE_START_Y$FOLLOW_UP_SWIPE_END_X$FOLLOW_UP_SWIPE_END_Y" ]]; then
+  follow_up_swipe_coordinate_mode="absolute"
+elif [[ -n "$FOLLOW_UP_SWIPE_START_X_RATIO$FOLLOW_UP_SWIPE_START_Y_RATIO$FOLLOW_UP_SWIPE_END_X_RATIO$FOLLOW_UP_SWIPE_END_Y_RATIO" ]]; then
+  follow_up_swipe_coordinate_mode="ratio"
 fi
 
 if [[ "$follow_up_input_selector_requested" == "true" && -z "$FOLLOW_UP_INPUT_VALUE" ]]; then
@@ -209,21 +255,49 @@ if [[ "$follow_up_input_selector_requested" == "true" && -z "$FOLLOW_UP_INPUT_VA
 fi
 
 if [[ "$follow_up_swipe_requested" == "true" ]]; then
-  for required_value_name in \
-    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X \
-    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y \
-    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X \
-    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y; do
-    required_value="${!required_value_name:-}"
-    if [[ -z "$required_value" ]]; then
-      echo "$required_value_name is required when any swipe coordinate is set." >&2
+  if [[ "$follow_up_swipe_coordinate_mode" == "absolute" ]]; then
+    if [[ -z "$FOLLOW_UP_SWIPE_START_X" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X is required when any absolute swipe coordinate is set." >&2
       exit 1
     fi
-  done
-  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X" "$FOLLOW_UP_SWIPE_START_X"
-  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y" "$FOLLOW_UP_SWIPE_START_Y"
-  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X" "$FOLLOW_UP_SWIPE_END_X"
-  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y" "$FOLLOW_UP_SWIPE_END_Y"
+    if [[ -z "$FOLLOW_UP_SWIPE_START_Y" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y is required when any absolute swipe coordinate is set." >&2
+      exit 1
+    fi
+    if [[ -z "$FOLLOW_UP_SWIPE_END_X" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X is required when any absolute swipe coordinate is set." >&2
+      exit 1
+    fi
+    if [[ -z "$FOLLOW_UP_SWIPE_END_Y" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y is required when any absolute swipe coordinate is set." >&2
+      exit 1
+    fi
+    validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X" "$FOLLOW_UP_SWIPE_START_X"
+    validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y" "$FOLLOW_UP_SWIPE_START_Y"
+    validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X" "$FOLLOW_UP_SWIPE_END_X"
+    validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y" "$FOLLOW_UP_SWIPE_END_Y"
+  elif [[ "$follow_up_swipe_coordinate_mode" == "ratio" ]]; then
+    if [[ -z "$FOLLOW_UP_SWIPE_START_X_RATIO" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO is required when any relative swipe coordinate is set." >&2
+      exit 1
+    fi
+    if [[ -z "$FOLLOW_UP_SWIPE_START_Y_RATIO" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO is required when any relative swipe coordinate is set." >&2
+      exit 1
+    fi
+    if [[ -z "$FOLLOW_UP_SWIPE_END_X_RATIO" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO is required when any relative swipe coordinate is set." >&2
+      exit 1
+    fi
+    if [[ -z "$FOLLOW_UP_SWIPE_END_Y_RATIO" ]]; then
+      echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO is required when any relative swipe coordinate is set." >&2
+      exit 1
+    fi
+    validate_ratio_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO" "$FOLLOW_UP_SWIPE_START_X_RATIO"
+    validate_ratio_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO" "$FOLLOW_UP_SWIPE_START_Y_RATIO"
+    validate_ratio_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO" "$FOLLOW_UP_SWIPE_END_X_RATIO"
+    validate_ratio_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO" "$FOLLOW_UP_SWIPE_END_Y_RATIO"
+  fi
   validate_non_negative_integer "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS" "$FOLLOW_UP_SWIPE_DURATION_MS"
 fi
 
@@ -284,10 +358,15 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.follow_up.wait_match_mode=%s\n' "$FOLLOW_UP_WAIT_MATCH_MODE"
   printf 'cross_app.follow_up.tap_match_mode=%s\n' "$FOLLOW_UP_TAP_MATCH_MODE"
   printf 'cross_app.follow_up.input_match_mode=%s\n' "$FOLLOW_UP_INPUT_MATCH_MODE"
+  printf 'cross_app.follow_up.swipe_coordinate_mode=%s\n' "$follow_up_swipe_coordinate_mode"
   printf 'cross_app.follow_up.swipe_start_x=%s\n' "${FOLLOW_UP_SWIPE_START_X:-<empty>}"
   printf 'cross_app.follow_up.swipe_start_y=%s\n' "${FOLLOW_UP_SWIPE_START_Y:-<empty>}"
   printf 'cross_app.follow_up.swipe_end_x=%s\n' "${FOLLOW_UP_SWIPE_END_X:-<empty>}"
   printf 'cross_app.follow_up.swipe_end_y=%s\n' "${FOLLOW_UP_SWIPE_END_Y:-<empty>}"
+  printf 'cross_app.follow_up.swipe_start_x_ratio=%s\n' "${FOLLOW_UP_SWIPE_START_X_RATIO:-<empty>}"
+  printf 'cross_app.follow_up.swipe_start_y_ratio=%s\n' "${FOLLOW_UP_SWIPE_START_Y_RATIO:-<empty>}"
+  printf 'cross_app.follow_up.swipe_end_x_ratio=%s\n' "${FOLLOW_UP_SWIPE_END_X_RATIO:-<empty>}"
+  printf 'cross_app.follow_up.swipe_end_y_ratio=%s\n' "${FOLLOW_UP_SWIPE_END_Y_RATIO:-<empty>}"
   printf 'cross_app.follow_up.swipe_duration_ms=%s\n' "$FOLLOW_UP_SWIPE_DURATION_MS"
   printf 'cross_app.follow_up.foreground_timeout_ms=%s\n' "$FOLLOW_UP_FOREGROUND_TIMEOUT_MS"
   printf 'cross_app.follow_up.foreground_poll_interval_ms=%s\n' "$FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS"
@@ -445,6 +524,74 @@ extract_visible_text_sample_json() {
   jq -c '[.payload.visibleText[]? | strings | select(length > 0)][0:8]' "$snapshot_file" 2>/dev/null || printf '%s' '[]'
 }
 
+extract_active_window_bounds_json() {
+  local snapshot_file=$1
+  jq -ec '
+    (.payload.nodes // [])
+    | map(select(.bounds != null))
+    | if length == 0 then
+        error("missing bounds")
+      else
+        {
+          left: (map(.bounds.left) | min),
+          top: (map(.bounds.top) | min),
+          right: (map(.bounds.right) | max),
+          bottom: (map(.bounds.bottom) | max)
+        }
+      end
+  ' "$snapshot_file" 2>/dev/null
+}
+
+resolve_swipe_coordinates_json() {
+  local snapshot_file=$1
+  if [[ "$follow_up_swipe_coordinate_mode" == "absolute" ]]; then
+    jq -cn \
+      --arg startX "$FOLLOW_UP_SWIPE_START_X" \
+      --arg startY "$FOLLOW_UP_SWIPE_START_Y" \
+      --arg endX "$FOLLOW_UP_SWIPE_END_X" \
+      --arg endY "$FOLLOW_UP_SWIPE_END_Y" \
+      '{
+        startX: ($startX | tonumber),
+        startY: ($startY | tonumber),
+        endX: ($endX | tonumber),
+        endY: ($endY | tonumber),
+        coordinateMode: "absolute",
+        bounds: null
+      }'
+    return 0
+  fi
+
+  local bounds_json
+  if ! bounds_json="$(extract_active_window_bounds_json "$snapshot_file")"; then
+    echo "Unable to derive swipe bounds from the current target window snapshot." >&2
+    jq '.' "$snapshot_file" >&2
+    exit 1
+  fi
+
+  jq -cn \
+    --argjson bounds "$bounds_json" \
+    --arg startXRatio "$FOLLOW_UP_SWIPE_START_X_RATIO" \
+    --arg startYRatio "$FOLLOW_UP_SWIPE_START_Y_RATIO" \
+    --arg endXRatio "$FOLLOW_UP_SWIPE_END_X_RATIO" \
+    --arg endYRatio "$FOLLOW_UP_SWIPE_END_Y_RATIO" \
+    '
+      ($bounds.right - $bounds.left) as $width
+      | ($bounds.bottom - $bounds.top) as $height
+      | if $width <= 0 or $height <= 0 then
+          error("invalid bounds")
+        else
+          {
+            startX: ($bounds.left + ($width * ($startXRatio | tonumber))),
+            startY: ($bounds.top + ($height * ($startYRatio | tonumber))),
+            endX: ($bounds.left + ($width * ($endXRatio | tonumber))),
+            endY: ($bounds.top + ($height * ($endYRatio | tonumber))),
+            coordinateMode: "ratio",
+            bounds: $bounds
+          }
+        end
+    '
+}
+
 echo "local_host.base_url=$BASE_URL"
 echo "local_host.ui_cross_app_probe=starting"
 echo "artifacts.dir=$ARTIFACT_DIR"
@@ -512,11 +659,13 @@ follow_up_wait_matched_text=""
 follow_up_swipe_ok=false
 follow_up_swipe_strategy=""
 follow_up_swipe_pre_package=""
+follow_up_swipe_coordinate_mode_json='null'
 follow_up_swipe_start_x_json='null'
 follow_up_swipe_start_y_json='null'
 follow_up_swipe_end_x_json='null'
 follow_up_swipe_end_y_json='null'
 follow_up_swipe_duration_ms_json='null'
+follow_up_swipe_bounds_json='null'
 follow_up_swipe_before_visible_text_json='null'
 follow_up_swipe_after_visible_text_json='null'
 follow_up_swipe_visible_text_changed_json='null'
@@ -588,6 +737,7 @@ if [[ "$follow_up_requested" == "true" ]]; then
   fi
 
   if [[ "$follow_up_swipe_requested" == "true" ]]; then
+    resolved_swipe_json='null'
     invoke_command "ui.state" "" "$FOLLOW_UP_PRE_SWIPE_STATE_JSON"
     if ! jq -e --arg package "$TARGET_PACKAGE" '
       .ok == true and
@@ -599,26 +749,29 @@ if [[ "$follow_up_requested" == "true" ]]; then
     fi
     follow_up_swipe_pre_package="$(jq -r '.payload.packageName // ""' "$FOLLOW_UP_PRE_SWIPE_STATE_JSON" 2>/dev/null || printf '%s' "")"
     follow_up_swipe_before_visible_text_json="$(extract_visible_text_sample_json "$FOLLOW_UP_PRE_SWIPE_STATE_JSON")"
-    follow_up_swipe_start_x_json="$FOLLOW_UP_SWIPE_START_X"
-    follow_up_swipe_start_y_json="$FOLLOW_UP_SWIPE_START_Y"
-    follow_up_swipe_end_x_json="$FOLLOW_UP_SWIPE_END_X"
-    follow_up_swipe_end_y_json="$FOLLOW_UP_SWIPE_END_Y"
+    resolved_swipe_json="$(resolve_swipe_coordinates_json "$FOLLOW_UP_PRE_SWIPE_STATE_JSON")"
+    follow_up_swipe_coordinate_mode_json="$(jq -c '.coordinateMode' <<<"$resolved_swipe_json")"
+    follow_up_swipe_start_x_json="$(jq -c '.startX' <<<"$resolved_swipe_json")"
+    follow_up_swipe_start_y_json="$(jq -c '.startY' <<<"$resolved_swipe_json")"
+    follow_up_swipe_end_x_json="$(jq -c '.endX' <<<"$resolved_swipe_json")"
+    follow_up_swipe_end_y_json="$(jq -c '.endY' <<<"$resolved_swipe_json")"
     follow_up_swipe_duration_ms_json="$FOLLOW_UP_SWIPE_DURATION_MS"
+    follow_up_swipe_bounds_json="$(jq -c '.bounds' <<<"$resolved_swipe_json")"
 
     invoke_command \
       "ui.swipe" \
       "$(jq -cn \
-        --arg startX "$FOLLOW_UP_SWIPE_START_X" \
-        --arg startY "$FOLLOW_UP_SWIPE_START_Y" \
-        --arg endX "$FOLLOW_UP_SWIPE_END_X" \
-        --arg endY "$FOLLOW_UP_SWIPE_END_Y" \
+        --argjson startX "$follow_up_swipe_start_x_json" \
+        --argjson startY "$follow_up_swipe_start_y_json" \
+        --argjson endX "$follow_up_swipe_end_x_json" \
+        --argjson endY "$follow_up_swipe_end_y_json" \
         --arg durationMs "$FOLLOW_UP_SWIPE_DURATION_MS" \
         --arg packageName "$TARGET_PACKAGE" \
         '{
-          startX: ($startX | tonumber),
-          startY: ($startY | tonumber),
-          endX: ($endX | tonumber),
-          endY: ($endY | tonumber),
+          startX: $startX,
+          startY: $startY,
+          endX: $endX,
+          endY: $endY,
           durationMs: ($durationMs | tonumber),
           packageName: $packageName
         }')" \
@@ -848,11 +1001,13 @@ jq -n \
   --argjson followUpWaitOk "$( [[ "$follow_up_wait_ok" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpSwipeRequested "$( [[ "$follow_up_swipe_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpSwipeOk "$( [[ "$follow_up_swipe_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpSwipeCoordinateMode "$follow_up_swipe_coordinate_mode_json" \
   --argjson followUpSwipeStartX "$follow_up_swipe_start_x_json" \
   --argjson followUpSwipeStartY "$follow_up_swipe_start_y_json" \
   --argjson followUpSwipeEndX "$follow_up_swipe_end_x_json" \
   --argjson followUpSwipeEndY "$follow_up_swipe_end_y_json" \
   --argjson followUpSwipeDurationMs "$follow_up_swipe_duration_ms_json" \
+  --argjson followUpSwipeBounds "$follow_up_swipe_bounds_json" \
   --argjson followUpSwipeVisibleTextBefore "$follow_up_swipe_before_visible_text_json" \
   --argjson followUpSwipeVisibleTextAfter "$follow_up_swipe_after_visible_text_json" \
   --argjson followUpSwipeVisibleTextChanged "$follow_up_swipe_visible_text_changed_json" \
@@ -887,6 +1042,7 @@ jq -n \
       waitMatchedText: (if $followUpWaitMatchedText == "" then null else $followUpWaitMatchedText end),
       waitOk: $followUpWaitOk,
       swipeRequested: $followUpSwipeRequested,
+      swipeCoordinateMode: $followUpSwipeCoordinateMode,
       swipeStartX: $followUpSwipeStartX,
       swipeStartY: $followUpSwipeStartY,
       swipeEndX: $followUpSwipeEndX,
@@ -895,6 +1051,7 @@ jq -n \
       swipeStrategy: (if $followUpSwipeStrategy == "" then null else $followUpSwipeStrategy end),
       swipeOk: $followUpSwipeOk,
       swipePrePackage: (if $followUpSwipePrePackage == "" then null else $followUpSwipePrePackage end),
+      swipeBounds: $followUpSwipeBounds,
       swipeVisibleTextBefore: $followUpSwipeVisibleTextBefore,
       swipeVisibleTextAfter: $followUpSwipeVisibleTextAfter,
       swipeVisibleTextChanged: $followUpSwipeVisibleTextChanged,
