@@ -116,8 +116,9 @@ export function parseConnectedDeviceCount(raw: string): number {
 export function parseBroadcastResult(raw: string): BroadcastResult {
   const resultCodeMatch = raw.match(/Broadcast completed: result=(-?\d+)/);
   const resultDataMatch = raw.match(/data="([^"]+)"/);
+  const rawResultCode = resultCodeMatch?.[1];
   return {
-    resultCode: resultCodeMatch ? Number.parseInt(resultCodeMatch[1], 10) : undefined,
+    resultCode: rawResultCode ? Number.parseInt(rawResultCode, 10) : undefined,
     resultData: resultDataMatch?.[1],
   };
 }
