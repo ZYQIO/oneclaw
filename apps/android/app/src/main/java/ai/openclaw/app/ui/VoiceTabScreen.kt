@@ -443,7 +443,13 @@ private fun VoiceTurnBubble(entry: VoiceConversationEntry) {
           color = if (isUser) mobileAccent else mobileTextSecondary,
         )
         Text(
-          if (entry.isStreaming && entry.text.isBlank()) language.pick("Listening response…", "正在接收回应…") else entry.text,
+          if (entry.isStreaming && entry.text.isBlank()) {
+            language.pick("Listening response…", "正在接收回应…")
+          } else if (isUser) {
+            entry.text
+          } else {
+            localizeVoiceConversationText(language, entry.text)
+          },
           style = mobileCallout,
           color = mobileText,
         )

@@ -220,6 +220,22 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeVoiceConversationText_translatesDefaultFailure() {
+    assertEquals(
+      "语音请求失败。",
+      localizeVoiceConversationText(AppLanguage.SimplifiedChinese, "Voice request failed"),
+    )
+  }
+
+  @Test
+  fun localizeVoiceConversationText_reusesChatErrorTranslation() {
+    assertEquals(
+      "不可用：未连接",
+      localizeVoiceConversationText(AppLanguage.SimplifiedChinese, "UNAVAILABLE: not connected"),
+    )
+  }
+
+  @Test
   fun onboardingTokenPlaceholder_translatesToChinese() {
     assertEquals("令牌", onboardingTokenPlaceholder(AppLanguage.SimplifiedChinese))
   }

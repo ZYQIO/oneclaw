@@ -609,6 +609,20 @@ internal fun localizeChatError(
   }
 }
 
+internal fun localizeVoiceConversationText(
+  language: AppLanguage,
+  text: String,
+): String {
+  val trimmed = text.trim()
+  if (trimmed.isEmpty()) return text
+  localizeChatError(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  return when (trimmed) {
+    "Response aborted" -> language.pick(trimmed, "响应已中止。")
+    "Voice request failed" -> language.pick(trimmed, "语音请求失败。")
+    else -> text
+  }
+}
+
 private fun localizeChatErrorSegmentValue(
   language: AppLanguage,
   raw: String,
