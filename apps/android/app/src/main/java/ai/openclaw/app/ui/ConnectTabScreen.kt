@@ -1056,7 +1056,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
           Text(t("Advanced controls", "高级控制"), style = mobileHeadline, color = mobileText)
-          Text(t("Setup code, endpoint, TLS, token, password, onboarding.", "Setup code、端点、TLS、token、密码、onboarding。"), style = mobileCaption1, color = mobileTextSecondary)
+          Text(gatewayAdvancedControlsDescription(language), style = mobileCaption1, color = mobileTextSecondary)
         }
         Icon(
           imageVector = if (advancedOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -1095,7 +1095,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             Text(t("Connection method", "连接方式"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
               MethodChip(
-                label = t("Setup Code", "Setup Code"),
+                label = gatewaySetupCodeLabel(language),
                 active = inputMode == ConnectInputMode.SetupCode,
                 onClick = { inputMode = ConnectInputMode.SetupCode },
               )
@@ -1111,14 +1111,14 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
             CommandBlock("openclaw qr --json")
 
             if (inputMode == ConnectInputMode.SetupCode) {
-              Text(t("Setup Code", "Setup Code"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(gatewaySetupCodeLabel(language), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = setupCode,
                 onValueChange = {
                   setupCode = it
                   validationText = null
                 },
-                placeholder = { Text(t("Paste setup code", "粘贴 setup code"), style = mobileBody, color = mobileTextTertiary) },
+                placeholder = { Text(gatewaySetupCodePlaceholder(language), style = mobileBody, color = mobileTextTertiary) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
                 maxLines = 5,
@@ -1152,7 +1152,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 )
               }
 
-              Text(t("Host", "Host"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(gatewayHostLabel(language), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = manualHostInput,
                 onValueChange = {
@@ -1209,11 +1209,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 )
               }
 
-              Text(t("Token (optional)", "Token（可选）"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(gatewayTokenLabel(language), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = gatewayToken,
                 onValueChange = { viewModel.setGatewayToken(it) },
-                placeholder = { Text(t("token", "token"), style = mobileBody, color = mobileTextTertiary) },
+                placeholder = { Text(onboardingTokenPlaceholder(language), style = mobileBody, color = mobileTextTertiary) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -1222,11 +1222,11 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 colors = outlinedColors(),
               )
 
-              Text(t("Password (optional)", "Password（可选）"), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+              Text(gatewayPasswordLabel(language), style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
               OutlinedTextField(
                 value = passwordInput,
                 onValueChange = { passwordInput = it },
-                placeholder = { Text(t("password", "password"), style = mobileBody, color = mobileTextTertiary) },
+                placeholder = { Text(onboardingPasswordPlaceholder(language), style = mobileBody, color = mobileTextTertiary) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),

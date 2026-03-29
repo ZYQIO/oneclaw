@@ -1059,7 +1059,7 @@ private fun GatewayStep(
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
           Text(language.pick("Advanced setup", "高级设置"), style = onboardingHeadlineStyle, color = onboardingText)
-          Text(language.pick("Paste setup code or enter host/port manually.", "粘贴 setup code，或手动输入 host/port。"), style = onboardingCaption1Style, color = onboardingTextSecondary)
+          Text(gatewayAdvancedSetupHint(language), style = onboardingCaption1Style, color = onboardingTextSecondary)
         }
         Icon(
           imageVector = if (advancedOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -1074,7 +1074,7 @@ private fun GatewayStep(
         GatewayModeToggle(inputMode = inputMode, onInputModeChange = onInputModeChange)
 
         if (inputMode == GatewayInputMode.SetupCode) {
-          Text(language.pick("SETUP CODE", "SETUP CODE"), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
+          Text(gatewaySetupCodeLabel(language), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
           OutlinedTextField(
             value = setupCode,
             onValueChange = onSetupCodeChange,
@@ -1105,7 +1105,7 @@ private fun GatewayStep(
             })
           }
 
-          Text(language.pick("HOST", "HOST"), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
+          Text(gatewayHostLabel(language), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
           OutlinedTextField(
             value = manualHost,
             onValueChange = onManualHostChange,
@@ -1150,7 +1150,7 @@ private fun GatewayStep(
             )
           }
 
-          Text(language.pick("TOKEN (OPTIONAL)", "TOKEN（可选）"), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
+          Text(gatewayTokenLabel(language), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
           OutlinedTextField(
             value = gatewayToken,
             onValueChange = onTokenChange,
@@ -1164,7 +1164,7 @@ private fun GatewayStep(
               onboardingTextFieldColors(),
           )
 
-          Text(language.pick("PASSWORD (OPTIONAL)", "PASSWORD（可选）"), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
+          Text(gatewayPasswordLabel(language), style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp), color = onboardingTextSecondary)
           OutlinedTextField(
             value = gatewayPassword,
             onValueChange = onPasswordChange,

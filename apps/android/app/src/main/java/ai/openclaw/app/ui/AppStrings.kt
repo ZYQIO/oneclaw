@@ -307,6 +307,30 @@ internal fun onboardingTokenPlaceholder(language: AppLanguage): String =
 internal fun onboardingPasswordPlaceholder(language: AppLanguage): String =
   language.pick("password", "密码")
 
+internal fun gatewaySetupCodeLabel(language: AppLanguage): String =
+  language.pick("Setup Code", "设置码")
+
+internal fun gatewaySetupCodePlaceholder(language: AppLanguage): String =
+  language.pick("Paste setup code", "粘贴设置码")
+
+internal fun gatewayHostLabel(language: AppLanguage): String =
+  language.pick("Host", "主机")
+
+internal fun gatewayTokenLabel(language: AppLanguage): String =
+  language.pick("Token (optional)", "令牌（可选）")
+
+internal fun gatewayPasswordLabel(language: AppLanguage): String =
+  language.pick("Password (optional)", "密码（可选）")
+
+internal fun gatewayAdvancedControlsDescription(language: AppLanguage): String =
+  language.pick(
+    "Setup code, endpoint, TLS, token, password, onboarding.",
+    "设置码、端点、TLS、令牌、密码和引导流程。",
+  )
+
+internal fun gatewayAdvancedSetupHint(language: AppLanguage): String =
+  language.pick("Paste setup code or enter host/port manually.", "粘贴设置码，或手动输入主机/端口。")
+
 internal fun onboardingSmsPermissionTitle(language: AppLanguage): String =
   language.pick("SMS", "短信")
 

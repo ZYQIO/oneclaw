@@ -151,6 +151,42 @@ class AppStringsTest {
   }
 
   @Test
+  fun gatewaySetupCodeLabel_translatesToChinese() {
+    assertEquals("设置码", gatewaySetupCodeLabel(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
+  fun gatewayHostLabel_translatesToChinese() {
+    assertEquals("主机", gatewayHostLabel(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
+  fun gatewayTokenLabel_translatesToChinese() {
+    assertEquals("令牌（可选）", gatewayTokenLabel(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
+  fun gatewayPasswordLabel_translatesToChinese() {
+    assertEquals("密码（可选）", gatewayPasswordLabel(AppLanguage.SimplifiedChinese))
+  }
+
+  @Test
+  fun gatewayAdvancedControlsDescription_translatesToChinese() {
+    assertEquals(
+      "设置码、端点、TLS、令牌、密码和引导流程。",
+      gatewayAdvancedControlsDescription(AppLanguage.SimplifiedChinese),
+    )
+  }
+
+  @Test
+  fun gatewayAdvancedSetupHint_translatesToChinese() {
+    assertEquals(
+      "粘贴设置码，或手动输入主机/端口。",
+      gatewayAdvancedSetupHint(AppLanguage.SimplifiedChinese),
+    )
+  }
+
+  @Test
   fun onboardingSmsPermissionTitle_translatesToChinese() {
     assertEquals("短信", onboardingSmsPermissionTitle(AppLanguage.SimplifiedChinese))
   }
