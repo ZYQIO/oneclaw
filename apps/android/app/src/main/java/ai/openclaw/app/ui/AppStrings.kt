@@ -12,6 +12,7 @@ private val gatewayClosedRegex = Regex("""^Gateway closed: (.+)$""", RegexOption
 private val gatewayClosedWithCodeRegex = Regex("""^gateway closed \((\d+)\): (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayAuthHintRegex = Regex("""^unauthorized: gateway (token|password) (missing|mismatch) \((.+)\)$""", RegexOption.IGNORE_CASE)
 private val codexRequestFailedRegex = Regex("""^OpenAI Codex request failed(?: \(([^)]+)\))?(?:\s*\|\s*(.+))?$""")
+private val runtimePrefixedErrorRegex = Regex("""^([A-Z_]+):\s*(.+)$""")
 private val usageLimitRegex = Regex("""^The usage limit has been reached(?:\s*\|\s*errorType=(.+))?$""", RegexOption.IGNORE_CASE)
 
 internal val LocalAppLanguage = staticCompositionLocalOf { AppLanguage.English }
@@ -449,6 +450,83 @@ private fun localizeTalkModeReason(
   }
 }
 
+private fun localizeRuntimePrefixedError(
+  language: AppLanguage,
+  message: String,
+): String? {
+  val trimmed = message.trim()
+  val match = runtimePrefixedErrorRegex.matchEntire(trimmed) ?: return null
+  val code = match.groupValues[1]
+  val detail = match.groupValues[2]
+  val localizedCode = localizeRuntimeErrorCode(language, code)
+  val localizedDetail = localizeRuntimeErrorDetail(language, detail)
+  if (localizedCode == code && localizedDetail == detail.trim()) {
+    return null
+  }
+  return language.pick(trimmed, "$localizedCode：$localizedDetail")
+}
+
+private fun localizeRuntimeErrorCode(
+  language: AppLanguage,
+  code: String,
+): String {
+  val trimmed = code.trim()
+  return when (trimmed) {
+    "ACTION_UNAVAILABLE" -> language.pick(trimmed, "操作不可用")
+    "A2UI_HOST_UNAVAILABLE" -> language.pick(trimmed, "A2UI Host 不可用")
+    "CALENDAR_UNAVAILABLE" -> language.pick(trimmed, "日历不可用")
+    "CALL_LOG_UNAVAILABLE" -> language.pick(trimmed, "通话记录不可用")
+    "CONTACTS_UNAVAILABLE" -> language.pick(trimmed, "联系人不可用")
+    "INVALID_REQUEST" -> language.pick(trimmed, "请求无效")
+    "LOCATION_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台定位不可用")
+    "LOCATION_UNAVAILABLE" -> language.pick(trimmed, "位置不可用")
+    "MOTION_UNAVAILABLE" -> language.pick(trimmed, "运动不可用")
+    "NODE_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台节点不可用")
+    "NOTIFICATIONS_UNAVAILABLE" -> language.pick(trimmed, "通知不可用")
+    "PEDOMETER_UNAVAILABLE" -> language.pick(trimmed, "计步器不可用")
+    "PHOTOS_UNAVAILABLE" -> language.pick(trimmed, "照片不可用")
+    "SMS_UNAVAILABLE" -> language.pick(trimmed, "短信不可用")
+    "UI_AUTOMATION_UNAVAILABLE" -> language.pick(trimmed, "UI 自动化不可用")
+    "UNAVAILABLE" -> language.pick(trimmed, "不可用")
+    else -> trimmed
+  }
+}
+
+private fun localizeRuntimeErrorDetail(
+  language: AppLanguage,
+  detail: String,
+): String {
+  val trimmed = detail.trim()
+  localizeConnectionStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  localizeRemoteAccessStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  localizeRuntimePrefixedError(language, trimmed)?.let { return it }
+  return when (trimmed) {
+    "A2UI host not reachable" -> language.pick(trimmed, "A2UI Host 无法访问")
+    "accessibility service is enabled but not yet bound" ->
+      language.pick(trimmed, "无障碍服务已启用，但尚未绑定")
+    "canvas unavailable" -> language.pick(trimmed, "Canvas 不可用")
+    "message or attachment required" -> language.pick(trimmed, "需要提供消息或附件")
+    "not connected" -> language.pick(trimmed, "未连接")
+    "paramsJSON required" -> language.pick(trimmed, "需要提供 paramsJSON")
+    "request failed" -> language.pick(trimmed, "请求失败")
+    "runId required" -> language.pick(trimmed, "需要提供 runId")
+    "SMS not available on this device" -> language.pick(trimmed, "此设备不支持短信")
+    "unknown command" -> language.pick(trimmed, "未知命令")
+    else ->
+      when {
+        trimmed.startsWith("expected JSON object with ", ignoreCase = true) ->
+          language.pick(
+            trimmed,
+            "需要包含 ${trimmed.removePrefix("expected JSON object with ").trim()} 的 JSON 对象",
+          )
+        trimmed.equals("expected JSON object", ignoreCase = true) ->
+          language.pick(trimmed, "需要 JSON 对象")
+        else -> trimmed
+      }
+  }
+}
+
 internal fun localizeChatError(
   language: AppLanguage,
   message: String,
@@ -459,6 +537,7 @@ internal fun localizeChatError(
   localizeConnectionStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
   localizeRemoteAccessStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
   translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  localizeRuntimePrefixedError(language, trimmed)?.let { return it }
 
   codexRequestFailedRegex.matchEntire(trimmed)?.let { match ->
     val statusMetadata = match.groupValues.getOrNull(1)?.trim().orEmpty()

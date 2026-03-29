@@ -163,6 +163,36 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesUnavailablePrefixError() {
+    assertEquals(
+      "不可用：未连接",
+      localizeChatError(AppLanguage.SimplifiedChinese, "UNAVAILABLE: not connected"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesInvalidRequestPrefixError() {
+    assertEquals(
+      "请求无效：需要提供消息或附件",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "INVALID_REQUEST: message or attachment required",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiAutomationUnavailablePrefixError() {
+    assertEquals(
+      "UI 自动化不可用：无障碍服务已启用，但尚未绑定",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_AUTOMATION_UNAVAILABLE: accessibility service is enabled but not yet bound",
+      ),
+    )
+  }
+
+  @Test
   fun localizeChatError_reusesKnownGatewayTranslation() {
     assertEquals(
       "网关错误：未授权：gateway token 不匹配（提供 gateway auth token）",
