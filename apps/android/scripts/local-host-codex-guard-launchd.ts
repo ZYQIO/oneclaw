@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 import { buildLaunchAgentPlist } from "../../../src/daemon/launchd-plist.js";
 import { resolveHomeDir, resolveUserPathWithHome } from "../../../src/daemon/paths.js";
 
-export type GuardLaunchdCommand = "install" | "status" | "uninstall";
+export type GuardLaunchdCommand = "install" | "status" | "uninstall" | "write-env";
 
 export type GuardLaunchdCliOptions = {
   command: GuardLaunchdCommand;
@@ -21,6 +21,7 @@ export type GuardLaunchdCliOptions = {
   port: number;
   watchIntervalMs?: number;
   devicePollIntervalMs?: number;
+  token?: string;
   source: string;
   json: boolean;
 };
@@ -50,6 +51,9 @@ export type GuardLaunchdStatus = {
   wrapperPath: string;
   stateDir: string;
   artifactDir: string;
+  envFile: string;
+  envFileExists: boolean;
+  tokenConfigured: boolean;
   installed: boolean;
   loaded: boolean;
   runtime?: {
@@ -74,7 +78,9 @@ const DEFAULT_STDOUT_BASENAME = "guard.log";
 const DEFAULT_STDERR_BASENAME = "guard.err.log";
 const DEFAULT_LOG_DIRNAME = "logs";
 const DEFAULT_ARTIFACT_DIRNAME = "artifacts";
+const DEFAULT_ENV_BASENAME = "guard.env";
 const REQUIRED_ENV_KEY = "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN";
+const TOKEN_PLACEHOLDER = "<token-from-connect-tab>";
 
 function usage(): string {
   return [
@@ -82,6 +88,7 @@ function usage(): string {
     "  pnpm android:local-host:codex-guard:launchd -- [install] --env-file <path>",
     "  pnpm android:local-host:codex-guard:launchd -- status",
     "  pnpm android:local-host:codex-guard:launchd -- uninstall",
+    "  pnpm android:local-host:codex-guard:launchd -- write-env [--token <token>]",
     "",
     "Options:",
     "  --env-file <path>",
@@ -95,11 +102,13 @@ function usage(): string {
     "  --port <port>",
     "  --watch-interval-ms <ms>",
     "  --device-poll-interval-ms <ms>",
+    "  --token <token>",
     "  --source <label>",
     "  --json",
     "",
     "Notes:",
     "  - install requires an env file that exports OPENCLAW_ANDROID_LOCAL_HOST_TOKEN.",
+    "  - write-env creates or updates that env file, defaulting to ~/.openclaw/android-local-host-codex-guard/guard.env.",
     "  - default install mode uses adb forward + wait-for-device + watch.",
     "  - installed state lives under ~/.openclaw/android-local-host-codex-guard by default.",
   ].join("\n");
@@ -155,6 +164,7 @@ export function parseCli(
       port: { type: "string" },
       "watch-interval-ms": { type: "string" },
       "device-poll-interval-ms": { type: "string" },
+      token: { type: "string" },
       source: { type: "string" },
       json: { type: "boolean", default: false },
       help: { type: "boolean", short: "h" },
@@ -167,7 +177,12 @@ export function parseCli(
   }
 
   const commandRaw = parsed.positionals[0]?.trim() || "install";
-  if (commandRaw !== "install" && commandRaw !== "status" && commandRaw !== "uninstall") {
+  if (
+    commandRaw !== "install" &&
+    commandRaw !== "status" &&
+    commandRaw !== "uninstall" &&
+    commandRaw !== "write-env"
+  ) {
     throw new Error(`Unsupported command: ${commandRaw}`);
   }
   const transportRaw =
@@ -209,6 +224,7 @@ export function parseCli(
         env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_DEVICE_POLL_INTERVAL_MS,
       "--device-poll-interval-ms",
     ),
+    token: trimOptional(parsed.values.token ?? env.OPENCLAW_ANDROID_LOCAL_HOST_TOKEN),
     source:
       trimOptional(parsed.values.source ?? env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_GUARD_SOURCE) ??
       DEFAULT_SOURCE,
@@ -369,6 +385,16 @@ function buildWrapperScript(params: {
   ].join("\n");
 }
 
+export function buildGuardEnvFileContent(token?: string): string {
+  const resolvedToken = trimOptional(token) ?? TOKEN_PLACEHOLDER;
+  return [
+    "# OpenClaw Android local-host Codex guard",
+    "# Replace the placeholder below with the bearer token shown in the phone's Connect tab.",
+    `export ${REQUIRED_ENV_KEY}=${shellQuote(resolvedToken)}`,
+    "",
+  ].join("\n");
+}
+
 export function resolveGuardLaunchdPlan(
   options: Omit<GuardLaunchdCliOptions, "command" | "json">,
   env: NodeJS.ProcessEnv = process.env,
@@ -398,16 +424,14 @@ export function resolveGuardLaunchdPlan(
   });
   const envFile = options.envFile
     ? resolveUserPathWithHome(options.envFile, home)
-    : undefined;
-  const wrapperScript = envFile
-    ? buildWrapperScript({
-        repoRoot,
-        envFile,
-        nodeBin: process.execPath,
-        tsxCliPath,
-        commandArgs,
-      })
-    : "";
+    : path.join(stateDir, DEFAULT_ENV_BASENAME);
+  const wrapperScript = buildWrapperScript({
+    repoRoot,
+    envFile,
+    nodeBin: process.execPath,
+    tsxCliPath,
+    commandArgs,
+  });
   const plist = buildLaunchAgentPlist({
     label: options.label,
     comment: "OpenClaw Android local-host Codex auth guard",
@@ -419,7 +443,7 @@ export function resolveGuardLaunchdPlan(
   return {
     label: options.label,
     repoRoot,
-    ...(envFile ? { envFile } : {}),
+    envFile,
     stateDir,
     artifactDir,
     logDir,
@@ -471,10 +495,28 @@ async function ensureFileExists(pathname: string, label: string): Promise<void> 
   }
 }
 
+function hasConfiguredToken(environment: Record<string, string>): boolean {
+  const token = trimOptional(environment[REQUIRED_ENV_KEY]);
+  return token != null && token !== TOKEN_PLACEHOLDER;
+}
+
+async function writeGuardEnv(options: GuardLaunchdCliOptions): Promise<{
+  envFile: string;
+  tokenConfigured: boolean;
+}> {
+  const plan = resolveGuardLaunchdPlan(options, process.env);
+  await mkdir(path.dirname(plan.envFile), { recursive: true, mode: 0o700 });
+  await chmod(path.dirname(plan.envFile), 0o700);
+  const content = buildGuardEnvFileContent(options.token);
+  await writeFile(plan.envFile, content, { mode: 0o600 });
+  await chmod(plan.envFile, 0o600);
+  return {
+    envFile: plan.envFile,
+    tokenConfigured: trimOptional(options.token) != null,
+  };
+}
+
 async function installGuard(options: GuardLaunchdCliOptions): Promise<GuardLaunchdStatus> {
-  if (!options.envFile) {
-    throw new Error("--env-file is required for install.");
-  }
   const adbBin = resolveAdbBinOrThrow(options);
   const plan = resolveGuardLaunchdPlan(
     {
@@ -483,11 +525,18 @@ async function installGuard(options: GuardLaunchdCliOptions): Promise<GuardLaunc
     },
     process.env,
   );
-  const envVars = await readEnvFile(plan.envFile ?? options.envFile);
+  await ensureFileExists(plan.envFile, "Env file");
+  const envVars = await readEnvFile(plan.envFile);
   if (!trimOptional(envVars[REQUIRED_ENV_KEY])) {
-    throw new Error(`Env file must define ${REQUIRED_ENV_KEY}.`);
+    throw new Error(
+      `Env file must define ${REQUIRED_ENV_KEY}. Run \`pnpm android:local-host:codex-guard:launchd -- write-env --env-file ${shellQuote(plan.envFile)}\` first.`,
+    );
   }
-  await ensureFileExists(plan.envFile ?? options.envFile, "Env file");
+  if (!hasConfiguredToken(envVars)) {
+    throw new Error(
+      `Env file still contains the placeholder token. Update ${plan.envFile} with the real Connect-tab bearer token or rerun write-env with --token.`,
+    );
+  }
   await ensureFileExists(path.join(plan.repoRoot, "apps/android/scripts/local-host-codex-sync.ts"), "Guard script");
   await ensureFileExists(path.join(plan.repoRoot, "node_modules/tsx/dist/cli.mjs"), "tsx runtime");
 
@@ -564,6 +613,14 @@ async function readLatestArtifact(pathname: string): Promise<unknown> {
 }
 
 async function readGuardStatusFromPlan(plan: GuardLaunchdPlan): Promise<GuardLaunchdStatus> {
+  let envFileExists = true;
+  let tokenConfigured = false;
+  try {
+    const envVars = await readEnvFile(plan.envFile);
+    tokenConfigured = hasConfiguredToken(envVars);
+  } catch {
+    envFileExists = false;
+  }
   let installed = true;
   try {
     await access(plan.plistPath);
@@ -584,6 +641,9 @@ async function readGuardStatusFromPlan(plan: GuardLaunchdPlan): Promise<GuardLau
     wrapperPath: plan.wrapperPath,
     stateDir: plan.stateDir,
     artifactDir: plan.artifactDir,
+    envFile: plan.envFile,
+    envFileExists,
+    tokenConfigured,
     installed,
     loaded,
     ...(runtime && Object.keys(runtime).length > 0 ? { runtime } : {}),
@@ -604,6 +664,9 @@ function printInstallStatus(status: GuardLaunchdStatus): void {
   console.log(`wrapper.path=${status.wrapperPath}`);
   console.log(`state.dir=${status.stateDir}`);
   console.log(`artifact.dir=${status.artifactDir}`);
+  console.log(`env.path=${status.envFile}`);
+  console.log(`env.exists=${String(status.envFileExists)}`);
+  console.log(`env.token_configured=${String(status.tokenConfigured)}`);
   if (status.runtime?.state) {
     console.log(`runtime.state=${status.runtime.state}`);
   }
@@ -667,6 +730,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     console.log(`label=${removed.label}`);
     console.log(`removed.plist=${String(removed.removedPlist)} path=${removed.plistPath}`);
     console.log(`removed.wrapper=${String(removed.removedWrapper)} path=${removed.wrapperPath}`);
+    return;
+  }
+  if (options.command === "write-env") {
+    const result = await writeGuardEnv(options);
+    if (options.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log(`env.path=${result.envFile}`);
+    console.log(`env.token_configured=${String(result.tokenConfigured)}`);
     return;
   }
   const status = await readGuardStatus(options);

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildGuardEnvFileContent,
   parseCli,
   resolveGuardLaunchdPlan,
 } from "../../../apps/android/scripts/local-host-codex-guard-launchd.js";
@@ -30,13 +31,23 @@ describe("parseCli", () => {
     expect(options.baseUrl).toBe("http://127.0.0.1:4950");
     expect(options.json).toBe(true);
   });
+
+  it("parses write-env token seeding", () => {
+    const options = parseCli([
+      "write-env",
+      "--token",
+      "secret-token",
+    ]);
+
+    expect(options.command).toBe("write-env");
+    expect(options.token).toBe("secret-token");
+  });
 });
 
 describe("resolveGuardLaunchdPlan", () => {
   it("builds a default adb-forward launch plan without embedding secrets", () => {
     const plan = resolveGuardLaunchdPlan(
       {
-        envFile: "~/secrets/android-codex-guard.env",
         repoRoot: "/repo/openclaw",
         stateDir: "~/.openclaw/android-local-host-codex-guard",
         label: "ai.openclaw.android-local-host-codex-guard",
@@ -52,6 +63,9 @@ describe("resolveGuardLaunchdPlan", () => {
 
     expect(plan.wrapperPath).toBe(
       "/Users/tester/.openclaw/android-local-host-codex-guard/run.sh",
+    );
+    expect(plan.envFile).toBe(
+      "/Users/tester/.openclaw/android-local-host-codex-guard/guard.env",
     );
     expect(plan.plistPath).toBe(
       "/Users/tester/Library/LaunchAgents/ai.openclaw.android-local-host-codex-guard.plist",
@@ -69,7 +83,7 @@ describe("resolveGuardLaunchdPlan", () => {
       "--source",
       "desktop-codex-guard-launchd",
     ]);
-    expect(plan.wrapperScript).toContain(". '/Users/tester/secrets/android-codex-guard.env'");
+    expect(plan.wrapperScript).toContain(". '/Users/tester/.openclaw/android-local-host-codex-guard/guard.env'");
     expect(plan.wrapperScript).not.toContain("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=");
     expect(plan.plist).toContain("<string>ai.openclaw.android-local-host-codex-guard</string>");
     expect(plan.plist).toContain(`<string>${plan.wrapperPath}</string>`);
@@ -112,5 +126,20 @@ describe("resolveGuardLaunchdPlan", () => {
     ]);
     expect(plan.wrapperScript).not.toContain("--use-adb-forward");
     expect(plan.wrapperScript).not.toContain("--adb-bin");
+  });
+});
+
+describe("buildGuardEnvFileContent", () => {
+  it("writes a placeholder template when no token is provided", () => {
+    const content = buildGuardEnvFileContent();
+
+    expect(content).toContain("# OpenClaw Android local-host Codex guard");
+    expect(content).toContain("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>'");
+  });
+
+  it("embeds the provided token when seeded", () => {
+    const content = buildGuardEnvFileContent("secret-token");
+
+    expect(content).toContain("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='secret-token'");
   });
 });

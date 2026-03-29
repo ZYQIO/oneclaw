@@ -234,15 +234,22 @@ If you also pass `--artifact-dir`, the guard writes durable files under that dir
 On macOS, if you want the guard to survive terminal restarts and login sessions more naturally, there is now also a LaunchAgent helper:
 
 ```bash
-cat > /tmp/openclaw-android-codex-guard.env <<'EOF'
-OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>'
-EOF
-
-pnpm android:local-host:codex-guard:launchd -- install --env-file /tmp/openclaw-android-codex-guard.env
+pnpm android:local-host:codex-guard:launchd -- write-env
+# edit ~/.openclaw/android-local-host-codex-guard/guard.env and replace the placeholder token
+pnpm android:local-host:codex-guard:launchd -- install
 pnpm android:local-host:codex-guard:launchd -- status
 ```
 
-The helper installs a per-user LaunchAgent that runs the same watch guard, keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default, and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at install time so the generated wrapper pins an absolute binary path.
+You can also seed the env file directly from the current shell or a pasted token:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:codex-guard:launchd -- write-env
+
+pnpm android:local-host:codex-guard:launchd -- write-env --token '<token-from-connect-tab>'
+```
+
+The helper installs a per-user LaunchAgent that runs the same watch guard, keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default, and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. `status` now also reports whether that env file exists and whether it still contains only the placeholder token. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at install time so the generated wrapper pins an absolute binary path.
 
 ## Local Host UI Automation Smoke
 
