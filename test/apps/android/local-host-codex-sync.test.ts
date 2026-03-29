@@ -6,6 +6,7 @@ import {
   planCodexSync,
   runCodexSyncWatch,
   selectDesktopCodexProfile,
+  waitForAdbDevice,
 } from "../../../apps/android/scripts/local-host-codex-sync.js";
 
 function oauthCredential(
@@ -89,6 +90,23 @@ describe("parseCli", () => {
     expect(options.baseUrl).toBe("http://127.0.0.1:3945");
   });
 
+  it("ignores forwarded separators after preset wrapper args", () => {
+    const options = parseCli([
+      "--use-adb-forward",
+      "--wait-for-device",
+      "--watch",
+      "--",
+      "--json",
+      "--token",
+      "secret-token",
+    ]);
+
+    expect(options.useAdbForward).toBe(true);
+    expect(options.waitForDevice).toBe(true);
+    expect(options.watch).toBe(true);
+    expect(options.json).toBe(true);
+  });
+
   it("parses watch settings", () => {
     const options = parseCli([
       "--token",
@@ -133,6 +151,7 @@ describe("runCodexSyncWatch", () => {
     const seenIterations: number[] = [];
     const sleepCalls: number[] = [];
     const preparedIterations: number[] = [];
+    const lifecycleStates: string[] = [];
 
     await runCodexSyncWatch(
       {
@@ -176,8 +195,12 @@ describe("runCodexSyncWatch", () => {
         async sleep(delayMs) {
           sleepCalls.push(delayMs);
         },
+        onLifecycleEvent(event) {
+          lifecycleStates.push(event.state);
+        },
         onIteration(summary) {
           seenIterations.push(summary.iteration);
+          expect(summary.kind).toBe("iteration");
         },
       },
     );
@@ -185,11 +208,13 @@ describe("runCodexSyncWatch", () => {
     expect(seenIterations).toEqual([1, 2, 3]);
     expect(preparedIterations).toEqual([1, 2, 3]);
     expect(sleepCalls).toEqual([12_000, 12_000]);
+    expect(lifecycleStates).toEqual(["started"]);
   });
 
   it("continues after recoverable watch errors", async () => {
     const successIterations: number[] = [];
     const errorIterations: Array<{ iteration: number; error: string }> = [];
+    const lifecycleStates: Array<{ state: string; iteration?: number; error?: string }> = [];
     let attempts = 0;
 
     await runCodexSyncWatch(
@@ -233,10 +258,19 @@ describe("runCodexSyncWatch", () => {
           };
         },
         async sleep() {},
+        onLifecycleEvent(event) {
+          lifecycleStates.push({
+            state: event.state,
+            iteration: event.iteration,
+            error: event.error,
+          });
+        },
         onIteration(summary) {
           successIterations.push(summary.iteration);
+          expect(summary.kind).toBe("iteration");
         },
         onIterationError(summary) {
+          expect(summary.kind).toBe("error");
           errorIterations.push({
             iteration: summary.iteration,
             error: summary.error,
@@ -252,5 +286,57 @@ describe("runCodexSyncWatch", () => {
       },
     ]);
     expect(successIterations).toEqual([2]);
+    expect(lifecycleStates).toEqual([
+      {
+        state: "started",
+        iteration: undefined,
+        error: undefined,
+      },
+      {
+        state: "recoverable_error",
+        iteration: 1,
+        error: "fetch failed",
+      },
+      {
+        state: "recovered",
+        iteration: 2,
+        error: undefined,
+      },
+    ]);
+  });
+
+  it("emits waiting and connected lifecycle events when device wait is needed", async () => {
+    const lifecycleStates: string[] = [];
+    let pollCount = 0;
+
+    await waitForAdbDevice(
+      {
+        token: "secret-token",
+        baseUrl: "http://127.0.0.1:3945",
+        port: 3945,
+        useAdbForward: true,
+        waitForDevice: true,
+        devicePollIntervalMs: 1000,
+        watch: true,
+        watchIntervalMs: 5000,
+        watchMaxRuns: 1,
+        force: false,
+        json: false,
+        source: "desktop-codex-sync",
+      },
+      {
+        requireAdbFn() {},
+        async sleep() {},
+        connectedDeviceCount() {
+          pollCount += 1;
+          return pollCount >= 2 ? 1 : 0;
+        },
+        onLifecycleEvent(event) {
+          lifecycleStates.push(event.state);
+        },
+      },
+    );
+
+    expect(lifecycleStates).toEqual(["waiting_for_device", "device_connected"]);
   });
 });

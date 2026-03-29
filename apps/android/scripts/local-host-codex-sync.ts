@@ -79,16 +79,32 @@ type SyncSummary = {
 };
 
 export type WatchIterationSummary = SyncSummary & {
+  kind: "iteration";
   ok: true;
   iteration: number;
   timestamp: string;
 };
 
 export type WatchIterationError = {
+  kind: "error";
   ok: false;
   iteration: number;
   timestamp: string;
   error: string;
+};
+
+export type WatchLifecycleEvent = {
+  kind: "lifecycle";
+  state:
+    | "started"
+    | "waiting_for_device"
+    | "device_connected"
+    | "recoverable_error"
+    | "recovered";
+  iteration?: number;
+  timestamp: string;
+  message: string;
+  error?: string;
 };
 
 const DEFAULT_PORT = 3945;
@@ -194,7 +210,7 @@ function normalizeBaseUrl(value: string): string {
 }
 
 function normalizeCliArgs(argv: string[]): string[] {
-  return argv[0] === "--" ? argv.slice(1) : argv;
+  return argv.filter((arg) => arg !== "--");
 }
 
 export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): SyncCliOptions {
@@ -518,6 +534,15 @@ function printWatchError(summary: WatchIterationError): void {
   console.log(`watch.error=${summary.error}`);
 }
 
+function printLifecycleEvent(event: WatchLifecycleEvent): void {
+  const iterationPart = event.iteration != null ? ` iteration=${event.iteration}` : "";
+  console.log(`watch.state=${event.state} timestamp=${event.timestamp}${iterationPart}`);
+  console.log(`watch.message=${event.message}`);
+  if (event.error) {
+    console.log(`watch.error=${event.error}`);
+  }
+}
+
 function isRecoverableWatchError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const recoverableMarkers = [
@@ -532,18 +557,39 @@ function isRecoverableWatchError(error: unknown): boolean {
   return recoverableMarkers.some((marker) => message.includes(marker));
 }
 
-async function waitForAdbDevice(
+export async function waitForAdbDevice(
   options: SyncCliOptions,
   deps: {
     sleep?: (delayMs: number) => Promise<void>;
     connectedDeviceCount?: () => number;
+    onLifecycleEvent?: (event: WatchLifecycleEvent) => void | Promise<void>;
+    requireAdbFn?: () => void;
   } = {},
 ): Promise<void> {
   const sleep = deps.sleep ?? sleepMs;
   const getConnectedDeviceCount = deps.connectedDeviceCount ?? connectedAdbDeviceCount;
-  requireAdb();
+  const assertAdb = deps.requireAdbFn ?? requireAdb;
+  assertAdb();
+  let emittedWaitingEvent = false;
   while (getConnectedDeviceCount() < 1) {
+    if (!emittedWaitingEvent) {
+      emittedWaitingEvent = true;
+      await deps.onLifecycleEvent?.({
+        kind: "lifecycle",
+        state: "waiting_for_device",
+        timestamp: new Date().toISOString(),
+        message: "Waiting for adb to report a connected Android device.",
+      });
+    }
     await sleep(options.devicePollIntervalMs);
+  }
+  if (emittedWaitingEvent) {
+    await deps.onLifecycleEvent?.({
+      kind: "lifecycle",
+      state: "device_connected",
+      timestamp: new Date().toISOString(),
+      message: "adb now reports a connected Android device.",
+    });
   }
 }
 
@@ -552,6 +598,7 @@ async function prepareTransport(
   deps: {
     sleep?: (delayMs: number) => Promise<void>;
     connectedDeviceCount?: () => number;
+    onLifecycleEvent?: (event: WatchLifecycleEvent) => void | Promise<void>;
   } = {},
 ): Promise<void> {
   if (options.useAdbForward) {
@@ -645,20 +692,42 @@ export async function runCodexSyncWatch(
     sleep?: (delayMs: number) => Promise<void>;
     onIteration?: (summary: WatchIterationSummary) => void | Promise<void>;
     onIterationError?: (summary: WatchIterationError) => void | Promise<void>;
+    onLifecycleEvent?: (event: WatchLifecycleEvent) => void | Promise<void>;
   } = {},
 ): Promise<void> {
-  const prepare = deps.prepareTransport ?? (async (nextOptions: SyncCliOptions) => await prepareTransport(nextOptions, deps));
+  const prepare =
+    deps.prepareTransport ??
+    (async (nextOptions: SyncCliOptions) => await prepareTransport(nextOptions, deps));
   const executeSync = deps.executeSync ?? executeCodexSync;
   const sleep = deps.sleep ?? sleepMs;
   const watchMaxRuns = options.watchMaxRuns;
   let iteration = 0;
+  let lastIterationHadRecoverableError = false;
+
+  await deps.onLifecycleEvent?.({
+    kind: "lifecycle",
+    state: "started",
+    timestamp: new Date().toISOString(),
+    message: "Started Codex auth guard watch.",
+  });
 
   while (true) {
     iteration += 1;
     try {
       await prepare(options);
+      if (lastIterationHadRecoverableError) {
+        lastIterationHadRecoverableError = false;
+        await deps.onLifecycleEvent?.({
+          kind: "lifecycle",
+          state: "recovered",
+          iteration,
+          timestamp: new Date().toISOString(),
+          message: "Recovered from a previous transient transport failure.",
+        });
+      }
       const summary = await executeSync(options);
       const iterationSummary: WatchIterationSummary = {
+        kind: "iteration",
         ...summary,
         ok: true,
         iteration,
@@ -669,7 +738,17 @@ export async function runCodexSyncWatch(
       if (!isRecoverableWatchError(error)) {
         throw error;
       }
+      lastIterationHadRecoverableError = true;
+      await deps.onLifecycleEvent?.({
+        kind: "lifecycle",
+        state: "recoverable_error",
+        iteration,
+        timestamp: new Date().toISOString(),
+        message: "Encountered a recoverable transport error; watch will keep running.",
+        error: error instanceof Error ? error.message : String(error),
+      });
       const errorSummary: WatchIterationError = {
+        kind: "error",
         ok: false,
         iteration,
         timestamp: new Date().toISOString(),
@@ -688,12 +767,19 @@ export async function runCodexSyncWatch(
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const options = parseCli(argv);
   if (options.watch) {
-    if (!options.json) {
-      console.log(
-        `watch.enabled=true interval_ms=${options.watchIntervalMs} max_runs=${options.watchMaxRuns ?? "unbounded"} wait_for_device=${String(options.waitForDevice)} device_poll_interval_ms=${options.devicePollIntervalMs}`,
-      );
-    }
     await runCodexSyncWatch(options, {
+      onLifecycleEvent(event) {
+        if (options.json) {
+          console.log(JSON.stringify(event));
+          return;
+        }
+        if (event.state === "started") {
+          console.log(
+            `watch.enabled=true interval_ms=${options.watchIntervalMs} max_runs=${options.watchMaxRuns ?? "unbounded"} wait_for_device=${String(options.waitForDevice)} device_poll_interval_ms=${options.devicePollIntervalMs}`,
+          );
+        }
+        printLifecycleEvent(event);
+      },
       onIteration(summary) {
         if (options.json) {
           console.log(JSON.stringify(summary));

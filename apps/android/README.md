@@ -193,6 +193,13 @@ OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
 pnpm android:local-host:codex-sync
 ```
 
+Default desktop-guard flow:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+pnpm android:local-host:codex-guard
+```
+
 Direct LAN flow:
 
 ```bash
@@ -217,6 +224,8 @@ Optional overrides:
 The sync command reads the preferred desktop `openai-codex` OAuth credential from the auth-profile store, checks the phone's `/auth/codex/status`, and only pushes desktop auth down when the phone is missing auth, already expired, or already in the refresh-warning window. If the desktop credential itself is also close to expiry, the command follows the import with `/auth/codex/refresh` on the phone so the phone ends on a fresh token set. Treat this as a trusted-path feature only: it reuses the existing bearer-protected local-host API and should stay on `adb forward`, localhost, or a trusted LAN/tunnel.
 
 When you want the desktop to act more like a connection-aware guard, add `--wait-for-device` so the command blocks until adb sees a connected phone instead of failing fast. Pair that with `--watch` and the desktop will keep polling the phone, rerun the same refill logic whenever the phone auth later becomes missing, expired, or refresh-recommended again, and keep looping across short transport failures instead of exiting on the first transient disconnect. Plain-text watch output is line-oriented for terminal use; `--json` switches watch mode to one compact JSON object per iteration, including recoverable error iterations.
+
+If you just want the opinionated default guard behavior, `pnpm android:local-host:codex-guard` is a thin wrapper around `codex-sync --use-adb-forward --wait-for-device --watch`. In JSON watch mode the stream is now typed: lifecycle events use `kind="lifecycle"`, success iterations use `kind="iteration"`, and recoverable failures use `kind="error"`, so an outer supervisor can distinguish connection state changes from actual sync passes.
 
 ## Local Host UI Automation Smoke
 

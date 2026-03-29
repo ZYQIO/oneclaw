@@ -503,6 +503,7 @@
     "android:install": "cd apps/android && ./gradlew :app:installDebug",
     "android:lint": "cd apps/android && ./gradlew :app:ktlintCheck :benchmark:ktlintCheck",
     "android:lint:android": "cd apps/android && ./gradlew :app:lintDebug",
+    "android:local-host:codex-guard": "pnpm exec tsx apps/android/scripts/local-host-codex-sync.ts --use-adb-forward --wait-for-device --watch",
     "android:local-host:codex-sync": "pnpm exec tsx apps/android/scripts/local-host-codex-sync.ts",
     "android:local-host:dedicated:device-owner": "bash apps/android/scripts/local-host-dedicated-device-owner.sh",
     "android:local-host:dedicated:post-provision": "bash apps/android/scripts/local-host-dedicated-post-provision-check.sh",
