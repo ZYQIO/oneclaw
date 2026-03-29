@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { parseArgs } from "node:util";
 import { resolveAuthProfileOrder } from "../../../src/agents/auth-profiles/order.js";
 import { ensureAuthProfileStore } from "../../../src/agents/auth-profiles/store.js";
@@ -8,6 +10,7 @@ import type { OpenClawConfig } from "../../../src/config/config.js";
 
 export type SyncCliOptions = {
   agentDir?: string;
+  artifactDir?: string;
   baseUrl: string;
   token: string;
   port: number;
@@ -61,7 +64,7 @@ type CodexImportPayload = {
   source: string;
 };
 
-type SyncSummary = {
+export type SyncSummary = {
   baseUrl: string;
   adbForwarded: boolean;
   desktop: {
@@ -107,6 +110,13 @@ export type WatchLifecycleEvent = {
   error?: string;
 };
 
+export type GuardArtifactPaths = {
+  artifactDir: string;
+  eventsJsonlPath: string;
+  latestJsonPath: string;
+  summaryJsonPath: string;
+};
+
 const DEFAULT_PORT = 3945;
 const DEFAULT_SOURCE = "desktop-codex-sync";
 const DESKTOP_REFRESH_WINDOW_MS = 30_000;
@@ -128,6 +138,7 @@ function usage(): string {
     "  --token <token>",
     "  --port <port>",
     "  --agent-dir <dir>",
+    "  --artifact-dir <dir>",
     "  --use-adb-forward",
     "  --wait-for-device",
     "  --device-poll-interval-ms <ms>",
@@ -223,6 +234,7 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
       token: { type: "string" },
       port: { type: "string" },
       "use-adb-forward": { type: "boolean", default: false },
+      "artifact-dir": { type: "string" },
       "wait-for-device": { type: "boolean", default: false },
       "device-poll-interval-ms": { type: "string" },
       watch: { type: "boolean", default: false },
@@ -276,6 +288,7 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
 
   return {
     agentDir: trimOptional(parsed.values["agent-dir"]),
+    artifactDir: trimOptional(parsed.values["artifact-dir"] ?? env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_ARTIFACT_DIR),
     baseUrl,
     token,
     port,
@@ -288,6 +301,16 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
     force: parsed.values.force ?? false,
     json: parsed.values.json ?? false,
     source: trimOptional(parsed.values.source) ?? DEFAULT_SOURCE,
+  };
+}
+
+export function resolveGuardArtifactPaths(artifactDir: string): GuardArtifactPaths {
+  const resolvedDir = path.resolve(artifactDir);
+  return {
+    artifactDir: resolvedDir,
+    eventsJsonlPath: path.join(resolvedDir, "events.jsonl"),
+    latestJsonPath: path.join(resolvedDir, "latest.json"),
+    summaryJsonPath: path.join(resolvedDir, "summary.json"),
   };
 }
 
@@ -543,6 +566,28 @@ function printLifecycleEvent(event: WatchLifecycleEvent): void {
   }
 }
 
+type GuardStreamEvent = WatchLifecycleEvent | WatchIterationSummary | WatchIterationError;
+
+export async function writeGuardArtifactEvent(
+  artifactDir: string,
+  event: GuardStreamEvent,
+): Promise<void> {
+  const paths = resolveGuardArtifactPaths(artifactDir);
+  await mkdir(paths.artifactDir, { recursive: true });
+  await appendFile(paths.eventsJsonlPath, `${JSON.stringify(event)}\n`, "utf8");
+  await writeFile(paths.latestJsonPath, `${JSON.stringify(event, null, 2)}\n`, "utf8");
+}
+
+export async function writeGuardArtifactSummary(
+  artifactDir: string,
+  summary: SyncSummary,
+): Promise<void> {
+  const paths = resolveGuardArtifactPaths(artifactDir);
+  await mkdir(paths.artifactDir, { recursive: true });
+  await writeFile(paths.summaryJsonPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+  await writeFile(paths.latestJsonPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+}
+
 function isRecoverableWatchError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const recoverableMarkers = [
@@ -768,7 +813,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const options = parseCli(argv);
   if (options.watch) {
     await runCodexSyncWatch(options, {
-      onLifecycleEvent(event) {
+      async onLifecycleEvent(event) {
+        if (options.artifactDir) {
+          await writeGuardArtifactEvent(options.artifactDir, event);
+        }
         if (options.json) {
           console.log(JSON.stringify(event));
           return;
@@ -777,10 +825,19 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           console.log(
             `watch.enabled=true interval_ms=${options.watchIntervalMs} max_runs=${options.watchMaxRuns ?? "unbounded"} wait_for_device=${String(options.waitForDevice)} device_poll_interval_ms=${options.devicePollIntervalMs}`,
           );
+          if (options.artifactDir) {
+            const paths = resolveGuardArtifactPaths(options.artifactDir);
+            console.log(`artifacts.dir=${paths.artifactDir}`);
+            console.log(`artifacts.events=${paths.eventsJsonlPath}`);
+            console.log(`artifacts.latest=${paths.latestJsonPath}`);
+          }
         }
         printLifecycleEvent(event);
       },
-      onIteration(summary) {
+      async onIteration(summary) {
+        if (options.artifactDir) {
+          await writeGuardArtifactEvent(options.artifactDir, summary);
+        }
         if (options.json) {
           console.log(JSON.stringify(summary));
           return;
@@ -790,7 +847,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           timestamp: summary.timestamp,
         });
       },
-      onIterationError(summary) {
+      async onIterationError(summary) {
+        if (options.artifactDir) {
+          await writeGuardArtifactEvent(options.artifactDir, summary);
+        }
         if (options.json) {
           console.log(JSON.stringify(summary));
           return;
@@ -801,9 +861,18 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
   const summary = await runCodexSync(options);
+  if (options.artifactDir) {
+    await writeGuardArtifactSummary(options.artifactDir, summary);
+  }
   if (options.json) {
     console.log(JSON.stringify(summary, null, 2));
     return;
+  }
+  if (options.artifactDir) {
+    const paths = resolveGuardArtifactPaths(options.artifactDir);
+    console.log(`artifacts.dir=${paths.artifactDir}`);
+    console.log(`artifacts.summary=${paths.summaryJsonPath}`);
+    console.log(`artifacts.latest=${paths.latestJsonPath}`);
   }
   printSummary(summary);
 }

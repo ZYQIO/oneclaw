@@ -1,12 +1,18 @@
+import os from "node:os";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AuthProfileStore, OAuthCredential } from "../../../src/agents/auth-profiles/types.js";
 import {
   countConnectedAdbDevicesFromOutput,
   parseCli,
   planCodexSync,
+  resolveGuardArtifactPaths,
   runCodexSyncWatch,
   selectDesktopCodexProfile,
   waitForAdbDevice,
+  writeGuardArtifactEvent,
+  writeGuardArtifactSummary,
 } from "../../../apps/android/scripts/local-host-codex-sync.js";
 
 function oauthCredential(
@@ -127,6 +133,17 @@ describe("parseCli", () => {
     expect(options.watchIntervalMs).toBe(45_000);
     expect(options.watchMaxRuns).toBe(3);
   });
+
+  it("parses artifact dir", () => {
+    const options = parseCli([
+      "--token",
+      "secret-token",
+      "--artifact-dir",
+      "./tmp/codex-guard",
+    ]);
+
+    expect(options.artifactDir).toBe("./tmp/codex-guard");
+  });
 });
 
 describe("countConnectedAdbDevicesFromOutput", () => {
@@ -143,6 +160,92 @@ describe("countConnectedAdbDevicesFromOutput", () => {
     );
 
     expect(count).toBe(2);
+  });
+});
+
+describe("artifact output", () => {
+  it("writes one-shot summary artifacts", async () => {
+    const artifactDir = await mkdtemp(path.join(os.tmpdir(), "openclaw-codex-sync-"));
+
+    try {
+      await writeGuardArtifactSummary(artifactDir, {
+        baseUrl: "http://127.0.0.1:3945",
+        adbForwarded: false,
+        desktop: {
+          profileId: "openai-codex:oauth",
+          expiresAt: 200_000,
+          refreshRecommended: false,
+        },
+        phoneBefore: {
+          configured: true,
+          expired: false,
+          refreshRecommended: false,
+        },
+        action: "skip",
+        reason: "phone-auth-healthy",
+        imported: false,
+        refreshedAfterImport: false,
+      });
+      const paths = resolveGuardArtifactPaths(artifactDir);
+      const summary = JSON.parse(await readFile(paths.summaryJsonPath, "utf8"));
+      const latest = JSON.parse(await readFile(paths.latestJsonPath, "utf8"));
+
+      expect(summary.action).toBe("skip");
+      expect(summary.reason).toBe("phone-auth-healthy");
+      expect(latest.action).toBe("skip");
+      expect(latest.reason).toBe("phone-auth-healthy");
+    } finally {
+      await rm(artifactDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes watch events as jsonl and latest snapshots", async () => {
+    const artifactDir = await mkdtemp(path.join(os.tmpdir(), "openclaw-codex-guard-"));
+
+    try {
+      await writeGuardArtifactEvent(artifactDir, {
+        kind: "lifecycle",
+        state: "started",
+        timestamp: new Date().toISOString(),
+        message: "Started Codex auth guard watch.",
+      });
+      await writeGuardArtifactEvent(artifactDir, {
+        kind: "iteration",
+        ok: true,
+        iteration: 1,
+        timestamp: new Date().toISOString(),
+        baseUrl: "http://127.0.0.1:3945",
+        adbForwarded: true,
+        desktop: {
+          profileId: "openai-codex:oauth",
+          expiresAt: 200_000,
+          refreshRecommended: false,
+        },
+        phoneBefore: {
+          configured: true,
+          expired: false,
+          refreshRecommended: false,
+        },
+        action: "skip",
+        reason: "phone-auth-healthy",
+        imported: false,
+        refreshedAfterImport: false,
+      });
+      const paths = resolveGuardArtifactPaths(artifactDir);
+      const events = (await readFile(paths.eventsJsonlPath, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      const latest = JSON.parse(await readFile(paths.latestJsonPath, "utf8"));
+
+      expect(events.map((event) => event.kind)).toEqual(["lifecycle", "iteration"]);
+      expect(events[0].state).toBe("started");
+      expect(events[1].ok).toBe(true);
+      expect(latest.kind).toBe("iteration");
+      expect(latest.ok).toBe(true);
+    } finally {
+      await rm(artifactDir, { recursive: true, force: true });
+    }
   });
 });
 

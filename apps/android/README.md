@@ -218,6 +218,7 @@ Optional overrides:
 - `pnpm android:local-host:codex-sync -- --wait-for-device --watch`
 - `pnpm android:local-host:codex-sync -- --watch --watch-interval-ms 45000`
 - `pnpm android:local-host:codex-sync -- --watch --watch-max-runs 10`
+- `pnpm android:local-host:codex-sync -- --artifact-dir .tmp/android-codex-guard`
 - `pnpm android:local-host:codex-sync -- --agent-dir /path/to/agent`
 - `pnpm android:local-host:codex-sync -- --json`
 
@@ -226,6 +227,8 @@ The sync command reads the preferred desktop `openai-codex` OAuth credential fro
 When you want the desktop to act more like a connection-aware guard, add `--wait-for-device` so the command blocks until adb sees a connected phone instead of failing fast. Pair that with `--watch` and the desktop will keep polling the phone, rerun the same refill logic whenever the phone auth later becomes missing, expired, or refresh-recommended again, and keep looping across short transport failures instead of exiting on the first transient disconnect. Plain-text watch output is line-oriented for terminal use; `--json` switches watch mode to one compact JSON object per iteration, including recoverable error iterations.
 
 If you just want the opinionated default guard behavior, `pnpm android:local-host:codex-guard` is a thin wrapper around `codex-sync --use-adb-forward --wait-for-device --watch`. In JSON watch mode the stream is now typed: lifecycle events use `kind="lifecycle"`, success iterations use `kind="iteration"`, and recoverable failures use `kind="error"`, so an outer supervisor can distinguish connection state changes from actual sync passes.
+
+If you also pass `--artifact-dir`, the guard writes durable files under that directory: `events.jsonl` for the append-only event stream, `latest.json` for the newest lifecycle or sync snapshot, and `summary.json` for one-shot sync runs. That gives launchd/tmux/agent wrappers a stable file surface without having to scrape terminal output.
 
 ## Local Host UI Automation Smoke
 
