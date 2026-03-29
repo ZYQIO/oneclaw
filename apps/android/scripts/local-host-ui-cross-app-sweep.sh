@@ -67,12 +67,18 @@ windows_json="$(jq -cn --arg windows "$WINDOWS_MS_RAW" '
   | map(tonumber)
 ')"
 
+windows_preset="custom"
+if [[ "$WINDOWS_MS_RAW" == "5000,15000,30000" ]]; then
+  windows_preset="default-5s-15s-30s"
+fi
+
 if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   jq -n \
     --arg script "local-host-ui-cross-app-sweep.sh" \
     --arg command "./apps/android/scripts/local-host-ui-cross-app-sweep.sh" \
     --arg probeCommand "./apps/android/scripts/local-host-ui-cross-app-probe.sh" \
     --arg windowsMsRaw "$WINDOWS_MS_RAW" \
+    --arg windowsPreset "$windows_preset" \
     --arg stopOnFirstNonReachable "$STOP_ON_FIRST_NON_REACHABLE" \
     --argjson windowsMs "$windows_json" \
     '{
@@ -86,6 +92,7 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
         }
       },
       probeCommand: $probeCommand,
+      windowsPreset: $windowsPreset,
       windowsMs: $windowsMs,
       stopOnFirstNonReachable: ($stopOnFirstNonReachable == "true"),
       requirements: ["jq"]
@@ -110,6 +117,7 @@ run_count=0
 
 echo "local_host.ui_cross_app_sweep=starting"
 echo "artifacts.root=$ARTIFACT_ROOT"
+echo "cross_app_sweep.preset=$windows_preset"
 echo "sweep.windows_ms=$WINDOWS_MS_RAW"
 
 IFS=',' read -r -a raw_windows <<<"$WINDOWS_MS_RAW"
@@ -192,6 +200,7 @@ done
 
 jq -n \
   --arg windowsMs "$WINDOWS_MS_RAW" \
+  --arg windowsPreset "$windows_preset" \
   --argjson runCount "$run_count" \
   --argjson allWindowsReachable "$( [[ "$all_windows_reachable" == "true" ]] && printf 'true' || printf 'false' )" \
   --arg followUpMode "$first_run_follow_up_mode" \
@@ -201,6 +210,7 @@ jq -n \
   --slurpfile runs "$SWEEP_JSONL" \
   '{
     windowsMs: ($windowsMs | split(",") | map(gsub(" "; "")) | map(select(length > 0)) | map(tonumber)),
+    windowsPreset: $windowsPreset,
     runCount: $runCount,
     allWindowsReachable: $allWindowsReachable,
     followUpMode: (

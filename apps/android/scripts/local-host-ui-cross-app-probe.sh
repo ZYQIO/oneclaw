@@ -155,10 +155,16 @@ else
   follow_up_mode="$(IFS='+'; printf '%s' "${follow_up_mode_parts[*]}")"
 fi
 
+cross_app_preset="base"
+if [[ "$follow_up_requested" == "true" ]]; then
+  cross_app_preset="follow-up:${follow_up_mode}"
+fi
+
 if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.describe=enabled\n'
   printf 'cross_app.script=%s\n' "local-host-ui-cross-app-probe.sh"
   printf 'cross_app.command=%s\n' "./apps/android/scripts/local-host-ui-cross-app-probe.sh"
+  printf 'cross_app.preset=%s\n' "$cross_app_preset"
   printf 'cross_app.target_package=%s\n' "$TARGET_PACKAGE"
   printf 'cross_app.follow_up_mode=%s\n' "$follow_up_mode"
   printf 'cross_app.observe_window_ms=%s\n' "$OBSERVE_WINDOW_MS"
@@ -182,6 +188,7 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.follow_up.wait_text=%s\n' "${FOLLOW_UP_WAIT_TEXT:-<empty>}"
   printf 'cross_app.follow_up.tap_text=%s\n' "${FOLLOW_UP_TAP_TEXT:-<empty>}"
   printf 'cross_app.follow_up.input_value=%s\n' "${FOLLOW_UP_INPUT_VALUE:-<empty>}"
+  printf 'cross_app.rerun_hint=%s\n' "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> ./apps/android/scripts/local-host-ui-cross-app-probe.sh"
   exit 0
 fi
 
