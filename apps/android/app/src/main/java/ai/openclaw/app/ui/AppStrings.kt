@@ -18,7 +18,9 @@ private val usageLimitRegex = Regex("""^The usage limit has been reached(?:\s*\|
 private val appNotInstalledRegex = Regex("""^Package `([^`]+)` is not installed on this device\.$""")
 private val appNotLaunchableRegex = Regex("""^Package `([^`]+)` is installed but has no launchable activity\.$""")
 private val launchIntentRejectedRegex = Regex("""^Android rejected the launch intent for `([^`]+)`\.$""")
-private val activePackageMismatchRegex = Regex("""^Active package `([^`]+)` does not match `([^`]+)`(?: yet)?\.$""")
+private val activePackageMismatchRegex = Regex("""^Active package `([^`]+)` does not match `([^`]+)`(?: yet)?\.?$""")
+private val uiWaitTimeoutDetailRegex =
+  Regex("""^text `([^`]+)` did not appear within (\d+)ms\. (.+?)(?: Last package: `([^`]+)`\.)?(?: Visible text: (.+)\.)?$""")
 
 internal val LocalAppLanguage = staticCompositionLocalOf { AppLanguage.English }
 
@@ -626,6 +628,44 @@ private fun localizeUiAutomationDetail(
   }
 }
 
+private fun localizeUiWaitTimeoutDetail(
+  language: AppLanguage,
+  detail: String,
+): String? {
+  val trimmed = detail.trim()
+  val match = uiWaitTimeoutDetailRegex.matchEntire(trimmed) ?: return null
+  val expectedText = match.groupValues[1]
+  val timeoutMs = match.groupValues[2]
+  val reasonText = match.groupValues[3].trim().removeSuffix(".")
+  val lastPackage = match.groupValues.getOrNull(4)?.trim().orEmpty()
+  val visibleText = match.groupValues.getOrNull(5)?.trim().orEmpty()
+  val localizedReason = localizeUiAutomationDetail(language, reasonText) ?: reasonText
+  return language.pick(
+    trimmed,
+    buildString {
+      append("文本 `")
+      append(expectedText)
+      append("` 未在 ")
+      append(timeoutMs)
+      append("ms 内出现。")
+      append(localizedReason)
+      if (!localizedReason.endsWith("。")) {
+        append('。')
+      }
+      if (lastPackage.isNotEmpty()) {
+        append("最后一个包名：`")
+        append(lastPackage)
+        append("`。")
+      }
+      if (visibleText.isNotEmpty()) {
+        append("可见文本：")
+        append(visibleText)
+        append('。')
+      }
+    },
+  )
+}
+
 private fun localizeRuntimeErrorDetail(
   language: AppLanguage,
   detail: String,
@@ -636,6 +676,7 @@ private fun localizeRuntimeErrorDetail(
   localizeRemoteAccessFailureReason(language, trimmed).takeIf { it != trimmed }?.let { return it }
   translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
   localizeRuntimePrefixedError(language, trimmed)?.let { return it }
+  localizeUiWaitTimeoutDetail(language, trimmed)?.let { return it }
   localizeUiAutomationDetail(language, trimmed)?.let { return it }
   return when (trimmed) {
     "A2UI host not reachable" -> language.pick(trimmed, "A2UI Host 无法访问")

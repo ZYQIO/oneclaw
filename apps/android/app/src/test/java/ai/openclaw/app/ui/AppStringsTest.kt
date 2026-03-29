@@ -535,6 +535,39 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesUiWaitTimeoutDetail() {
+    assertEquals(
+      "UI 等待超时：文本 `Continue` 未在 1200ms 内出现。当前前台包 `com.android.launcher` 与 `com.android.settings` 不匹配。最后一个包名：`com.android.launcher`。可见文本：`Home`, `OpenClaw`。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_WAIT_TIMEOUT: text `Continue` did not appear within 1200ms. Active package `com.android.launcher` does not match `com.android.settings` yet. Last package: `com.android.launcher`. Visible text: `Home`, `OpenClaw`.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesAppNotLaunchableFailure() {
+    assertEquals(
+      "应用不可启动：此设备已安装包 `com.example.app`，但没有可启动 activity。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "APP_NOT_LAUNCHABLE: Package `com.example.app` is installed but has no launchable activity.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesAppLaunchFailedReason() {
+    assertEquals(
+      "应用启动失败：Android 拒绝了包 `com.example.app` 的启动 intent。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "APP_LAUNCH_FAILED: Android rejected the launch intent for `com.example.app`.",
+      ),
+    )
+  }
+
+  @Test
   fun localizeVoiceConversationText_translatesDefaultFailure() {
     assertEquals(
       "语音请求失败。",
