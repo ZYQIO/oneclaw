@@ -49,6 +49,7 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.preset")).toBe("base");
     expect(values.get("cross_app.follow_up.preset")).toBe("<none>");
     expect(values.get("cross_app.follow_up_mode")).toBe("none");
+    expect(values.get("cross_app.follow_up.final_wait_requested")).toBe("false");
     expect(values.get("cross_app.follow_up.swipe_coordinate_mode")).toBe("none");
     expect(values.get("cross_app.target_reset_before_launch")).toBe("false");
     expect(values.get("cross_app.follow_up.foreground_timeout_ms")).toBe("5000");
@@ -129,7 +130,7 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up.swipe_duration_ms")).toBe("350");
   });
 
-  it("expands the calculator preset into a resource-id tap flow", () => {
+  it("expands the calculator preset into a tap plus final-wait flow", () => {
     const values = runDescribe({
       OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET:
         "calculator-home-open-conversion",
@@ -141,13 +142,30 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.target_package")).toBe(
       "com.coloros.calculator",
     );
-    expect(values.get("cross_app.follow_up_mode")).toBe("tap");
+    expect(values.get("cross_app.follow_up_mode")).toBe("final-wait+tap");
+    expect(values.get("cross_app.follow_up.final_wait_requested")).toBe("true");
+    expect(values.get("cross_app.follow_up.final_wait_text")).toBe("汇率");
     expect(values.get("cross_app.follow_up.tap_resource_id")).toBe(
       "com.coloros.calculator:id/item_open_conversion",
     );
     expect(values.get("cross_app.follow_up.tap_match_mode")).toBe("exact");
     expect(values.get("cross_app.rerun_hint")).toContain(
       "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=calculator-home-open-conversion",
+    );
+  });
+
+  it("keeps explicit final-wait overrides ahead of calculator preset defaults", () => {
+    const values = runDescribe({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET:
+        "calculator-home-open-conversion",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FINAL_WAIT_TEXT: "长度",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FINAL_WAIT_MATCH_MODE: "exact",
+    });
+
+    expect(values.get("cross_app.follow_up.final_wait_text")).toBe("长度");
+    expect(values.get("cross_app.follow_up.final_wait_match_mode")).toBe("exact");
+    expect(values.get("cross_app.rerun_hint")).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FINAL_WAIT_TEXT=",
     );
   });
 

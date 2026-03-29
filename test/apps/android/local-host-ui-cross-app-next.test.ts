@@ -87,11 +87,29 @@ describe("local-host-ui-cross-app-next --describe", () => {
     expect(summary.probeDescribe["cross_app.target_package"]).toBe(
       "com.coloros.calculator",
     );
+    expect(summary.probeDescribe["cross_app.follow_up_mode"]).toBe(
+      "final-wait+tap",
+    );
+    expect(summary.probeDescribe["cross_app.follow_up.final_wait_text"]).toBe(
+      "汇率",
+    );
     expect(summary.probeDescribe["cross_app.follow_up.tap_resource_id"]).toBe(
       "com.coloros.calculator:id/item_open_conversion",
     );
     expect(summary.recommendedCommand).toContain(
       "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=calculator-home-open-conversion",
+    );
+  });
+
+  it("preserves final-wait overrides in the recommended command", () => {
+    const summary = runDescribe([], {
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET:
+        "calculator-home-open-conversion",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FINAL_WAIT_TEXT: "长度",
+    });
+
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FINAL_WAIT_TEXT=",
     );
   });
 
