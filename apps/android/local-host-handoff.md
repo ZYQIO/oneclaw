@@ -18,8 +18,11 @@ As of March 29, 2026, the MVP happy path is working, the streaming gate has dire
 - Codex 浏览器授权已经完成，并且 `/status` 会返回 `codexAuthConfigured=true`。Codex browser auth completes, and `/status` returns `codexAuthConfigured=true`.
 - 远控 `/chat/send-wait` 已成功返回模型回复。Remote `/chat/send-wait` has successfully returned a model reply.
 - 远控 `/invoke` 的只读命令已成功执行。Read-only `/invoke` commands have succeeded remotely.
+- 现在还多了一条 debug-only 的 adb token bootstrap：`pnpm android:local-host:token` 可以直接把当前 local-host bearer token 从 debug app 导回桌面，所以远端复跑不必再回 Connect 页手抄 token。There is now also a debug-only adb token bootstrap: `pnpm android:local-host:token` can pull the current local-host bearer token straight out of the debug app back to the desktop, so remote reruns no longer need to copy the token by hand from the Connect tab.
 - 高风险命令层在关闭时会被明确拒绝。Higher-risk command tiers are clearly rejected when disabled.
 - LAN 冒烟脚本已经成功。The LAN smoke script has succeeded.
+- `pnpm android:local-host:smoke` 现在已经变成会报真失败的远端基线：如果 `/chat/send-wait` 返回 `state=error`、超时，或者 `/invoke` 返回 `ok=false`，它会非零退出并落盘 `summary.json`。`pnpm android:local-host:smoke` is now a truthful remote baseline: if `/chat/send-wait` returns `state=error`, times out, or `/invoke` returns `ok=false`, it exits non-zero and writes `summary.json`.
+- 2026 年 3 月 29 日在当前 OPPO / ColorOS 真机上的最新 adb-forward 复跑再次表明：`/status` 与 `device.status` 都正常，但 chat 仍会落到 `chat.error_class=openai_connect_timeout`、`chat.error_host=chatgpt.com`、`chat.error_address_family=ipv6`。这说明当前真实 blocker 是手机到 `chatgpt.com` 的 IPv6 出站连通性，不是 bearer token、写权限开关或本机 Host 基础链路回归。The latest adb-forward rerun on March 29, 2026 on the current OPPO / ColorOS device again showed that `/status` and `device.status` are both healthy, but chat still lands at `chat.error_class=openai_connect_timeout`, `chat.error_host=chatgpt.com`, and `chat.error_address_family=ipv6`. That means the real blocker is the phone's outbound IPv6 connectivity to `chatgpt.com`, not the bearer token, write gating, or a local-host transport regression.
 - `auth/codex/status` 和 `auth/codex/refresh` 已在真机验证成功。`auth/codex/status` and `auth/codex/refresh` have both been validated successfully on-device.
 - 仓库里现在还多了一条桌面侧补授权路径：`pnpm android:local-host:codex-sync` 会读取电脑当前优先的 `openai-codex` OAuth profile，探测手机 `/auth/codex/status`，并只在手机缺授权、已过期或已进入 refresh-warning 窗口时，才通过受保护的 `auth/codex/import` 把桌面凭证同步到手机；如果桌面凭证本身也接近过期，它还会跟着调用手机 `/auth/codex/refresh`。The repo now also has a desktop-side auth refill path: `pnpm android:local-host:codex-sync` reads the desktop's preferred `openai-codex` OAuth profile, checks the phone's `/auth/codex/status`, and only syncs desktop auth down through the guarded `auth/codex/import` route when the phone is missing auth, already expired, or already inside the refresh-warning window; if the desktop credential itself is near expiry, it follows with the phone's `/auth/codex/refresh`.
 - 这条桌面侧补授权路径现在还支持 `--watch`：在 USB `adb forward` 或可信 LAN/tunnel 持续存在时，它会周期性重跑同一条探测+补同步逻辑，因此手机授权后续再次过期时，电脑可以继续自动回补，而不是只做一次性同步。That desktop-side auth refill path now also supports `--watch`: while USB `adb forward` or a trusted LAN/tunnel remains up, it periodically reruns the same detect-and-refill logic so the desktop can keep refilling the phone again if phone auth later expires instead of only doing a one-shot sync.
@@ -229,6 +232,7 @@ bash apps/android/scripts/local-host-permission-smoke.sh
 - `./gradlew :app:installDebug` 在这台设备上可能触发 ddmlib `InstallException: -99`，但直接 `adb install -r -d ...apk` 是可行的。`./gradlew :app:installDebug` may hit ddmlib `InstallException: -99` on this device, but direct `adb install -r -d ...apk` works.
 - 在当前 OPPO / ColorOS 真机上，重新安装 APK 后 accessibility grant 会被系统清空；如果 `ui.state` 突然回到 disabled，要先重新开启 OpenClaw 的无障碍服务。On the current OPPO / ColorOS phone, reinstalling the APK clears the accessibility grant; if `ui.state` suddenly returns to disabled again, re-enable the OpenClaw accessibility service first.
 - `pnpm android:local-host:smoke` 依赖当前 shell 能找到 `pnpm`；如果环境里 `pnpm` shim 不可用，直接调用脚本本体即可。`pnpm android:local-host:smoke` depends on a working `pnpm` shim; if `pnpm` is unavailable in the shell, run the script directly instead.
+- 当前这台 OPPO / ColorOS 真机上的 `pnpm android:local-host:smoke` 已不再是“status 绿了就算通过”；最新 adb-forward 复跑会明确失败在 `chat.error_class=openai_connect_timeout` 且 `chat.error_address_family=ipv6`，所以后续排查优先看手机到 `chatgpt.com` 的 IPv6 出站路径。On the current OPPO / ColorOS phone, `pnpm android:local-host:smoke` is no longer a “green /status means pass” check; the latest adb-forward rerun now fails explicitly at `chat.error_class=openai_connect_timeout` with `chat.error_address_family=ipv6`, so follow-up troubleshooting should prioritize the phone's outbound IPv6 path to `chatgpt.com`.
 - 这台 Android 15 设备拒绝 shell 侧 `pm revoke` 和 `appops set`；权限脚本会在权限已被拒绝时直接验证失败路径，只在权限已授予时才尝试临时撤回。This Android 15 device rejects shell-side `pm revoke` and `appops set`; the permission script validates already-denied cases directly and only attempts temporary revocation when a permission starts granted.
 - 这台 OPPO / ColorOS V15 设备会把 `Recents` 划卡当成系统级 `force stop`，并清空 app 闹钟；对 dedicated 部署来说，这比普通后台回收更激进。This OPPO / ColorOS V15 device treats a Recents swipe-away as a system-level `force stop` and clears the app's alarms; for dedicated deployment this is more aggressive than ordinary background eviction.
 - 已尝试用 `openclaw://auth/callback` deep link、浏览器成功页自动回跳和 `Return to OpenClaw` CTA 修正 Codex 浏览器授权回 App；单测和系统级 deep-link resolve 已通过，但在当前 OPPO / ColorOS 真机的真实浏览器授权流程里仍不能稳定自动回到 App。暂时继续依赖“手动切回 App / 粘贴 redirect URL 或 code”的兜底路径。We already tried to fix the Codex browser-auth return-to-app path with the `openclaw://auth/callback` deep link, browser-page auto-return, and a `Return to OpenClaw` CTA; unit tests and system-level deep-link resolution pass, but on the current OPPO / ColorOS device the real browser auth flow still does not reliably jump back into the app. For now we keep relying on the fallback path of manually switching back to the app or pasting the redirect URL / code.
@@ -269,6 +273,7 @@ Read this section first when resuming later today. / 如果今天晚些时候继
 - `pnpm android:local-host:ui:cross-app:next` 现在已经把当前默认 preset、describe 元数据和最终 probe/sweep 汇总收成了一个更顺手的“next”入口；如果只是继续 follow-up 主线，优先从它开跑。
 - `pnpm android:local-host:codex-sync` 现在已经是仓库内建命令，适合在 USB `adb forward` 或可信 LAN/tunnel 下补手机 Codex 授权；`--watch` + `--wait-for-device` 则把它推进成更接近“电脑检测到连接后持续守护”的模式，但这条能力目前仍然是“桌面主动推送同步”，还不是手机端自动从 Gateway/桌面拉取凭证。
 - `pnpm android:local-host:codex-guard` 现在已经是更顺手的默认守护入口；如果只是日常把手机接到电脑上并希望持续保授权，优先用它，而不是每次手工补完整参数。
+- `pnpm android:local-host:token -- --json` 现在已经是远端调试的最快起手式；如果只是为了重跑 smoke、cross-app 或别的 local-host 桌面脚本，不必再回 Connect 页抄 bearer token。
 - `pnpm android:local-host:codex-guard -- --artifact-dir <dir> --json` 现在已经能同时给人和外层守护器用：stdout 是结构化事件流，目录里还有稳定文件落盘。
 - macOS 长驻入口现在优先用更短 wrapper：`pnpm android:local-host:codex-guard:setup|status|write-env|uninstall`；底层 `pnpm android:local-host:codex-guard:launchd` 仍保留给需要更细粒度参数时使用。
 - 首次把 launchd guard 配起来时，优先跑 `pnpm android:local-host:codex-guard:setup`；如果只想手工写模板或种 token，再用 `pnpm android:local-host:codex-guard:write-env`。
@@ -281,19 +286,22 @@ Read this section first when resuming later today. / 如果今天晚些时候继
 
 - 不要把 Codex 浏览器授权回跳问题重新当作当前 blocker；继续把它当成有兜底路径的非阻塞项。
 - 不要把 `usage_limit_reached` 或旧 streaming 超时记录重新解释成 Android 本机 Host 回归。
+- 不要把当前 `pnpm android:local-host:smoke` 的失败重新当成 bearer token、write gate 或 `/status` 回归；最新真机结果已经把它收敛成 `chatgpt.com` 的 IPv6 出站连接超时。
 - 不要把“做成系统服务 / root / 自定义 ROM”重新提到主优先级前面；当前最优先仍是 `Device Owner` / `TestDPC` 路线。
 - 不要假设拿到电池优化豁免就等于 OPPO / ColorOS 上的 dedicated 稳定；`Recents` 划卡仍会 `force stop`。
 
 ### First Commands To Run Tonight / 今晚恢复时先跑这些命令
 
 1. `pnpm android:local-host:ui`
-2. `pnpm android:local-host:dedicated:readiness`
-3. `pnpm android:local-host:codex-guard -- --json`
-4. `pnpm android:local-host:dedicated:testdpc-install`
-4. 如果要推进跨 app follow-up，给 `pnpm android:local-host:ui:cross-app` 补上目标 app 的 wait/tap/inputText 环境变量后再跑一轮
-5. 如果确定要继续 dedicated 官方入管，再看 `pnpm android:local-host:dedicated:testdpc-qr`
-6. 如果手机已经完成 DPC provisioning，再优先看 `pnpm android:local-host:dedicated:post-provision:next`，必要时再下钻到 `pnpm android:local-host:dedicated:post-provision` 和 `pnpm android:local-host:dedicated:testdpc-kiosk`
-7. 如果要继续双语工作，下一步直接扫剩余的深层 runtime / auth 错误文本、较少见的 gateway/control-ui 边缘态和次级页面，不要回头重做已经接好的 `Settings -> Language` 主流程。
+2. `pnpm android:local-host:token -- --json`
+3. `pnpm android:local-host:smoke`
+4. `pnpm android:local-host:dedicated:readiness`
+5. `pnpm android:local-host:codex-guard -- --json`
+6. `pnpm android:local-host:dedicated:testdpc-install`
+7. 如果要推进跨 app follow-up，给 `pnpm android:local-host:ui:cross-app` 补上目标 app 的 wait/tap/inputText 环境变量后再跑一轮
+8. 如果确定要继续 dedicated 官方入管，再看 `pnpm android:local-host:dedicated:testdpc-qr`
+9. 如果手机已经完成 DPC provisioning，再优先看 `pnpm android:local-host:dedicated:post-provision:next`，必要时再下钻到 `pnpm android:local-host:dedicated:post-provision` 和 `pnpm android:local-host:dedicated:testdpc-kiosk`
+10. 如果要继续双语工作，下一步直接扫剩余的深层 runtime / auth 错误文本、较少见的 gateway/control-ui 边缘态和次级页面，不要回头重做已经接好的 `Settings -> Language` 主流程。
 
 ## Next Tasks / 接下来要做的事
 

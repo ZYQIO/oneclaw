@@ -199,6 +199,10 @@ Optional overrides:
 
 The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`, and `/invoke`, then prints a compact summary.
 
+- It now exits non-zero when `/chat/send-wait` returns `state=error`, times out, or when `/invoke` returns `ok=false`; successful `/status` alone no longer counts as a passing smoke.
+- Each run now writes `summary.json` and emits compact `chat.error_class`, `chat.error_host`, `chat.error_address_family`, and `chat.hint` fields when it can classify an upstream failure.
+- On March 29, 2026, a fresh adb-forward retest on the current OPPO / ColorOS device still reached `status.ok=true` plus `invoke.ok=true`, but `chat` classified as `openai_connect_timeout` with `chat.error_address_family=ipv6`; treat that as an outbound Codex network boundary rather than a local-host token or write-gate regression.
+
 ## Local Host Codex Auth Sync
 
 Use this when the phone is already paired to a trusted desktop and the phone's Codex auth has gone missing, expired, or is close enough to expiry that you would rather reuse the desktop login than re-open the browser flow.
