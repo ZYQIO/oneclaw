@@ -60,6 +60,28 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeRemoteAccessStatus_translatesPermissionDeniedFailure() {
+    assertEquals(
+      "远程访问启动失败：权限被拒绝",
+      localizeRemoteAccessStatus(
+        AppLanguage.SimplifiedChinese,
+        "Remote access failed to start: Permission denied",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeRemoteAccessStatus_translatesBindFailureReason() {
+    assertEquals(
+      "远程访问启动失败：绑定失败：地址已被占用",
+      localizeRemoteAccessStatus(
+        AppLanguage.SimplifiedChinese,
+        "Remote access failed to start: bind failed: Address already in use",
+      ),
+    )
+  }
+
+  @Test
   fun localizeMicCaptureStatus_translatesListeningQueueState() {
     assertEquals(
       "监听中 · 2 条排队中",

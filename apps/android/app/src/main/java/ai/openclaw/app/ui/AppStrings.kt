@@ -192,7 +192,28 @@ internal fun localizeRemoteAccessStatus(
     trimmed.startsWith("Remote access failed to start: ") ->
       language.pick(
         english = trimmed,
-        simplifiedChinese = "远程访问启动失败：${trimmed.removePrefix("Remote access failed to start: ")}",
+        simplifiedChinese = "远程访问启动失败：${localizeRemoteAccessFailureReason(language, trimmed.removePrefix("Remote access failed to start: "))}",
+      )
+    else -> trimmed
+  }
+}
+
+private fun localizeRemoteAccessFailureReason(
+  language: AppLanguage,
+  reasonText: String,
+): String {
+  val trimmed = reasonText.trim()
+  return when {
+    trimmed.equals("Permission denied", ignoreCase = true) ->
+      language.pick(trimmed, "权限被拒绝")
+    trimmed.equals("Address already in use", ignoreCase = true) ->
+      language.pick(trimmed, "地址已被占用")
+    trimmed.equals("Cannot assign requested address", ignoreCase = true) ->
+      language.pick(trimmed, "无法分配请求的地址")
+    trimmed.startsWith("bind failed: ", ignoreCase = true) ->
+      language.pick(
+        trimmed,
+        "绑定失败：${localizeRemoteAccessFailureReason(language, trimmed.substringAfter(":").trim())}",
       )
     else -> trimmed
   }

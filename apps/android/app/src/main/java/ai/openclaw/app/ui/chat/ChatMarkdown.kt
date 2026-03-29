@@ -34,11 +34,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ai.openclaw.app.AppLanguage
+import ai.openclaw.app.ui.LocalAppLanguage
 import ai.openclaw.app.ui.mobileAccent
 import ai.openclaw.app.ui.mobileCallout
 import ai.openclaw.app.ui.mobileCaption1
 import ai.openclaw.app.ui.mobileCodeBg
 import ai.openclaw.app.ui.mobileCodeText
+import ai.openclaw.app.ui.pick
 import ai.openclaw.app.ui.mobileTextSecondary
 import org.commonmark.Extension
 import org.commonmark.ext.autolink.AutolinkExtension
@@ -548,21 +551,33 @@ private data class ParsedDataImage(
   val base64: String,
 )
 
+internal fun inlineImageContentDescription(
+  language: AppLanguage,
+  mimeType: String?,
+): String {
+  return mimeType ?: language.pick("image", "图片")
+}
+
+internal fun inlineImageUnavailableLabel(language: AppLanguage): String {
+  return language.pick("Image unavailable", "图片不可用")
+}
+
 @Composable
 private fun InlineBase64Image(base64: String, mimeType: String?) {
+  val language = LocalAppLanguage.current
   val imageState = rememberBase64ImageState(base64)
   val image = imageState.image
 
   if (image != null) {
     Image(
       bitmap = image!!,
-      contentDescription = mimeType ?: "image",
+      contentDescription = inlineImageContentDescription(language, mimeType),
       contentScale = ContentScale.Fit,
       modifier = Modifier.fillMaxWidth(),
     )
   } else if (imageState.failed) {
     Text(
-      text = "Image unavailable",
+      text = inlineImageUnavailableLabel(language),
       modifier = Modifier.padding(vertical = 2.dp),
       style = mobileCaption1,
       color = mobileTextSecondary,
