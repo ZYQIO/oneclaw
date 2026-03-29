@@ -16,13 +16,13 @@ internal object DebugLocalHostTokenExporter {
 
   private val tokenRegex = Regex("""^ocrt_[0-9a-f]{64}$""")
 
-  fun register(context: Context, prefs: SecurePrefs): BroadcastReceiver {
+  fun register(context: Context, prefsProvider: () -> SecurePrefs): BroadcastReceiver {
     val receiver =
       object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
           if (intent.action != exportAction) return
           try {
-            val token = validateToken(prefs.localHostRemoteAccessToken.value)
+            val token = validateToken(prefsProvider().localHostRemoteAccessToken.value)
             val file = writeTokenSnapshot(context.cacheDir, token)
             setResultCode(resultOk)
             setResultData(file.absolutePath)

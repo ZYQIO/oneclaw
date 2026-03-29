@@ -47,7 +47,7 @@ class NodeApp : Application() {
           .build(),
       )
       if (debugLocalHostTokenReceiver == null) {
-        debugLocalHostTokenReceiver = DebugLocalHostTokenExporter.register(this, prefs)
+        debugLocalHostTokenReceiver = DebugLocalHostTokenExporter.register(this) { prefs }
       }
     }
   }
