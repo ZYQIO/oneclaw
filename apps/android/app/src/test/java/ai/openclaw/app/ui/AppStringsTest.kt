@@ -49,6 +49,22 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeConnectionStatus_translatesLocalHostPermissionDenied() {
+    assertEquals(
+      "本机 Host 错误：权限被拒绝",
+      localizeConnectionStatus(AppLanguage.SimplifiedChinese, "Local host error: Permission denied"),
+    )
+  }
+
+  @Test
+  fun localizeConnectionStatus_translatesLocalHostUnavailableError() {
+    assertEquals(
+      "本机 Host 错误：不可用：未连接",
+      localizeConnectionStatus(AppLanguage.SimplifiedChinese, "Local host error: UNAVAILABLE: not connected"),
+    )
+  }
+
+  @Test
   fun localizeRemoteAccessStatus_translatesLocalHostHint() {
     assertEquals(
       "请切换到 Local Host 以接受远程连接。",

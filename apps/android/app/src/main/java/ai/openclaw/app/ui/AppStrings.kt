@@ -9,6 +9,7 @@ private val queuedWaitingRegex = Regex("""^(\d+) queued · waiting for gateway$"
 private val speechErrorRegex = Regex("""^Speech error \((\d+)\)$""")
 private val gatewayErrorRegex = Regex("""^Gateway error: (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayClosedRegex = Regex("""^Gateway closed: (.+)$""", RegexOption.IGNORE_CASE)
+private val localHostErrorRegex = Regex("""^Local host error: (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayClosedWithCodeRegex = Regex("""^gateway closed \((\d+)\): (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayAuthHintRegex = Regex("""^unauthorized: gateway (token|password) (missing|mismatch) \((.+)\)$""", RegexOption.IGNORE_CASE)
 private val codexRequestFailedRegex = Regex("""^OpenAI Codex request failed(?: \(([^)]+)\))?(?:\s*\|\s*(.+))?$""")
@@ -36,6 +37,10 @@ internal fun localizeConnectionStatus(
   statusText: String,
 ): String {
   val trimmed = statusText.trim()
+  localHostErrorRegex.matchEntire(trimmed)?.let { match ->
+    val reason = localizeRuntimeErrorDetail(language, match.groupValues[1])
+    return language.pick(trimmed, "本机 Host 错误：$reason")
+  }
   gatewayErrorRegex.matchEntire(trimmed)?.let { match ->
     val reason = localizeGatewayDisconnectReason(language, match.groupValues[1])
     return language.pick(trimmed, "网关错误：$reason")
@@ -499,6 +504,7 @@ private fun localizeRuntimeErrorDetail(
   val trimmed = detail.trim()
   localizeConnectionStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
   localizeRemoteAccessStatus(language, trimmed).takeIf { it != trimmed }?.let { return it }
+  localizeRemoteAccessFailureReason(language, trimmed).takeIf { it != trimmed }?.let { return it }
   translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
   localizeRuntimePrefixedError(language, trimmed)?.let { return it }
   return when (trimmed) {
@@ -509,6 +515,7 @@ private fun localizeRuntimeErrorDetail(
     "message or attachment required" -> language.pick(trimmed, "需要提供消息或附件")
     "not connected" -> language.pick(trimmed, "未连接")
     "paramsJSON required" -> language.pick(trimmed, "需要提供 paramsJSON")
+    "Permission denied" -> language.pick(trimmed, "权限被拒绝")
     "request failed" -> language.pick(trimmed, "请求失败")
     "runId required" -> language.pick(trimmed, "需要提供 runId")
     "SMS not available on this device" -> language.pick(trimmed, "此设备不支持短信")
