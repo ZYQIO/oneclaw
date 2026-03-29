@@ -293,6 +293,27 @@ if [[ "$has_device_owner" == "true" && "$package_installed" == "true" && "$launc
   post_provision_ready=true
 fi
 
+recommended_action=""
+recommended_command=""
+if [[ "$has_device_owner" != "true" ]]; then
+  recommended_action="testdpc-qr"
+  recommended_command="pnpm android:local-host:dedicated:testdpc-qr"
+elif [[ "$lock_task_allowlisted" != "true" ]]; then
+  recommended_action="testdpc-kiosk"
+  recommended_command="pnpm android:local-host:dedicated:testdpc-kiosk"
+elif [[ "$post_provision_ready" == "true" && "$LAUNCH" != "true" ]]; then
+  recommended_action="launch-openclaw"
+  recommended_command="pnpm android:local-host:dedicated:post-provision -- --launch"
+elif [[ "$post_provision_ready" == "true" && "${lock_task_mode_state_after_launch:-}" == "NONE" ]]; then
+  recommended_action="launch-openclaw"
+  recommended_command="pnpm android:local-host:dedicated:post-provision -- --launch"
+elif [[ "$dedicated_enabled_true" != "true" || "$onboarding_completed_true" != "true" || "$local_host_mode" != "true" ]]; then
+  recommended_action="launch-openclaw"
+  recommended_command="pnpm android:local-host:dedicated:post-provision -- --launch"
+else
+  recommended_action="healthy"
+fi
+
 recommendations_json='[]'
 if [[ "$has_device_owner" != "true" ]]; then
   recommendations_json="$(jq -cn --argjson prev "$recommendations_json" '$prev + ["finish dedicated-device provisioning so the phone has a real Device Owner before expecting kiosk behavior"]')"
@@ -342,6 +363,8 @@ jq -n \
   --arg localApkPath "${local_apk_path:-}" \
   --arg lockTaskModeState "${lock_task_mode_state:-}" \
   --arg lockTaskModeStateAfterLaunch "${lock_task_mode_state_after_launch:-}" \
+  --arg recommendedAction "$recommended_action" \
+  --arg recommendedCommand "$recommended_command" \
   --arg topActivityAfterLaunch "${top_activity_after_launch:-}" \
   --arg launchOutput "${launch_output:-}" \
   --argjson hasAnyOwner "$(bool_json "$has_any_owner")" \
@@ -405,6 +428,8 @@ jq -n \
     viability: {
       postProvisionReady: $postProvisionReady
     },
+    recommendedAction: (if $recommendedAction == "" then null else $recommendedAction end),
+    recommendedCommand: (if $recommendedCommand == "" then null else $recommendedCommand end),
     recommendations: $recommendations
   }' >"$SUMMARY_JSON"
 
@@ -416,6 +441,10 @@ printf 'dedicated.post_provision.app=%s dedicated=%s onboarding=%s gateway=%s ma
   "$package_installed" "${dedicated_enabled:-unknown}" "${onboarding_completed:-unknown}" "${gateway_connection_mode:-unknown}" "${manifest_lock_task_mode_label:-unknown}"
 printf 'dedicated.post_provision.ready=%s resolved_activity=%s\n' \
   "$post_provision_ready" "${resolved_activity:-unknown}"
+printf 'dedicated.post_provision.recommended_action=%s\n' "${recommended_action:-unknown}"
+if [[ -n "$recommended_command" ]]; then
+  printf 'dedicated.post_provision.recommended_command=%s\n' "$recommended_command"
+fi
 if [[ "$LAUNCH" == "true" ]]; then
   printf 'dedicated.post_provision.launch=%s lock_task_mode_after_launch=%s\n' \
     "$launch_succeeded" "${lock_task_mode_state_after_launch:-unknown}"
