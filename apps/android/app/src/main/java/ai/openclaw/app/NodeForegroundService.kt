@@ -10,6 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import ai.openclaw.app.node.Quad
+import ai.openclaw.app.ui.localizeConnectionStatus
+import ai.openclaw.app.ui.pick
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,11 +32,17 @@ class NodeForegroundService : Service() {
     super.onCreate()
     cancelDedicatedHostServiceRecovery(applicationContext)
     LocalHostDedicatedDeploymentManager.scheduleWatchdogIfNeeded(applicationContext)
-    ensureChannel()
-    val initial = buildNotification(title = "OpenClaw Node", text = "Starting…")
-    startForegroundWithTypes(notification = initial)
 
     val app = application as NodeApp
+    val initialLanguage = app.prefs.appLanguage.value
+    ensureChannel(language = initialLanguage)
+    val initial =
+      buildNotification(
+        language = initialLanguage,
+        title = foregroundNotificationTitle(initialLanguage, connected = false),
+        text = foregroundNotificationStartingText(initialLanguage),
+      )
+    startForegroundWithTypes(notification = initial)
     val runtime =
       when {
         app.prefs.onboardingCompleted.value -> app.ensureRuntime()
@@ -46,26 +54,40 @@ class NodeForegroundService : Service() {
     }
     notificationJob =
       scope.launch {
+        val languageAndStatus =
+          combine(
+            app.prefs.appLanguage,
+            runtime.statusText,
+          ) { language, status -> NotificationLanguageStatus(language, status) }
         combine(
-          runtime.statusText,
+          languageAndStatus,
           runtime.serverName,
           runtime.isConnected,
           runtime.micEnabled,
           runtime.micIsListening,
-        ) { status, server, connected, micEnabled, micListening ->
-          Quint(status, server, connected, micEnabled, micListening)
-        }.collect { (status, server, connected, micEnabled, micListening) ->
-          val title = if (connected) "OpenClaw Node · Connected" else "OpenClaw Node"
-          val micSuffix =
-            if (micEnabled) {
-              if (micListening) " · Mic: Listening" else " · Mic: Pending"
-            } else {
-              ""
-            }
-          val text = (server?.let { "$status · $it" } ?: status) + micSuffix
+        ) { languageStatus, server, connected, micEnabled, micListening ->
+          NotificationState(
+            language = languageStatus.language,
+            status = languageStatus.status,
+            server = server,
+            connected = connected,
+            micEnabled = micEnabled,
+            micListening = micListening,
+          )
+        }.collect { state ->
+          val title = foregroundNotificationTitle(state.language, state.connected)
+          val text =
+            foregroundNotificationText(
+              language = state.language,
+              statusText = state.status,
+              serverName = state.server,
+              micEnabled = state.micEnabled,
+              micListening = state.micListening,
+            )
 
+          ensureChannel(language = state.language)
           startForegroundWithTypes(
-            notification = buildNotification(title = title, text = text),
+            notification = buildNotification(language = state.language, title = title, text = text),
           )
         }
       }
@@ -124,21 +146,21 @@ class NodeForegroundService : Service() {
 
   override fun onBind(intent: Intent?) = null
 
-  private fun ensureChannel() {
+  private fun ensureChannel(language: AppLanguage) {
     val mgr = getSystemService(NotificationManager::class.java)
     val channel =
       NotificationChannel(
         CHANNEL_ID,
-        "Connection",
+        foregroundNotificationChannelName(language),
         NotificationManager.IMPORTANCE_LOW,
       ).apply {
-        description = "OpenClaw node connection status"
+        description = foregroundNotificationChannelDescription(language)
         setShowBadge(false)
       }
     mgr.createNotificationChannel(channel)
   }
 
-  private fun buildNotification(title: String, text: String): Notification {
+  private fun buildNotification(language: AppLanguage, title: String, text: String): Notification {
     val launchIntent = Intent(this, MainActivity::class.java).apply {
       flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
@@ -167,7 +189,7 @@ class NodeForegroundService : Service() {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-      .addAction(0, "Disconnect", stopPending)
+      .addAction(0, foregroundNotificationActionLabel(language), stopPending)
       .build()
   }
 
@@ -204,4 +226,64 @@ class NodeForegroundService : Service() {
   }
 }
 
-private data class Quint<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+internal fun foregroundNotificationActionLabel(language: AppLanguage): String =
+  language.pick("Disconnect", "断开连接")
+
+internal fun foregroundNotificationChannelDescription(language: AppLanguage): String =
+  language.pick("OpenClaw node connection status", "OpenClaw 节点连接状态")
+
+internal fun foregroundNotificationChannelName(language: AppLanguage): String =
+  language.pick("Connection", "连接")
+
+internal fun foregroundNotificationMicSuffix(
+  language: AppLanguage,
+  micEnabled: Boolean,
+  micListening: Boolean,
+): String {
+  if (!micEnabled) return ""
+  return if (micListening) {
+    language.pick(" · Mic: Listening", " · 麦克风：监听中")
+  } else {
+    language.pick(" · Mic: Pending", " · 麦克风：待命")
+  }
+}
+
+internal fun foregroundNotificationStartingText(language: AppLanguage): String =
+  language.pick("Starting…", "启动中…")
+
+internal fun foregroundNotificationText(
+  language: AppLanguage,
+  statusText: String,
+  serverName: String?,
+  micEnabled: Boolean,
+  micListening: Boolean,
+): String {
+  val localizedStatus = localizeConnectionStatus(language, statusText)
+  val base = serverName?.let { "$localizedStatus · $it" } ?: localizedStatus
+  return base + foregroundNotificationMicSuffix(language, micEnabled, micListening)
+}
+
+internal fun foregroundNotificationTitle(
+  language: AppLanguage,
+  connected: Boolean,
+): String {
+  return if (connected) {
+    language.pick("OpenClaw Node · Connected", "OpenClaw 节点 · 已连接")
+  } else {
+    language.pick("OpenClaw Node", "OpenClaw 节点")
+  }
+}
+
+private data class NotificationLanguageStatus(
+  val language: AppLanguage,
+  val status: String,
+)
+
+private data class NotificationState(
+  val language: AppLanguage,
+  val status: String,
+  val server: String?,
+  val connected: Boolean,
+  val micEnabled: Boolean,
+  val micListening: Boolean,
+)

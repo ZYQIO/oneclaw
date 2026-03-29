@@ -135,10 +135,11 @@ class NodeForegroundServiceTest {
     val method =
       NodeForegroundService::class.java.getDeclaredMethod(
         "buildNotification",
+        AppLanguage::class.java,
         String::class.java,
         String::class.java,
       )
     method.isAccessible = true
-    return method.invoke(service, "Title", "Text") as Notification
+    return method.invoke(service, AppLanguage.English, "Title", "Text") as Notification
   }
 }
