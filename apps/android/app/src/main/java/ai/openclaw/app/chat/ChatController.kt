@@ -1,5 +1,6 @@
 package ai.openclaw.app.chat
 
+import ai.openclaw.app.AppLanguage
 import ai.openclaw.app.gateway.GatewayRpcClient
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -23,6 +24,7 @@ class ChatController(
   private val session: GatewayRpcClient,
   private val json: Json,
   private val supportsChatSubscribe: Boolean,
+  private val currentLanguage: () -> AppLanguage = { AppLanguage.English },
 ) {
   private val _sessionKey = MutableStateFlow("main")
   val sessionKey: StateFlow<String> = _sessionKey.asStateFlow()
@@ -122,7 +124,12 @@ class ChatController(
     }
 
     val runId = UUID.randomUUID().toString()
-    val text = if (trimmed.isEmpty() && attachments.isNotEmpty()) "See attached." else trimmed
+    val text =
+      if (trimmed.isEmpty() && attachments.isNotEmpty()) {
+        attachmentOnlyMessagePlaceholder(currentLanguage())
+      } else {
+        trimmed
+      }
     val sessionKey = _sessionKey.value
     val thinking = normalizeThinking(thinkingLevel)
 
@@ -525,6 +532,13 @@ class ChatController(
       "high" -> "high"
       else -> "off"
     }
+  }
+}
+
+internal fun attachmentOnlyMessagePlaceholder(language: AppLanguage): String {
+  return when (language) {
+    AppLanguage.English -> "See attached."
+    AppLanguage.SimplifiedChinese -> "见附件。"
   }
 }
 

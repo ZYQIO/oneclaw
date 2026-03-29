@@ -430,6 +430,7 @@ class NodeRuntime(
       session = operatorRpcClient,
       json = json,
       supportsChatSubscribe = false,
+      currentLanguage = { prefs.appLanguage.value },
     )
   private val voiceReplySpeakerLazy: Lazy<TalkModeManager> = lazy {
     // Reuse the existing TalkMode speech engine (ElevenLabs + deterministic system-TTS fallback)
