@@ -28,6 +28,7 @@ FOLLOW_UP_INPUT_MATCH_MODE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_MAT
 FOLLOW_UP_INPUT_INDEX="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_INDEX:-0}"
 FOLLOW_UP_SETTLE_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS:-1000}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-local-host-cross-app.XXXXXX)}"
+DESCRIBE_ONLY=false
 
 usage() {
   cat <<'EOF'
@@ -42,6 +43,8 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE="openclaw"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID="com.example:id/search_src_text"] \
   ./apps/android/scripts/local-host-ui-cross-app-probe.sh
+
+  ./apps/android/scripts/local-host-ui-cross-app-probe.sh --describe
 
 What it does:
   1. Requires adb plus a reachable local-host bearer token
@@ -67,6 +70,20 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --describe)
+      DESCRIBE_ONLY=true
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
 require_cmd() {
   local name=$1
   if ! command -v "$name" >/dev/null 2>&1; then
@@ -75,9 +92,7 @@ require_cmd() {
   fi
 }
 
-require_cmd curl
 require_cmd jq
-require_cmd adb
 
 validate_match_mode() {
   local raw=$1
@@ -89,12 +104,6 @@ validate_match_mode() {
       ;;
   esac
 }
-
-if [[ -z "$TOKEN" ]]; then
-  echo "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN is required." >&2
-  usage >&2
-  exit 1
-fi
 
 validate_match_mode "$FOLLOW_UP_WAIT_MATCH_MODE"
 validate_match_mode "$FOLLOW_UP_TAP_MATCH_MODE"
@@ -128,6 +137,72 @@ fi
 follow_up_requested=false
 if [[ "$follow_up_wait_requested" == "true" || "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
   follow_up_requested=true
+fi
+
+follow_up_mode_parts=()
+if [[ "$follow_up_wait_requested" == "true" ]]; then
+  follow_up_mode_parts+=("wait")
+fi
+if [[ "$follow_up_tap_requested" == "true" ]]; then
+  follow_up_mode_parts+=("tap")
+fi
+if [[ "$follow_up_input_requested" == "true" ]]; then
+  follow_up_mode_parts+=("input")
+fi
+if [[ "${#follow_up_mode_parts[@]}" -eq 0 ]]; then
+  follow_up_mode="none"
+else
+  follow_up_mode="$(IFS='+'; printf '%s' "${follow_up_mode_parts[*]}")"
+fi
+
+if [[ "$DESCRIBE_ONLY" == "true" ]]; then
+  printf 'cross_app.describe=enabled\n'
+  printf 'cross_app.script=%s\n' "local-host-ui-cross-app-probe.sh"
+  printf 'cross_app.command=%s\n' "./apps/android/scripts/local-host-ui-cross-app-probe.sh"
+  printf 'cross_app.target_package=%s\n' "$TARGET_PACKAGE"
+  printf 'cross_app.follow_up_mode=%s\n' "$follow_up_mode"
+  printf 'cross_app.observe_window_ms=%s\n' "$OBSERVE_WINDOW_MS"
+  printf 'cross_app.poll_interval_ms=%s\n' "$POLL_INTERVAL_MS"
+  printf 'cross_app.recovery_wait_ms=%s\n' "$RECOVERY_WAIT_MS"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_PORT=%s\n' "$PORT"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE=%s\n' "$APP_PACKAGE"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_COMPONENT=%s\n' "$APP_COMPONENT"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=%s\n' "$TARGET_PACKAGE"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=%s\n' "$OBSERVE_WINDOW_MS"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=%s\n' "$POLL_INTERVAL_MS"
+  printf 'cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS=%s\n' "$RECOVERY_WAIT_MS"
+  printf 'cross_app.follow_up.wait_requested=%s\n' "$follow_up_wait_requested"
+  printf 'cross_app.follow_up.tap_requested=%s\n' "$follow_up_tap_requested"
+  printf 'cross_app.follow_up.input_requested=%s\n' "$follow_up_input_requested"
+  printf 'cross_app.follow_up.input_selector_requested=%s\n' "$follow_up_input_selector_requested"
+  printf 'cross_app.follow_up.wait_match_mode=%s\n' "$FOLLOW_UP_WAIT_MATCH_MODE"
+  printf 'cross_app.follow_up.tap_match_mode=%s\n' "$FOLLOW_UP_TAP_MATCH_MODE"
+  printf 'cross_app.follow_up.input_match_mode=%s\n' "$FOLLOW_UP_INPUT_MATCH_MODE"
+  printf 'cross_app.follow_up.settle_ms=%s\n' "$FOLLOW_UP_SETTLE_MS"
+  printf 'cross_app.follow_up.wait_text=%s\n' "${FOLLOW_UP_WAIT_TEXT:-<empty>}"
+  printf 'cross_app.follow_up.tap_text=%s\n' "${FOLLOW_UP_TAP_TEXT:-<empty>}"
+  printf 'cross_app.follow_up.input_value=%s\n' "${FOLLOW_UP_INPUT_VALUE:-<empty>}"
+  exit 0
+fi
+
+if [[ -z "$TOKEN" ]]; then
+  echo "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN is required." >&2
+  usage >&2
+  exit 1
+fi
+
+require_cmd curl
+require_cmd adb
+
+follow_up_requested_count=0
+if [[ "$follow_up_wait_requested" == "true" ]]; then
+  follow_up_requested_count=$((follow_up_requested_count + 1))
+fi
+if [[ "$follow_up_tap_requested" == "true" ]]; then
+  follow_up_requested_count=$((follow_up_requested_count + 1))
+fi
+if [[ "$follow_up_input_requested" == "true" ]]; then
+  follow_up_requested_count=$((follow_up_requested_count + 1))
 fi
 
 device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
@@ -528,6 +603,7 @@ jq -n \
   --arg followUpInputResourceId "$FOLLOW_UP_INPUT_RESOURCE_ID" \
   --arg followUpInputStrategy "$follow_up_input_strategy" \
   --arg followUpStatePackage "$follow_up_state_package" \
+  --arg followUpMode "$follow_up_mode" \
   --argjson followUpRequested "$( [[ "$follow_up_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpWaitRequested "$( [[ "$follow_up_wait_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpWaitOk "$( [[ "$follow_up_wait_ok" == "true" ]] && printf 'true' || printf 'false' )" \
@@ -536,6 +612,7 @@ jq -n \
   --argjson followUpInputRequested "$( [[ "$follow_up_input_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpInputOk "$( [[ "$follow_up_input_ok" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpStateOk "$( [[ "$follow_up_state_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpRequestedCount "$follow_up_requested_count" \
   --argjson followUpInputValueLength "${#FOLLOW_UP_INPUT_VALUE}" \
   '{
     appPackage: $appPackage,
@@ -549,7 +626,9 @@ jq -n \
     firstTargetRound: $firstTargetRound,
     firstStatusFailureRound: $firstStatusFailureRound,
     followUp: {
+      mode: $followUpMode,
       requested: $followUpRequested,
+      requestedCount: $followUpRequestedCount,
       waitRequested: $followUpWaitRequested,
       waitText: ($followUpWaitText | select(length > 0)),
       waitMatchedText: ($followUpWaitMatchedText | select(length > 0)),
@@ -582,7 +661,8 @@ printf 'cross_app.target=%s classification=%s target_top_rounds=%s status_succes
 printf 'cross_app.first_target_round=%s first_status_failure_round=%s\n' \
   "$first_target_round" "$first_status_failure_round"
 if [[ "$follow_up_requested" == "true" ]]; then
-  printf 'cross_app.follow_up wait_ok=%s tap_ok=%s input_ok=%s state_ok=%s\n' \
+  printf 'cross_app.follow_up_mode=%s wait_ok=%s tap_ok=%s input_ok=%s state_ok=%s\n' \
+    "$follow_up_mode" \
     "$follow_up_wait_ok" "$follow_up_tap_ok" "$follow_up_input_ok" "$follow_up_state_ok"
 fi
 printf 'recovery.http_code=%s recovery.ok=%s recovered_package=%s\n' \
