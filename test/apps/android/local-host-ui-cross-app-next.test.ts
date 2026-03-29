@@ -49,13 +49,41 @@ describe("local-host-ui-cross-app-next --describe", () => {
 
     expect(summary.probeDescribe["cross_app.target_package"]).toBe("com.example.settings");
     expect(summary.probeDescribe["cross_app.follow_up.input_value"]).toBe("codex");
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=com.example.settings",
+    );
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=codex",
+    );
+  });
+
+  it("keeps reset helpers and shell-quoted overrides in the recommended command", () => {
+    const summary = runDescribe([], {
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET: "settings-home-swipe-up",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH:
+        "true",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE: "open claw",
+    });
+
+    expect(summary.preset).toBe("settings-home-swipe-up");
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH=true",
+    );
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=open\\ claw",
+    );
   });
 
   it("switches into sweep mode when requested", () => {
-    const summary = runDescribe(["--sweep"]);
+    const summary = runDescribe(["--sweep"], {
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWEEP_WINDOWS_MS: "4000,9000",
+    });
 
     expect(summary.mode).toBe("sweep");
     expect(summary.sweepDescribe).not.toBeNull();
     expect(summary.recommendedCommand).toContain("-- --sweep");
+    expect(summary.recommendedCommand).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWEEP_WINDOWS_MS=4000\\,9000",
+    );
   });
 });

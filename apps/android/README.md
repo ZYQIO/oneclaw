@@ -355,7 +355,7 @@ OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
 pnpm android:local-host:ui:cross-app:next
 ```
 
-That wrapper defaults the current repo preset `settings-search-input`, keeps explicit env overrides intact, and writes a wrapper-level `next-summary.json` alongside the underlying probe or sweep artifacts. Add `-- --sweep` when you want the same preset to flow into the multi-window sweep.
+That wrapper defaults the current repo preset `settings-search-input`, keeps explicit env overrides intact, and writes a wrapper-level `next-summary.json` alongside the underlying probe or sweep artifacts. Its `recommendedCommand` now also preserves the current wrapper-level override envs, so reruns no longer silently drop things like the opt-in reset helper. Add `-- --sweep` when you want the same preset to flow into the multi-window sweep.
 
 The current `settings-search-input` preset is tuned for OEM and locale variance: instead of assuming English `Settings / Search` copy, it now defaults to the stable Settings `resourceId` selectors `com.android.settings:id/searchView` and `com.android.settings:id/search_src_text`, then runs a bounded tap+input flow with `openclaw`. Explicit env overrides still win when a device needs different selectors.
 
