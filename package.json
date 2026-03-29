@@ -511,6 +511,7 @@
     "android:local-host:codex-guard:write-env": "pnpm android:local-host:codex-guard:launchd -- write-env",
     "android:local-host:codex-sync": "pnpm exec tsx apps/android/scripts/local-host-codex-sync.ts",
     "android:local-host:dedicated:device-owner": "bash apps/android/scripts/local-host-dedicated-device-owner.sh",
+    "android:local-host:dedicated:next": "bash apps/android/scripts/local-host-dedicated-next.sh",
     "android:local-host:dedicated:post-provision": "bash apps/android/scripts/local-host-dedicated-post-provision-check.sh",
     "android:local-host:dedicated:readiness": "bash apps/android/scripts/local-host-dedicated-readiness.sh",
     "android:local-host:dedicated:testdpc-install": "bash apps/android/scripts/local-host-dedicated-testdpc-install.sh",
