@@ -38,6 +38,8 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.preset")).toBe("base");
     expect(values.get("cross_app.follow_up.preset")).toBe("<none>");
     expect(values.get("cross_app.follow_up_mode")).toBe("none");
+    expect(values.get("cross_app.follow_up.foreground_timeout_ms")).toBe("5000");
+    expect(values.get("cross_app.follow_up.foreground_poll_interval_ms")).toBe("250");
   });
 
   it("expands the settings-search-input preset into a resource-id tap+input flow", () => {

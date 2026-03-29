@@ -375,6 +375,8 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS=5000`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS=250`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS=1000`
 
 The cross-app probe calls `ui.launchApp` for the target package, then polls two truths in parallel:
@@ -382,7 +384,10 @@ The cross-app probe calls `ui.launchApp` for the target package, then polls two 
 - ADB foreground-activity state, using `topResumedActivity` and current focus
 - Remote `/status`, to see whether OpenClaw stays reachable while another app is supposed to be on top
 
-When the optional follow-up env vars are set, the same probe can also run `ui.waitForText`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Treat those selectors as app- and OEM-specific until the corresponding real-device proof is captured.
+When the optional follow-up env vars are set, the same probe first waits for `ui.state` to report that the target package really became the active window, then it can run `ui.waitForText`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Treat those selectors as app- and OEM-specific until the corresponding real-device proof is captured.
+
+- On March 29, 2026, that target-foreground wait closed a real race on the current OPPO / ColorOS phone: without it, `ui.launchApp(com.android.settings)` could still leave `ai.openclaw.app` as the active package for a short window and cause an immediate `UI_TARGET_MISMATCH`; with it, the default `pnpm android:local-host:ui:cross-app:next` path again completed with `foreground_ready=true`, `tap_ok=true`, `input_ok=true`, and `state_ok=true`.
+- On the same phone, the first direct `ui.swipe` proof now also exists on the Settings homepage: a guarded upward swipe kept `packageName=com.android.settings` while shifting visible rows from `WLAN` / `蓝牙` / `移动网络` into lower entries such as `通知与控制中心` / `密码与安全` / `隐私` / `应用` / `电池`.
 
 At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON.
 
