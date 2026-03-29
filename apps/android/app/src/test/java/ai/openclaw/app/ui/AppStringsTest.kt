@@ -447,6 +447,94 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesSmsPermissionRequirement() {
+    assertEquals(
+      "需要短信权限：请授予短信权限",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "SMS_PERMISSION_REQUIRED: grant SMS permission",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesContactsPermissionRequirement() {
+    assertEquals(
+      "需要联系人权限：请授予联系人权限",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "CONTACTS_PERMISSION_REQUIRED: grant Contacts permission",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesAppNotInstalledFailure() {
+    assertEquals(
+      "应用未安装：此设备未安装包 `com.example.app`。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "APP_NOT_INSTALLED: Package `com.example.app` is not installed on this device.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesAppLaunchUnavailableFailure() {
+    assertEquals(
+      "应用启动不可用：尚未为 `ui.launchApp` 配置应用启动动作。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "APP_LAUNCH_UNAVAILABLE: No app-launch action is configured for ui.launchApp.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiTargetNotFoundFailure() {
+    assertEquals(
+      "未找到 UI 目标：没有找到与请求点击选择器匹配的无障碍节点。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_TARGET_NOT_FOUND: No matching accessibility node was found for the requested tap selector.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiTargetMismatchFailure() {
+    assertEquals(
+      "UI 目标不匹配：当前前台包 `com.android.settings` 与 `ai.openclaw.app` 不匹配。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_TARGET_MISMATCH: Active package `com.android.settings` does not match `ai.openclaw.app`.",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiTapInvalidRequest() {
+    assertEquals(
+      "请求无效：`ui.tap` 需要提供 x/y，或至少一个选择器字段",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "INVALID_REQUEST: ui.tap requires x/y or at least one selector field",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUiActionFailureReason() {
+    assertEquals(
+      "操作失败：匹配到的节点同时拒绝了无障碍点击和后备点击手势。",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UI_ACTION_FAILED: Matched node rejected both accessibility click and fallback tap gesture.",
+      ),
+    )
+  }
+
+  @Test
   fun localizeVoiceConversationText_translatesDefaultFailure() {
     assertEquals(
       "语音请求失败。",

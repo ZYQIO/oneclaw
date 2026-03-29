@@ -15,6 +15,10 @@ private val gatewayAuthHintRegex = Regex("""^unauthorized: gateway (token|passwo
 private val codexRequestFailedRegex = Regex("""^OpenAI Codex request failed(?: \(([^)]+)\))?(?:\s*\|\s*(.+))?$""")
 private val runtimePrefixedErrorRegex = Regex("""^([A-Z_]+):\s*(.+)$""")
 private val usageLimitRegex = Regex("""^The usage limit has been reached(?:\s*\|\s*errorType=(.+))?$""", RegexOption.IGNORE_CASE)
+private val appNotInstalledRegex = Regex("""^Package `([^`]+)` is not installed on this device\.$""")
+private val appNotLaunchableRegex = Regex("""^Package `([^`]+)` is installed but has no launchable activity\.$""")
+private val launchIntentRejectedRegex = Regex("""^Android rejected the launch intent for `([^`]+)`\.$""")
+private val activePackageMismatchRegex = Regex("""^Active package `([^`]+)` does not match `([^`]+)`(?: yet)?\.$""")
 
 internal val LocalAppLanguage = staticCompositionLocalOf { AppLanguage.English }
 
@@ -480,21 +484,30 @@ private fun localizeRuntimeErrorCode(
 ): String {
   val trimmed = code.trim()
   return when (trimmed) {
+    "APP_LAUNCH_FAILED" -> language.pick(trimmed, "应用启动失败")
+    "APP_LAUNCH_UNAVAILABLE" -> language.pick(trimmed, "应用启动不可用")
+    "APP_NOT_INSTALLED" -> language.pick(trimmed, "应用未安装")
+    "APP_NOT_LAUNCHABLE" -> language.pick(trimmed, "应用不可启动")
     "ACTION_FAILED" -> language.pick(trimmed, "操作失败")
     "ACTION_UNAVAILABLE" -> language.pick(trimmed, "操作不可用")
     "A2UI_HOST_UNAVAILABLE" -> language.pick(trimmed, "A2UI Host 不可用")
     "CALENDAR_UNAVAILABLE" -> language.pick(trimmed, "日历不可用")
+    "CALENDAR_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要日历权限")
     "CAMERA_DISABLED" -> language.pick(trimmed, "相机已关闭")
     "CAMERA_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要相机权限")
     "CAMERA_TOO_LARGE" -> language.pick(trimmed, "相机内容过大")
+    "CALL_LOG_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要通话记录权限")
     "CALL_LOG_UNAVAILABLE" -> language.pick(trimmed, "通话记录不可用")
     "COMMAND_DISABLED" -> language.pick(trimmed, "命令已禁用")
+    "CONTACTS_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要联系人权限")
     "CONTACTS_UNAVAILABLE" -> language.pick(trimmed, "联系人不可用")
     "INVALID_REQUEST" -> language.pick(trimmed, "请求无效")
+    "LOCATION_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要位置权限")
     "LOCATION_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台定位不可用")
     "LOCATION_DISABLED" -> language.pick(trimmed, "位置已关闭")
     "LOCATION_UNAVAILABLE" -> language.pick(trimmed, "位置不可用")
     "MIC_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要麦克风权限")
+    "MOTION_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要运动权限")
     "MOTION_UNAVAILABLE" -> language.pick(trimmed, "运动不可用")
     "NODE_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台节点不可用")
     "NOT_AUTHORIZED" -> language.pick(trimmed, "未授权")
@@ -504,12 +517,112 @@ private fun localizeRuntimeErrorCode(
     "NOTIFICATION_NOT_FOUND" -> language.pick(trimmed, "未找到通知")
     "NOTIFICATIONS_UNAVAILABLE" -> language.pick(trimmed, "通知不可用")
     "PEDOMETER_UNAVAILABLE" -> language.pick(trimmed, "计步器不可用")
+    "PHOTOS_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要照片权限")
     "PHOTOS_UNAVAILABLE" -> language.pick(trimmed, "照片不可用")
+    "SMS_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要短信权限")
     "SMS_UNAVAILABLE" -> language.pick(trimmed, "短信不可用")
     "UI_AUTOMATION_DISABLED" -> language.pick(trimmed, "UI 自动化已关闭")
     "UI_AUTOMATION_UNAVAILABLE" -> language.pick(trimmed, "UI 自动化不可用")
+    "UI_ACTION_FAILED" -> language.pick(trimmed, "操作失败")
+    "UI_TARGET_DISABLED" -> language.pick(trimmed, "UI 目标已禁用")
+    "UI_TARGET_MISMATCH" -> language.pick(trimmed, "UI 目标不匹配")
+    "UI_TARGET_NOT_FOUND" -> language.pick(trimmed, "未找到 UI 目标")
+    "UI_TARGET_UNAVAILABLE" -> language.pick(trimmed, "UI 目标不可用")
+    "UI_WAIT_TIMEOUT" -> language.pick(trimmed, "UI 等待超时")
     "UNAVAILABLE" -> language.pick(trimmed, "不可用")
     else -> trimmed
+  }
+}
+
+private fun localizeUiAutomationDetail(
+  language: AppLanguage,
+  detail: String,
+): String? {
+  val trimmed = detail.trim()
+  appNotInstalledRegex.matchEntire(trimmed)?.let { match ->
+    val packageName = match.groupValues[1]
+    return language.pick(trimmed, "此设备未安装包 `$packageName`。")
+  }
+  appNotLaunchableRegex.matchEntire(trimmed)?.let { match ->
+    val packageName = match.groupValues[1]
+    return language.pick(trimmed, "此设备已安装包 `$packageName`，但没有可启动 activity。")
+  }
+  launchIntentRejectedRegex.matchEntire(trimmed)?.let { match ->
+    val packageName = match.groupValues[1]
+    return language.pick(trimmed, "Android 拒绝了包 `$packageName` 的启动 intent。")
+  }
+  activePackageMismatchRegex.matchEntire(trimmed)?.let { match ->
+    val activePackage = match.groupValues[1]
+    val expectedPackage = match.groupValues[2]
+    return language.pick(trimmed, "当前前台包 `$activePackage` 与 `$expectedPackage` 不匹配。")
+  }
+  return when (trimmed) {
+    "Accessibility service is not enabled." ->
+      language.pick(trimmed, "无障碍服务未启用。")
+    "Accessibility service is enabled but not yet bound." ->
+      language.pick(trimmed, "无障碍服务已启用，但尚未绑定。")
+    "No active accessibility window is available." ->
+      language.pick(trimmed, "当前没有活动的无障碍窗口可用。")
+    "No active accessibility window is available for selector-based tap." ->
+      language.pick(trimmed, "当前没有可用于按选择器点击的活动无障碍窗口。")
+    "No active accessibility window is available for ui.inputText." ->
+      language.pick(trimmed, "当前没有可供 `ui.inputText` 使用的活动无障碍窗口。")
+    "No editable accessibility node is available for ui.inputText." ->
+      language.pick(trimmed, "当前没有可供 `ui.inputText` 使用的可编辑无障碍节点。")
+    "No matching accessibility node was found for the requested tap selector." ->
+      language.pick(trimmed, "没有找到与请求点击选择器匹配的无障碍节点。")
+    "The selected editable accessibility node is disabled." ->
+      language.pick(trimmed, "选中的可编辑无障碍节点已禁用。")
+    "Matched node rejected both accessibility click and fallback tap gesture." ->
+      language.pick(trimmed, "匹配到的节点同时拒绝了无障碍点击和后备点击手势。")
+    "Accessibility service rejected the tap gesture." ->
+      language.pick(trimmed, "无障碍服务拒绝了点击手势。")
+    "The selected editable node rejected ACTION_SET_TEXT." ->
+      language.pick(trimmed, "选中的可编辑节点拒绝了 ACTION_SET_TEXT。")
+    "No app-launch action is configured for ui.launchApp." ->
+      language.pick(trimmed, "尚未为 `ui.launchApp` 配置应用启动动作。")
+    "ui.launchApp was not accepted by Android" ->
+      language.pick(trimmed, "Android 未接受 `ui.launchApp`。")
+    "ui.inputText was not accepted by the accessibility service" ->
+      language.pick(trimmed, "无障碍服务未接受 `ui.inputText`。")
+    "ui.tap was not accepted by the accessibility service" ->
+      language.pick(trimmed, "无障碍服务未接受 `ui.tap`。")
+    "ui.back was not accepted by the accessibility service" ->
+      language.pick(trimmed, "无障碍服务未接受 `ui.back`。")
+    "ui.home was not accepted by the accessibility service" ->
+      language.pick(trimmed, "无障碍服务未接受 `ui.home`。")
+    "grant Calendar permission" -> language.pick(trimmed, "请授予日历权限")
+    "grant Call Log permission" -> language.pick(trimmed, "请授予通话记录权限")
+    "grant Contacts permission" -> language.pick(trimmed, "请授予联系人权限")
+    "grant Location permission" -> language.pick(trimmed, "请授予位置权限")
+    "grant Motion permission" -> language.pick(trimmed, "请授予运动权限")
+    "grant Photos permission" -> language.pick(trimmed, "请授予照片权限")
+    "grant SMS permission" -> language.pick(trimmed, "请授予短信权限")
+    "expected JSON object with packageName" ->
+      language.pick(trimmed, "需要包含 packageName 的 JSON 对象")
+    "expected JSON object with text and optional timeoutMs/pollIntervalMs/matchMode/ignoreCase/packageName" ->
+      language.pick(trimmed, "需要包含 text 以及可选 timeoutMs/pollIntervalMs/matchMode/ignoreCase/packageName 的 JSON 对象")
+    "expected JSON object with value and optional text/contentDescription/resourceId/packageName/matchMode/ignoreCase/index" ->
+      language.pick(trimmed, "需要包含 value 以及可选 text/contentDescription/resourceId/packageName/matchMode/ignoreCase/index 的 JSON 对象")
+    "expected JSON object with x/y or text/contentDescription/resourceId and optional packageName/matchMode/ignoreCase/index" ->
+      language.pick(trimmed, "需要包含 x/y 或 text/contentDescription/resourceId 以及可选 packageName/matchMode/ignoreCase/index 的 JSON 对象")
+    "packageName is required" -> language.pick(trimmed, "需要提供 packageName")
+    "text is required" -> language.pick(trimmed, "需要提供 text")
+    "Tap coordinate x is missing." -> language.pick(trimmed, "缺少点击坐标 x。")
+    "Tap coordinate y is missing." -> language.pick(trimmed, "缺少点击坐标 y。")
+    "ui.inputText index must be zero or greater" ->
+      language.pick(trimmed, "`ui.inputText` 的 index 必须大于等于 0")
+    "ui.tap requires both x and y when using coordinate mode" ->
+      language.pick(trimmed, "`ui.tap` 在坐标模式下必须同时提供 x 和 y")
+    "ui.tap accepts either coordinates or selector fields, not both" ->
+      language.pick(trimmed, "`ui.tap` 只能提供坐标或选择器字段之一，不能同时提供")
+    "ui.tap requires x/y or at least one selector field" ->
+      language.pick(trimmed, "`ui.tap` 需要提供 x/y，或至少一个选择器字段")
+    "ui.tap coordinates must be non-negative" ->
+      language.pick(trimmed, "`ui.tap` 的坐标必须为非负数")
+    "ui.tap index must be zero or greater" ->
+      language.pick(trimmed, "`ui.tap` 的 index 必须大于等于 0")
+    else -> null
   }
 }
 
@@ -523,6 +636,7 @@ private fun localizeRuntimeErrorDetail(
   localizeRemoteAccessFailureReason(language, trimmed).takeIf { it != trimmed }?.let { return it }
   translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
   localizeRuntimePrefixedError(language, trimmed)?.let { return it }
+  localizeUiAutomationDetail(language, trimmed)?.let { return it }
   return when (trimmed) {
     "A2UI host not reachable" -> language.pick(trimmed, "A2UI Host 无法访问")
     "accessibility service is enabled but not yet bound" ->
