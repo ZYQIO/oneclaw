@@ -249,7 +249,7 @@ pnpm android:local-host:codex-guard:launchd -- write-env
 pnpm android:local-host:codex-guard:launchd -- write-env --token '<token-from-connect-tab>'
 ```
 
-The helper installs a per-user LaunchAgent that runs the same watch guard, keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default, and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. `status` now also reports whether that env file exists and whether it still contains only the placeholder token. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at install time so the generated wrapper pins an absolute binary path.
+The helper installs a per-user LaunchAgent that runs the same watch guard, keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default, and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. `status` now also reports whether that env file exists, whether it still contains only the placeholder token, and a `recommendedAction` field that tells you whether the next step is `write-env`, `configure-token`, `install`, or `check-launchagent`. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at install time so the generated wrapper pins an absolute binary path.
 
 ## Local Host UI Automation Smoke
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildGuardEnvFileContent,
   parseCli,
+  recommendGuardAction,
   resolveGuardLaunchdPlan,
 } from "../../../apps/android/scripts/local-host-codex-guard-launchd.js";
 
@@ -141,5 +142,62 @@ describe("buildGuardEnvFileContent", () => {
     const content = buildGuardEnvFileContent("secret-token");
 
     expect(content).toContain("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='secret-token'");
+  });
+});
+
+describe("recommendGuardAction", () => {
+  it("asks for write-env before anything else when env is missing", () => {
+    expect(
+      recommendGuardAction({
+        envFileExists: false,
+        tokenConfigured: false,
+        installed: false,
+        loaded: false,
+      }),
+    ).toBe("write-env");
+  });
+
+  it("asks for token configuration when env exists but still has the placeholder", () => {
+    expect(
+      recommendGuardAction({
+        envFileExists: true,
+        tokenConfigured: false,
+        installed: false,
+        loaded: false,
+      }),
+    ).toBe("configure-token");
+  });
+
+  it("asks for install when env is ready but launchd is not installed", () => {
+    expect(
+      recommendGuardAction({
+        envFileExists: true,
+        tokenConfigured: true,
+        installed: false,
+        loaded: false,
+      }),
+    ).toBe("install");
+  });
+
+  it("asks for launchd investigation when installed but not loaded", () => {
+    expect(
+      recommendGuardAction({
+        envFileExists: true,
+        tokenConfigured: true,
+        installed: true,
+        loaded: false,
+      }),
+    ).toBe("check-launchagent");
+  });
+
+  it("reports healthy when everything is ready and loaded", () => {
+    expect(
+      recommendGuardAction({
+        envFileExists: true,
+        tokenConfigured: true,
+        installed: true,
+        loaded: true,
+      }),
+    ).toBe("healthy");
   });
 });

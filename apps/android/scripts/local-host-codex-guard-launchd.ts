@@ -54,6 +54,12 @@ export type GuardLaunchdStatus = {
   envFile: string;
   envFileExists: boolean;
   tokenConfigured: boolean;
+  recommendedAction:
+    | "write-env"
+    | "configure-token"
+    | "install"
+    | "check-launchagent"
+    | "healthy";
   installed: boolean;
   loaded: boolean;
   runtime?: {
@@ -500,6 +506,27 @@ function hasConfiguredToken(environment: Record<string, string>): boolean {
   return token != null && token !== TOKEN_PLACEHOLDER;
 }
 
+export function recommendGuardAction(params: {
+  envFileExists: boolean;
+  tokenConfigured: boolean;
+  installed: boolean;
+  loaded: boolean;
+}): GuardLaunchdStatus["recommendedAction"] {
+  if (!params.envFileExists) {
+    return "write-env";
+  }
+  if (!params.tokenConfigured) {
+    return "configure-token";
+  }
+  if (!params.installed) {
+    return "install";
+  }
+  if (!params.loaded) {
+    return "check-launchagent";
+  }
+  return "healthy";
+}
+
 async function writeGuardEnv(options: GuardLaunchdCliOptions): Promise<{
   envFile: string;
   tokenConfigured: boolean;
@@ -644,6 +671,12 @@ async function readGuardStatusFromPlan(plan: GuardLaunchdPlan): Promise<GuardLau
     envFile: plan.envFile,
     envFileExists,
     tokenConfigured,
+    recommendedAction: recommendGuardAction({
+      envFileExists,
+      tokenConfigured,
+      installed,
+      loaded,
+    }),
     installed,
     loaded,
     ...(runtime && Object.keys(runtime).length > 0 ? { runtime } : {}),
@@ -667,6 +700,7 @@ function printInstallStatus(status: GuardLaunchdStatus): void {
   console.log(`env.path=${status.envFile}`);
   console.log(`env.exists=${String(status.envFileExists)}`);
   console.log(`env.token_configured=${String(status.tokenConfigured)}`);
+  console.log(`recommended.action=${status.recommendedAction}`);
   if (status.runtime?.state) {
     console.log(`runtime.state=${status.runtime.state}`);
   }
