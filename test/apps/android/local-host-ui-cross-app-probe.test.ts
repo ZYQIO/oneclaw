@@ -87,6 +87,12 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up.tap_text")).toBe("Search settings");
     expect(values.get("cross_app.follow_up.tap_resource_id")).toBe("<empty>");
     expect(values.get("cross_app.follow_up.input_value")).toBe("codex");
+    expect(values.get("cross_app.rerun_hint")).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=codex",
+    );
+    expect(values.get("cross_app.rerun_hint")).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT=Search\\ settings",
+    );
   });
 
   it("reports swipe follow-up configuration when coordinates are provided", () => {
@@ -151,6 +157,9 @@ describe("local-host-ui-cross-app-probe --describe", () => {
         "cross_app.run_env.OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH",
       ),
     ).toBe("true");
+    expect(values.get("cross_app.rerun_hint")).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH=true",
+    );
   });
 
   it("fails clearly when swipe coordinates are incomplete", () => {

@@ -140,6 +140,10 @@ require_cmd() {
   fi
 }
 
+shell_quote() {
+  printf '%q' "$1"
+}
+
 apply_follow_up_preset() {
   case "$FOLLOW_UP_PRESET" in
     "")
@@ -233,6 +237,80 @@ validate_boolean() {
 }
 
 validate_boolean "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH" "$RESET_TARGET_BEFORE_LAUNCH"
+
+append_rerun_env() {
+  local env_name=$1
+  local env_value=${!env_name-}
+  if [[ -z "${env_value}" ]]; then
+    return 0
+  fi
+  printf '%s=%s\n' "$env_name" "$(shell_quote "$env_value")"
+}
+
+build_probe_rerun_hint() {
+  local -a parts=()
+  local env_name
+  local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
+    OPENCLAW_ANDROID_LOCAL_HOST_PORT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_COMPONENT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TIMEOUT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_CONTENT_DESCRIPTION
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_INDEX
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_CONTENT_DESCRIPTION
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_INDEX
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS
+  )
+
+  parts+=("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token>")
+  for env_name in "${env_names[@]}"; do
+    while IFS= read -r env_assignment; do
+      if [[ -n "$env_assignment" ]]; then
+        parts+=("$env_assignment")
+      fi
+    done < <(append_rerun_env "$env_name")
+  done
+  parts+=("./apps/android/scripts/local-host-ui-cross-app-probe.sh")
+
+  local output=""
+  local part
+  for part in "${parts[@]}"; do
+    if [[ -n "$output" ]]; then
+      output+=" "
+    fi
+    output+="$part"
+  done
+  printf '%s' "$output"
+}
 
 follow_up_wait_requested=false
 if [[ -n "$FOLLOW_UP_WAIT_TEXT" ]]; then
@@ -395,11 +473,7 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.follow_up.tap_resource_id=%s\n' "${FOLLOW_UP_TAP_RESOURCE_ID:-<empty>}"
   printf 'cross_app.follow_up.input_value=%s\n' "${FOLLOW_UP_INPUT_VALUE:-<empty>}"
   printf 'cross_app.follow_up.input_resource_id=%s\n' "${FOLLOW_UP_INPUT_RESOURCE_ID:-<empty>}"
-  if [[ -n "$FOLLOW_UP_PRESET" ]]; then
-    printf 'cross_app.rerun_hint=%s\n' "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET=$FOLLOW_UP_PRESET ./apps/android/scripts/local-host-ui-cross-app-probe.sh"
-  else
-    printf 'cross_app.rerun_hint=%s\n' "OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> ./apps/android/scripts/local-host-ui-cross-app-probe.sh"
-  fi
+  printf 'cross_app.rerun_hint=%s\n' "$(build_probe_rerun_hint)"
   exit 0
 fi
 

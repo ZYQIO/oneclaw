@@ -57,6 +57,149 @@ require_cmd() {
   fi
 }
 
+shell_quote() {
+  printf '%q' "$1"
+}
+
+append_rerun_env() {
+  local env_name=$1
+  local env_value=${!env_name-}
+  if [[ -z "${env_value}" ]]; then
+    return 0
+  fi
+  printf '%s=%s\n' "$env_name" "$(shell_quote "$env_value")"
+}
+
+build_probe_command() {
+  local observe_window_value=$1
+  local -a parts=()
+  local env_name
+  local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
+    OPENCLAW_ANDROID_LOCAL_HOST_PORT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_COMPONENT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TIMEOUT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_CONTENT_DESCRIPTION
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_INDEX
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_CONTENT_DESCRIPTION
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_INDEX
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS
+  )
+
+  parts+=("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token>")
+  parts+=("OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=$(shell_quote "$observe_window_value")")
+  for env_name in "${env_names[@]}"; do
+    while IFS= read -r env_assignment; do
+      if [[ -n "$env_assignment" ]]; then
+        parts+=("$env_assignment")
+      fi
+    done < <(append_rerun_env "$env_name")
+  done
+  parts+=("./apps/android/scripts/local-host-ui-cross-app-probe.sh")
+
+  local output=""
+  local part
+  for part in "${parts[@]}"; do
+    if [[ -n "$output" ]]; then
+      output+=" "
+    fi
+    output+="$part"
+  done
+  printf '%s' "$output"
+}
+
+build_sweep_recommended_command() {
+  local -a parts=()
+  local env_name
+  local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
+    OPENCLAW_ANDROID_LOCAL_HOST_PORT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_COMPONENT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PRESET
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FORCE_STOP_TARGET_BEFORE_LAUNCH
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TIMEOUT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_CONTENT_DESCRIPTION
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_INDEX
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_CONTENT_DESCRIPTION
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_MATCH_MODE
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_INDEX
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y_RATIO
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWEEP_WINDOWS_MS
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_STOP_ON_FIRST_NON_REACHABLE
+  )
+
+  parts+=("OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token>")
+  for env_name in "${env_names[@]}"; do
+    while IFS= read -r env_assignment; do
+      if [[ -n "$env_assignment" ]]; then
+        parts+=("$env_assignment")
+      fi
+    done < <(append_rerun_env "$env_name")
+  done
+  parts+=("./apps/android/scripts/local-host-ui-cross-app-sweep.sh")
+
+  local output=""
+  local part
+  for part in "${parts[@]}"; do
+    if [[ -n "$output" ]]; then
+      output+=" "
+    fi
+    output+="$part"
+  done
+  printf '%s' "$output"
+}
+
 require_cmd jq
 
 windows_json="$(jq -cn --arg windows "$WINDOWS_MS_RAW" '
@@ -76,7 +219,8 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   jq -n \
     --arg script "local-host-ui-cross-app-sweep.sh" \
     --arg command "./apps/android/scripts/local-host-ui-cross-app-sweep.sh" \
-    --arg probeCommand "./apps/android/scripts/local-host-ui-cross-app-probe.sh" \
+    --arg probeCommand "$(build_probe_command "<window-ms>")" \
+    --arg recommendedCommand "$(build_sweep_recommended_command)" \
     --arg windowsMsRaw "$WINDOWS_MS_RAW" \
     --arg windowsPreset "$windows_preset" \
     --arg stopOnFirstNonReachable "$STOP_ON_FIRST_NON_REACHABLE" \
@@ -92,6 +236,7 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
         }
       },
       probeCommand: $probeCommand,
+      recommendedCommand: $recommendedCommand,
       windowsPreset: $windowsPreset,
       windowsMs: $windowsMs,
       stopOnFirstNonReachable: ($stopOnFirstNonReachable == "true"),
@@ -170,6 +315,7 @@ for raw_window in "${raw_windows[@]}"; do
     --arg followUpMode "$follow_up_mode" \
     --argjson recoveryOk "$( [[ "$recovery_ok" == "true" ]] && printf 'true' || printf 'false' )" \
     --arg artifactDir "$run_dir" \
+    --arg probeCommand "$(build_probe_command "$window_ms")" \
     '{
       run: $run,
       observeWindowMs: $observeWindowMs,
@@ -178,7 +324,8 @@ for raw_window in "${raw_windows[@]}"; do
       targetTopCount: $targetTopCount,
       followUpMode: $followUpMode,
       recoveryOk: $recoveryOk,
-      artifactDir: $artifactDir
+      artifactDir: $artifactDir,
+      probeCommand: $probeCommand
     }' >>"$SWEEP_JSONL"
   printf '\n' >>"$SWEEP_JSONL"
 
@@ -201,6 +348,8 @@ done
 jq -n \
   --arg windowsMs "$WINDOWS_MS_RAW" \
   --arg windowsPreset "$windows_preset" \
+  --arg recommendedCommand "$(build_sweep_recommended_command)" \
+  --arg probeCommand "$(build_probe_command "<window-ms>")" \
   --argjson runCount "$run_count" \
   --argjson allWindowsReachable "$( [[ "$all_windows_reachable" == "true" ]] && printf 'true' || printf 'false' )" \
   --arg followUpMode "$first_run_follow_up_mode" \
@@ -225,7 +374,8 @@ jq -n \
     firstNonReachableArtifactDir: (
       if $firstNonReachableArtifactDir == "" then null else $firstNonReachableArtifactDir end
     ),
-    probeCommand: "./apps/android/scripts/local-host-ui-cross-app-probe.sh",
+    recommendedCommand: $recommendedCommand,
+    probeCommand: $probeCommand,
     runs: $runs
   }' >"$SUMMARY_JSON"
 
