@@ -11,6 +11,7 @@ import type { OpenClawConfig } from "../../../src/config/config.js";
 export type SyncCliOptions = {
   agentDir?: string;
   artifactDir?: string;
+  adbBin?: string;
   baseUrl: string;
   token: string;
   port: number;
@@ -137,6 +138,7 @@ function usage(): string {
     "  --base-url <url>",
     "  --token <token>",
     "  --port <port>",
+    "  --adb-bin <path>",
     "  --agent-dir <dir>",
     "  --artifact-dir <dir>",
     "  --use-adb-forward",
@@ -233,6 +235,7 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
       "base-url": { type: "string" },
       token: { type: "string" },
       port: { type: "string" },
+      "adb-bin": { type: "string" },
       "use-adb-forward": { type: "boolean", default: false },
       "artifact-dir": { type: "string" },
       "wait-for-device": { type: "boolean", default: false },
@@ -289,6 +292,7 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
   return {
     agentDir: trimOptional(parsed.values["agent-dir"]),
     artifactDir: trimOptional(parsed.values["artifact-dir"] ?? env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_ARTIFACT_DIR),
+    adbBin: trimOptional(parsed.values["adb-bin"] ?? env.OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN),
     baseUrl,
     token,
     port,
@@ -441,13 +445,17 @@ function buildCodexImportPayload(params: {
   };
 }
 
-function requireAdb(): void {
+function resolveAdbBin(options: SyncCliOptions): string {
+  return options.adbBin?.trim() || "adb";
+}
+
+function requireAdb(adbBin: string): void {
   try {
-    execFileSync("adb", ["version"], {
+    execFileSync(adbBin, ["version"], {
       stdio: "ignore",
     });
   } catch {
-    throw new Error("adb is required when --use-adb-forward is enabled.");
+    throw new Error(`adb is required when --use-adb-forward is enabled (tried: ${adbBin}).`);
   }
 }
 
@@ -460,20 +468,22 @@ export function countConnectedAdbDevicesFromOutput(output: string): number {
     .filter((line) => line.split(/\s+/)[1] === "device").length;
 }
 
-function connectedAdbDeviceCount(): number {
-  requireAdb();
-  const devices = execFileSync("adb", ["devices"], {
+function connectedAdbDeviceCountForOptions(options: SyncCliOptions): number {
+  const adbBin = resolveAdbBin(options);
+  requireAdb(adbBin);
+  const devices = execFileSync(adbBin, ["devices"], {
     encoding: "utf8",
   });
   return countConnectedAdbDevicesFromOutput(devices);
 }
 
-function ensureAdbForward(port: number): void {
-  const connected = connectedAdbDeviceCount();
+function ensureAdbForward(options: SyncCliOptions): void {
+  const adbBin = resolveAdbBin(options);
+  const connected = connectedAdbDeviceCountForOptions(options);
   if (connected < 1) {
     throw new Error("No connected Android device (adb state=device).");
   }
-  execFileSync("adb", ["forward", `tcp:${port}`, `tcp:${port}`], {
+  execFileSync(adbBin, ["forward", `tcp:${options.port}`, `tcp:${options.port}`], {
     stdio: "ignore",
   });
 }
@@ -612,8 +622,10 @@ export async function waitForAdbDevice(
   } = {},
 ): Promise<void> {
   const sleep = deps.sleep ?? sleepMs;
-  const getConnectedDeviceCount = deps.connectedDeviceCount ?? connectedAdbDeviceCount;
-  const assertAdb = deps.requireAdbFn ?? requireAdb;
+  const getConnectedDeviceCount =
+    deps.connectedDeviceCount ?? (() => connectedAdbDeviceCountForOptions(options));
+  const adbBin = resolveAdbBin(options);
+  const assertAdb = deps.requireAdbFn ?? (() => requireAdb(adbBin));
   assertAdb();
   let emittedWaitingEvent = false;
   while (getConnectedDeviceCount() < 1) {
@@ -650,7 +662,7 @@ async function prepareTransport(
     if (options.waitForDevice) {
       await waitForAdbDevice(options, deps);
     }
-    ensureAdbForward(options.port);
+    ensureAdbForward(options);
   }
 }
 

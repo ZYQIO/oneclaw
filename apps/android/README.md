@@ -218,6 +218,7 @@ Optional overrides:
 - `pnpm android:local-host:codex-sync -- --wait-for-device --watch`
 - `pnpm android:local-host:codex-sync -- --watch --watch-interval-ms 45000`
 - `pnpm android:local-host:codex-sync -- --watch --watch-max-runs 10`
+- `pnpm android:local-host:codex-sync -- --adb-bin /path/to/adb`
 - `pnpm android:local-host:codex-sync -- --artifact-dir .tmp/android-codex-guard`
 - `pnpm android:local-host:codex-sync -- --agent-dir /path/to/agent`
 - `pnpm android:local-host:codex-sync -- --json`
@@ -229,6 +230,19 @@ When you want the desktop to act more like a connection-aware guard, add `--wait
 If you just want the opinionated default guard behavior, `pnpm android:local-host:codex-guard` is a thin wrapper around `codex-sync --use-adb-forward --wait-for-device --watch`. In JSON watch mode the stream is now typed: lifecycle events use `kind="lifecycle"`, success iterations use `kind="iteration"`, and recoverable failures use `kind="error"`, so an outer supervisor can distinguish connection state changes from actual sync passes.
 
 If you also pass `--artifact-dir`, the guard writes durable files under that directory: `events.jsonl` for the append-only event stream, `latest.json` for the newest lifecycle or sync snapshot, and `summary.json` for one-shot sync runs. That gives launchd/tmux/agent wrappers a stable file surface without having to scrape terminal output.
+
+On macOS, if you want the guard to survive terminal restarts and login sessions more naturally, there is now also a LaunchAgent helper:
+
+```bash
+cat > /tmp/openclaw-android-codex-guard.env <<'EOF'
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>'
+EOF
+
+pnpm android:local-host:codex-guard:launchd -- install --env-file /tmp/openclaw-android-codex-guard.env
+pnpm android:local-host:codex-guard:launchd -- status
+```
+
+The helper installs a per-user LaunchAgent that runs the same watch guard, keeps artifacts under `~/.openclaw/android-local-host-codex-guard/` by default, and keeps the bearer token in the external env file instead of copying it into the LaunchAgent plist. By default it uses `adb forward`; if the desktop LaunchAgent context cannot find `adb` reliably, pass `--adb-bin /path/to/adb` at install time so the generated wrapper pins an absolute binary path.
 
 ## Local Host UI Automation Smoke
 

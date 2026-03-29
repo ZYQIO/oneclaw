@@ -138,10 +138,13 @@ describe("parseCli", () => {
     const options = parseCli([
       "--token",
       "secret-token",
+      "--adb-bin",
+      "/opt/android/platform-tools/adb",
       "--artifact-dir",
       "./tmp/codex-guard",
     ]);
 
+    expect(options.adbBin).toBe("/opt/android/platform-tools/adb");
     expect(options.artifactDir).toBe("./tmp/codex-guard");
   });
 });
