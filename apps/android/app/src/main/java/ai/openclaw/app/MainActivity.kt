@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     WindowCompat.setDecorFitsSystemWindows(window, false)
-    permissionRequester = PermissionRequester(this)
+    permissionRequester = PermissionRequester(this) { prefs.appLanguage.value }
 
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {

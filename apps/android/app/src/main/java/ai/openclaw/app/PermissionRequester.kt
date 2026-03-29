@@ -11,6 +11,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
+import ai.openclaw.app.ui.pick
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -19,7 +20,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-class PermissionRequester(private val activity: ComponentActivity) {
+class PermissionRequester(
+  private val activity: ComponentActivity,
+  private val currentLanguage: () -> AppLanguage = { AppLanguage.English },
+) {
   private val mutex = Mutex()
   private var pending: CompletableDeferred<Map<String, Boolean>>? = null
 
@@ -87,21 +91,23 @@ class PermissionRequester(private val activity: ComponentActivity) {
   private suspend fun showRationaleDialog(permissions: List<String>): Boolean =
     withContext(Dispatchers.Main) {
       suspendCancellableCoroutine { cont ->
+        val language = currentLanguage()
         AlertDialog.Builder(activity)
-          .setTitle("Permission required")
-          .setMessage(buildRationaleMessage(permissions))
-          .setPositiveButton("Continue") { _, _ -> cont.resume(true) }
-          .setNegativeButton("Not now") { _, _ -> cont.resume(false) }
+          .setTitle(permissionRationaleTitle(language))
+          .setMessage(buildRationaleMessage(language, permissions))
+          .setPositiveButton(permissionContinueLabel(language)) { _, _ -> cont.resume(true) }
+          .setNegativeButton(permissionNotNowLabel(language)) { _, _ -> cont.resume(false) }
           .setOnCancelListener { cont.resume(false) }
           .show()
       }
     }
 
   private fun showSettingsDialog(permissions: List<String>) {
+    val language = currentLanguage()
     AlertDialog.Builder(activity)
-      .setTitle("Enable permission in Settings")
-      .setMessage(buildSettingsMessage(permissions))
-      .setPositiveButton("Open Settings") { _, _ ->
+      .setTitle(permissionSettingsTitle(language))
+      .setMessage(buildSettingsMessage(language, permissions))
+      .setPositiveButton(permissionOpenSettingsLabel(language)) { _, _ ->
         val intent =
           Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -109,25 +115,65 @@ class PermissionRequester(private val activity: ComponentActivity) {
           )
         activity.startActivity(intent)
       }
-      .setNegativeButton("Cancel", null)
+      .setNegativeButton(permissionCancelLabel(language), null)
       .show()
   }
 
-  private fun buildRationaleMessage(permissions: List<String>): String {
-    val labels = permissions.map { permissionLabel(it) }
-    return "OpenClaw needs ${labels.joinToString(", ")} permissions to continue."
+  private fun buildRationaleMessage(language: AppLanguage, permissions: List<String>): String {
+    return permissionRationaleMessage(language, permissions)
   }
 
-  private fun buildSettingsMessage(permissions: List<String>): String {
-    val labels = permissions.map { permissionLabel(it) }
-    return "Please enable ${labels.joinToString(", ")} in Android Settings to continue."
+  private fun buildSettingsMessage(language: AppLanguage, permissions: List<String>): String {
+    return permissionSettingsMessage(language, permissions)
+  }
+}
+
+internal fun permissionContinueLabel(language: AppLanguage): String = language.pick("Continue", "继续")
+
+internal fun permissionNotNowLabel(language: AppLanguage): String = language.pick("Not now", "稍后")
+
+internal fun permissionRationaleTitle(language: AppLanguage): String =
+  language.pick("Permission required", "需要权限")
+
+internal fun permissionSettingsTitle(language: AppLanguage): String =
+  language.pick("Enable permission in Settings", "在设置中启用权限")
+
+internal fun permissionOpenSettingsLabel(language: AppLanguage): String =
+  language.pick("Open Settings", "打开设置")
+
+internal fun permissionCancelLabel(language: AppLanguage): String = language.pick("Cancel", "取消")
+
+internal fun permissionLabel(
+  language: AppLanguage,
+  permission: String,
+): String =
+  when (permission) {
+    Manifest.permission.CAMERA -> language.pick("Camera", "相机")
+    Manifest.permission.RECORD_AUDIO -> language.pick("Microphone", "麦克风")
+    Manifest.permission.SEND_SMS -> language.pick("SMS", "短信")
+    else -> permission
   }
 
-  private fun permissionLabel(permission: String): String =
-    when (permission) {
-      Manifest.permission.CAMERA -> "Camera"
-      Manifest.permission.RECORD_AUDIO -> "Microphone"
-      Manifest.permission.SEND_SMS -> "SMS"
-      else -> permission
-    }
+internal fun permissionRationaleMessage(
+  language: AppLanguage,
+  permissions: List<String>,
+): String {
+  val labels = permissions.map { permissionLabel(language, it) }
+  return if (language == AppLanguage.SimplifiedChinese) {
+    "OpenClaw 需要${labels.joinToString("、")}权限才能继续。"
+  } else {
+    "OpenClaw needs ${labels.joinToString(", ")} permissions to continue."
+  }
+}
+
+internal fun permissionSettingsMessage(
+  language: AppLanguage,
+  permissions: List<String>,
+): String {
+  val labels = permissions.map { permissionLabel(language, it) }
+  return if (language == AppLanguage.SimplifiedChinese) {
+    "请在 Android 设置中启用${labels.joinToString("、")}权限后再继续。"
+  } else {
+    "Please enable ${labels.joinToString(", ")} in Android Settings to continue."
+  }
 }
