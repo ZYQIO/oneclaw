@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -161,57 +162,64 @@ class OpenClawAccessibilityService : AccessibilityService() {
   }
 
   private fun snapshotActiveWindowInternal(): JsonObject? {
-    val root = rootInActiveWindow ?: return null
+    val roots = collectAccessibleRoots()
+    if (roots.isEmpty()) return null
     var packageName: String? = null
     val visibleText = LinkedHashSet<String>()
     val nodes = mutableListOf<JsonObject>()
     var truncated = false
-    val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
-    queue.addLast(root to 0)
-
-    while (queue.isNotEmpty()) {
-      val (node, depth) = queue.removeFirst()
-      if (packageName == null) {
-        packageName = node.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-      }
-
+    roots.forEach { root ->
       if (nodes.size >= maxUiStateNodes) {
         truncated = true
-        continue
+        return@forEach
       }
+      val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+      queue.addLast(root to 0)
 
-      val text = normalizeNodeText(node.text?.toString())
-      val contentDescription = normalizeNodeText(node.contentDescription?.toString())
-      if (visibleText.size < maxVisibleTextItems) {
-        text?.let(visibleText::add)
-        contentDescription?.let(visibleText::add)
-      }
-
-      nodes +=
-        buildJsonObject {
-          put("depth", JsonPrimitive(depth))
-          put("className", JsonPrimitive(node.className?.toString().orEmpty()))
-          text?.let { put("text", JsonPrimitive(it)) }
-          contentDescription?.let { put("contentDescription", JsonPrimitive(it)) }
-          node.viewIdResourceName?.trim()?.takeIf { it.isNotEmpty() }?.let {
-            put("resourceId", JsonPrimitive(it))
-          }
-          put("clickable", JsonPrimitive(node.isClickable))
-          put("enabled", JsonPrimitive(node.isEnabled))
-          put("focused", JsonPrimitive(node.isFocused))
-          put("selected", JsonPrimitive(node.isSelected))
-          put("editable", JsonPrimitive(node.isEditable))
-          put("bounds", nodeBoundsJson(node))
+      while (queue.isNotEmpty()) {
+        val (node, depth) = queue.removeFirst()
+        if (packageName == null) {
+          packageName = node.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
         }
 
-      if (nodes.size < maxUiStateNodes) {
-        for (index in 0 until node.childCount) {
-          node.getChild(index)?.let { child ->
-            queue.addLast(child to depth + 1)
-          }
+        if (nodes.size >= maxUiStateNodes) {
+          truncated = true
+          continue
         }
-      } else if (node.childCount > 0) {
-        truncated = true
+
+        val text = normalizeNodeText(node.text?.toString())
+        val contentDescription = normalizeNodeText(node.contentDescription?.toString())
+        if (visibleText.size < maxVisibleTextItems) {
+          text?.let(visibleText::add)
+          contentDescription?.let(visibleText::add)
+        }
+
+        nodes +=
+          buildJsonObject {
+            put("depth", JsonPrimitive(depth))
+            put("className", JsonPrimitive(node.className?.toString().orEmpty()))
+            text?.let { put("text", JsonPrimitive(it)) }
+            contentDescription?.let { put("contentDescription", JsonPrimitive(it)) }
+            node.viewIdResourceName?.trim()?.takeIf { it.isNotEmpty() }?.let {
+              put("resourceId", JsonPrimitive(it))
+            }
+            put("clickable", JsonPrimitive(node.isClickable))
+            put("enabled", JsonPrimitive(node.isEnabled))
+            put("focused", JsonPrimitive(node.isFocused))
+            put("selected", JsonPrimitive(node.isSelected))
+            put("editable", JsonPrimitive(node.isEditable))
+            put("bounds", nodeBoundsJson(node))
+          }
+
+        if (nodes.size < maxUiStateNodes) {
+          for (index in 0 until node.childCount) {
+            node.getChild(index)?.let { child ->
+              queue.addLast(child to depth + 1)
+            }
+          }
+        } else if (node.childCount > 0) {
+          truncated = true
+        }
       }
     }
 
@@ -258,16 +266,19 @@ class OpenClawAccessibilityService : AccessibilityService() {
       return performCoordinateTap(request = request)
     }
 
-    val root = rootInActiveWindow
-      ?: return UiAutomationTapResult(
+    val roots = collectAccessibleRoots()
+    if (roots.isEmpty()) {
+      return UiAutomationTapResult(
         performed = false,
         errorCode = "UI_TARGET_UNAVAILABLE",
         reason = "No active accessibility window is available for selector-based tap.",
       )
-    val activePackageName = root.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    val activePackageName = roots.firstNotNullOfOrNull { rootPackageName(it) }
+    val matchingRoots = filterRootsByPackage(roots = roots, packageName = request.packageName)
     if (
       request.packageName != null &&
-      !request.packageName.equals(activePackageName, ignoreCase = true)
+      matchingRoots.isEmpty()
     ) {
       return UiAutomationTapResult(
         performed = false,
@@ -279,8 +290,8 @@ class OpenClawAccessibilityService : AccessibilityService() {
     }
 
     val matchedNode =
-      findMatchingNode(
-        root = root,
+      findMatchingNodeInRoots(
+        roots = if (request.packageName != null) matchingRoots else roots,
         index = request.index,
       ) { node ->
         matchesNodeSelector(
@@ -326,7 +337,7 @@ class OpenClawAccessibilityService : AccessibilityService() {
   }
 
   private fun performCoordinateTap(request: UiAutomationTapRequest): UiAutomationTapResult {
-    val activePackageName = rootInActiveWindow?.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    val activePackageName = collectAccessibleRoots().firstNotNullOfOrNull { rootPackageName(it) }
     if (
       request.packageName != null &&
       !request.packageName.equals(activePackageName, ignoreCase = true)
@@ -363,7 +374,7 @@ class OpenClawAccessibilityService : AccessibilityService() {
   private fun performSwipeInternal(
     request: UiAutomationSwipeRequest,
   ): UiAutomationSwipeResult {
-    val activePackageName = rootInActiveWindow?.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    val activePackageName = collectAccessibleRoots().firstNotNullOfOrNull { rootPackageName(it) }
     if (
       request.packageName != null &&
       !request.packageName.equals(activePackageName, ignoreCase = true)
@@ -412,16 +423,19 @@ class OpenClawAccessibilityService : AccessibilityService() {
   private fun performInputTextInternal(
     request: UiAutomationInputTextRequest,
   ): UiAutomationInputTextResult {
-    val root = rootInActiveWindow
-      ?: return UiAutomationInputTextResult(
+    val roots = collectAccessibleRoots()
+    if (roots.isEmpty()) {
+      return UiAutomationInputTextResult(
         performed = false,
         errorCode = "UI_TARGET_UNAVAILABLE",
         reason = "No active accessibility window is available for ui.inputText.",
       )
-    val activePackageName = root.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    val activePackageName = roots.firstNotNullOfOrNull { rootPackageName(it) }
+    val matchingRoots = filterRootsByPackage(roots = roots, packageName = request.packageName)
     if (
       request.packageName != null &&
-      !request.packageName.equals(activePackageName, ignoreCase = true)
+      matchingRoots.isEmpty()
     ) {
       return UiAutomationInputTextResult(
         performed = false,
@@ -433,7 +447,10 @@ class OpenClawAccessibilityService : AccessibilityService() {
     }
 
     val target =
-      resolveInputTextTarget(root = root, request = request)
+      resolveInputTextTarget(
+        roots = if (request.packageName != null) matchingRoots else roots,
+        request = request,
+      )
         ?: return UiAutomationInputTextResult(
           performed = false,
           errorCode = "UI_TARGET_NOT_FOUND",
@@ -512,13 +529,13 @@ class OpenClawAccessibilityService : AccessibilityService() {
   )
 
   private fun resolveInputTextTarget(
-    root: AccessibilityNodeInfo,
+    roots: List<AccessibilityNodeInfo>,
     request: UiAutomationInputTextRequest,
   ): EditableTargetSelection? {
     if (request.hasSelector) {
       val matchedNode =
-        findMatchingNode(
-          root = root,
+        findMatchingNodeInRoots(
+          roots = roots,
           index = request.index,
         ) { node ->
           node.isEditable &&
@@ -535,7 +552,7 @@ class OpenClawAccessibilityService : AccessibilityService() {
     }
 
     val focusedEditable =
-      findFirstMatchingNode(root) { node ->
+      findFirstMatchingNodeInRoots(roots) { node ->
         node.isEditable && (node.isFocused || node.isAccessibilityFocused)
       }
     if (focusedEditable != null) {
@@ -543,12 +560,12 @@ class OpenClawAccessibilityService : AccessibilityService() {
     }
 
     val firstEditable =
-      findFirstMatchingNode(root) { node ->
+      findFirstMatchingNodeInRoots(roots) { node ->
         node.isEditable
       } ?: return null
     val secondEditable =
-      findMatchingNode(
-        root = root,
+      findMatchingNodeInRoots(
+        roots = roots,
         index = 1,
       ) { node ->
         node.isEditable
@@ -589,6 +606,128 @@ class OpenClawAccessibilityService : AccessibilityService() {
     root: AccessibilityNodeInfo,
     predicate: (AccessibilityNodeInfo) -> Boolean,
   ): AccessibilityNodeInfo? = findMatchingNode(root = root, index = 0, predicate = predicate)
+
+  private fun findMatchingNodeInRoots(
+    roots: List<AccessibilityNodeInfo>,
+    index: Int,
+    predicate: (AccessibilityNodeInfo) -> Boolean,
+  ): AccessibilityNodeInfo? {
+    var remainingIndex = index
+    roots.forEach { root ->
+      val match = findMatchingNode(root = root, index = remainingIndex, predicate = predicate)
+      if (match != null) {
+        return match
+      }
+      remainingIndex -= countMatchingNodes(root = root, predicate = predicate)
+    }
+    return null
+  }
+
+  private fun findFirstMatchingNodeInRoots(
+    roots: List<AccessibilityNodeInfo>,
+    predicate: (AccessibilityNodeInfo) -> Boolean,
+  ): AccessibilityNodeInfo? = findMatchingNodeInRoots(roots = roots, index = 0, predicate = predicate)
+
+  private fun countMatchingNodes(
+    root: AccessibilityNodeInfo,
+    predicate: (AccessibilityNodeInfo) -> Boolean,
+  ): Int {
+    var count = 0
+    val queue = ArrayDeque<AccessibilityNodeInfo>()
+    queue.addLast(root)
+
+    while (queue.isNotEmpty()) {
+      val node = queue.removeFirst()
+      if (predicate(node)) {
+        count += 1
+      }
+      for (childIndex in 0 until node.childCount) {
+        node.getChild(childIndex)?.let(queue::addLast)
+      }
+    }
+
+    return count
+  }
+
+  private fun collectAccessibleRoots(): List<AccessibilityNodeInfo> {
+    val activePackageName = rootInActiveWindow?.let(::rootPackageName)
+    val windowRoots =
+      windows
+        .orEmpty()
+        .mapNotNull { window ->
+          val root = window.root?.takeIf { hasUsableBounds(it) } ?: return@mapNotNull null
+          WindowRootCandidate(
+            root = root,
+            packageName = rootPackageName(root),
+            isActive = window.isActive,
+            isFocused = window.isFocused,
+            layer = window.layer,
+          )
+        }.sortedWith(
+          compareByDescending<WindowRootCandidate> {
+            activePackageName != null && it.packageName.equals(activePackageName, ignoreCase = true)
+          }.thenByDescending { it.isActive }
+            .thenByDescending { it.isFocused }
+            .thenByDescending { it.layer },
+        ).map { it.root }
+    if (windowRoots.isNotEmpty()) {
+      return dedupeRoots(windowRoots)
+    }
+    return listOfNotNull(rootInActiveWindow?.takeIf(::hasUsableBounds))
+  }
+
+  private data class WindowRootCandidate(
+    val root: AccessibilityNodeInfo,
+    val packageName: String?,
+    val isActive: Boolean,
+    val isFocused: Boolean,
+    val layer: Int,
+  )
+
+  private fun dedupeRoots(roots: List<AccessibilityNodeInfo>): List<AccessibilityNodeInfo> {
+    val seenKeys = LinkedHashSet<String>()
+    val deduped = mutableListOf<AccessibilityNodeInfo>()
+    roots.forEach { root ->
+      val key = rootSignature(root)
+      if (seenKeys.add(key)) {
+        deduped += root
+      }
+    }
+    return deduped
+  }
+
+  private fun rootSignature(root: AccessibilityNodeInfo): String {
+    val rect = Rect()
+    root.getBoundsInScreen(rect)
+    return listOf(
+      root.packageName?.toString().orEmpty(),
+      root.className?.toString().orEmpty(),
+      rect.left,
+      rect.top,
+      rect.right,
+      rect.bottom,
+      root.childCount,
+    ).joinToString("|")
+  }
+
+  private fun hasUsableBounds(root: AccessibilityNodeInfo): Boolean {
+    val rect = Rect()
+    root.getBoundsInScreen(rect)
+    return !rect.isEmpty
+  }
+
+  private fun rootPackageName(root: AccessibilityNodeInfo): String? =
+    root.packageName?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+
+  private fun filterRootsByPackage(
+    roots: List<AccessibilityNodeInfo>,
+    packageName: String?,
+  ): List<AccessibilityNodeInfo> {
+    val normalizedPackageName = packageName?.trim()?.takeIf { it.isNotEmpty() } ?: return roots
+    return roots.filter { root ->
+      normalizedPackageName.equals(rootPackageName(root), ignoreCase = true)
+    }
+  }
 
   private fun matchesTapSelector(
     node: AccessibilityNodeInfo,
