@@ -135,6 +135,32 @@ class LocalHostNodesToolingTest {
     }
 
   @Test
+  fun uiWaitForText_acceptsQueryAliasForText() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.waitForText", command)
+            assertTrue(paramsJson.orEmpty().contains("\"text\":\"更多\""))
+            GatewaySession.InvokeResult.ok("""{"ok":true,"wait":{"matched":true}}""")
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson =
+            """{"action":"ui_wait_for_text","query":"更多","timeoutMs":1500,"pollIntervalMs":100}""",
+        )
+
+      assertTrue(result.outputText.contains("matched"))
+    }
+
+  @Test
   fun uiBack_mapsInvokeCommandForOperatorSessions() =
     runTest {
       val bridge =
@@ -303,6 +329,34 @@ class LocalHostNodesToolingTest {
           name = "nodes",
           argumentsJson =
             """{"action":"ui_tap","text":"Continue","packageName":"com.example.app","index":1,"matchMode":"exact"}""",
+        )
+
+      assertTrue(result.outputText.contains("tap"))
+    }
+
+  @Test
+  fun uiTap_acceptsQueryAliasAndIgnoresZeroCoordinateNoise() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("ui.tap", command)
+            assertTrue(paramsJson.orEmpty().contains("\"text\":\"更多\""))
+            assertFalse(paramsJson.orEmpty().contains("\"x\":0"))
+            assertFalse(paramsJson.orEmpty().contains("\"y\":0"))
+            GatewaySession.InvokeResult.ok("""{"ok":true,"action":"tap","strategy":"gesture_tap"}""")
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson =
+            """{"action":"ui_tap","query":"更多","x":0,"y":0,"matchMode":"exact"}""",
         )
 
       assertTrue(result.outputText.contains("tap"))

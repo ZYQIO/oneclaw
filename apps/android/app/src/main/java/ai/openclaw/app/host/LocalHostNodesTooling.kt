@@ -326,7 +326,7 @@ internal class LocalHostNodesToolBridge(
       "ui_input_text" ->
         buildJsonObject {
           copyString(params, "value")
-          copyString(params, "text")
+          copyString(params, "text", "query")
           copyString(params, "contentDescription")
           copyString(params, "resourceId")
           copyString(params, "packageName")
@@ -336,9 +336,18 @@ internal class LocalHostNodesToolBridge(
         }
       "ui_tap" ->
         buildJsonObject {
-          copyNumber(params, "x")
-          copyNumber(params, "y")
-          copyString(params, "text")
+          val selectorText = readString(params, "text", "query")
+          val hasSelector =
+            listOf(
+              selectorText,
+              readString(params, "contentDescription"),
+              readString(params, "resourceId"),
+            ).any { !it.isNullOrEmpty() }
+          if (!hasSelector) {
+            copyNumber(params, "x")
+            copyNumber(params, "y")
+          }
+          selectorText?.let { put("text", JsonPrimitive(it)) }
           copyString(params, "contentDescription")
           copyString(params, "resourceId")
           copyString(params, "packageName")
@@ -357,7 +366,7 @@ internal class LocalHostNodesToolBridge(
         }
       "ui_wait_for_text" ->
         buildJsonObject {
-          copyString(params, "text")
+          copyString(params, "text", "query")
           copyNumber(params, "timeoutMs")
           copyNumber(params, "pollIntervalMs")
           copyBoolean(params, "ignoreCase")
@@ -607,8 +616,9 @@ private fun JsonObjectBuilder.putStringArrayProperty(name: String) {
 private fun JsonObjectBuilder.copyString(
   params: JsonObject,
   key: String,
+  vararg aliases: String,
 ) {
-  readString(params, key)?.let { put(key, JsonPrimitive(it)) }
+  readString(params, key, *aliases)?.let { put(key, JsonPrimitive(it)) }
 }
 
 private fun JsonObjectBuilder.copyNumber(
@@ -643,10 +653,31 @@ private fun readString(
   params: JsonObject,
   key: String,
 ): String? =
-  (params[key] as? JsonPrimitive)
-    ?.content
-    ?.trim()
-    ?.takeIf { it.isNotEmpty() }
+  readString(params, key, *emptyArray())
+
+private fun readString(
+  params: JsonObject,
+  key: String,
+  vararg aliases: String,
+): String? {
+  val direct =
+    (params[key] as? JsonPrimitive)
+      ?.content
+      ?.trim()
+      ?.takeIf { it.isNotEmpty() }
+  if (direct != null) return direct
+  aliases.forEach { alias ->
+    val candidate =
+      (params[alias] as? JsonPrimitive)
+        ?.content
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    if (candidate != null) {
+      return candidate
+    }
+  }
+  return null
+}
 
 private fun readNumberPrimitive(
   params: JsonObject,
