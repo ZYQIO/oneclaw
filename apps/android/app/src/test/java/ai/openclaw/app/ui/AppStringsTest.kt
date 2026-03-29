@@ -272,6 +272,47 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesNotificationReplyUnavailable() {
+    assertEquals(
+      "操作不可用：通知没有可回复的操作",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "ACTION_UNAVAILABLE: notification has no reply action",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesNotificationReplyTextRequirement() {
+    assertEquals(
+      "请求无效：回复操作需要提供 replyText",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "INVALID_REQUEST: replyText required for reply action",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesSystemNotificationAuthorization() {
+    assertEquals(
+      "未授权：通知权限",
+      localizeChatError(AppLanguage.SimplifiedChinese, "NOT_AUTHORIZED: notifications"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesSystemNotificationPostFailure() {
+    assertEquals(
+      "通知失败：发送失败",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "NOTIFICATION_FAILED: notification post failed",
+      ),
+    )
+  }
+
+  @Test
   fun localizeChatError_translatesCameraPermissionRequirement() {
     assertEquals(
       "需要相机权限：请授予相机权限",
@@ -298,6 +339,47 @@ class AppStringsTest {
     assertEquals(
       "不可用：相机尚未就绪",
       localizeChatError(AppLanguage.SimplifiedChinese, "UNAVAILABLE: camera not ready"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraSnapFailure() {
+    assertEquals(
+      "不可用：相机拍照失败",
+      localizeChatError(AppLanguage.SimplifiedChinese, "UNAVAILABLE: camera snap failed"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraDecodeFailure() {
+    assertEquals(
+      "不可用：无法解码拍摄图像",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UNAVAILABLE: failed to decode captured image",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraEncodeFailure() {
+    assertEquals(
+      "不可用：无法编码 JPEG",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UNAVAILABLE: failed to encode JPEG",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraClipFinalizeTimeout() {
+    assertEquals(
+      "不可用：相机视频收尾超时",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UNAVAILABLE: camera clip finalize timed out",
+      ),
     )
   }
 
