@@ -372,6 +372,11 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=500`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_RECOVERY_WAIT_MS=1500`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_WAIT_TEXT=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y=...`
+- `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS=250`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE=...`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_TEXT=...` or `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID=...`
@@ -384,12 +389,14 @@ The cross-app probe calls `ui.launchApp` for the target package, then polls two 
 - ADB foreground-activity state, using `topResumedActivity` and current focus
 - Remote `/status`, to see whether OpenClaw stays reachable while another app is supposed to be on top
 
-When the optional follow-up env vars are set, the same probe first waits for `ui.state` to report that the target package really became the active window, then it can run `ui.waitForText`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Treat those selectors as app- and OEM-specific until the corresponding real-device proof is captured.
+When the optional follow-up env vars are set, the same probe first waits for `ui.state` to report that the target package really became the active window, then it can run `ui.waitForText`, `ui.swipe`, `ui.tap`, `ui.inputText`, and a final `ui.state` inside the launched app before the reachability polling starts. Treat those selectors and swipe coordinates as app- and OEM-specific until the corresponding real-device proof is captured.
 
 - On March 29, 2026, that target-foreground wait closed a real race on the current OPPO / ColorOS phone: without it, `ui.launchApp(com.android.settings)` could still leave `ai.openclaw.app` as the active package for a short window and cause an immediate `UI_TARGET_MISMATCH`; with it, the default `pnpm android:local-host:ui:cross-app:next` path again completed with `foreground_ready=true`, `tap_ok=true`, `input_ok=true`, and `state_ok=true`.
 - On the same phone, the first direct `ui.swipe` proof now also exists on the Settings homepage: a guarded upward swipe kept `packageName=com.android.settings` while shifting visible rows from `WLAN` / `蓝牙` / `移动网络` into lower entries such as `通知与控制中心` / `密码与安全` / `隐私` / `应用` / `电池`.
+- Later on March 29, 2026, the repo-side swipe follow-up also passed on that phone with env-provided coordinates, producing `swipe_ok=true`, `swipe_text_changed=true`, and a non-empty `summary.json` that now records both `followUp.swipeVisibleTextBefore` and `followUp.swipeVisibleTextAfter`.
+- If you want to replay that Settings-homepage swipe proof after a previous `settings-search-input` run, first reset Settings back to the homepage with `adb shell am force-stop com.android.settings`; the probe intentionally does not erase target-app state on your behalf.
 
-At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON.
+At the end it restores OpenClaw with adb, confirms recovery, and writes both a timeline JSONL and a compact summary JSON. Swipe runs additionally persist before/after `visibleText` samples plus `followUp.swipeVisibleTextChanged`, and the summary file now stays non-empty even when optional string fields are unset.
 
 - `classification=launch_accepted_not_foregrounded` means Android accepted the launch intent but the target package never became the true foreground app during the observation window.
 - `classification=foregrounded_host_reachable` means the target package reached the foreground and OpenClaw stayed reachable throughout the probe window.

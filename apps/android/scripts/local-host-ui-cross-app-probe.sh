@@ -27,6 +27,11 @@ FOLLOW_UP_INPUT_CONTENT_DESCRIPTION="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_
 FOLLOW_UP_INPUT_RESOURCE_ID="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID:-}"
 FOLLOW_UP_INPUT_MATCH_MODE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_MATCH_MODE:-contains}"
 FOLLOW_UP_INPUT_INDEX="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_INDEX:-0}"
+FOLLOW_UP_SWIPE_START_X="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X:-}"
+FOLLOW_UP_SWIPE_START_Y="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y:-}"
+FOLLOW_UP_SWIPE_END_X="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X:-}"
+FOLLOW_UP_SWIPE_END_Y="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y:-}"
+FOLLOW_UP_SWIPE_DURATION_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS:-250}"
 FOLLOW_UP_FOREGROUND_TIMEOUT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS:-5000}"
 FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS:-250}"
 FOLLOW_UP_SETTLE_MS="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_SETTLE_MS:-1000}"
@@ -55,6 +60,11 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_TAP_RESOURCE_ID="com.example:id/search"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE="openclaw"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_RESOURCE_ID="com.example:id/search_src_text"] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X=720] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y=2600] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X=720] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y=900] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS=350] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_TIMEOUT_MS=5000] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS=250] \
   ./apps/android/scripts/local-host-ui-cross-app-probe.sh
@@ -65,12 +75,13 @@ What it does:
   1. Requires adb plus a reachable local-host bearer token
   2. Verifies /status and /invoke/capabilities, then foregrounds OpenClaw
   3. Calls ui.launchApp for the target package
-  4. Optionally runs wait/tap/inputText follow-up actions inside the launched app
+  4. Optionally runs wait/swipe/tap/inputText follow-up actions inside the launched app
   5. Polls both adb foreground activity state and remote /status over time
   6. Restores OpenClaw with adb and verifies the host is reachable again
 
 Follow-up note:
   - The optional wait/tap/input selectors are app and OEM specific.
+  - Swipe coordinates are also device specific unless you already validated them on the same screen.
   - Keep the current 30s reachability proof separate from follow-up-action proof.
   - Presets seed common follow-up envs but explicit env overrides still win.
 
@@ -149,6 +160,24 @@ validate_match_mode "$FOLLOW_UP_WAIT_MATCH_MODE"
 validate_match_mode "$FOLLOW_UP_TAP_MATCH_MODE"
 validate_match_mode "$FOLLOW_UP_INPUT_MATCH_MODE"
 
+validate_non_negative_number() {
+  local name=$1
+  local raw=$2
+  if ! jq -en --arg value "$raw" '$value | tonumber | if . < 0 then error("negative") else . end' >/dev/null 2>&1; then
+    echo "$name must be a non-negative number." >&2
+    exit 1
+  fi
+}
+
+validate_non_negative_integer() {
+  local name=$1
+  local raw=$2
+  if ! [[ "$raw" =~ ^[0-9]+$ ]]; then
+    echo "$name must be a non-negative integer." >&2
+    exit 1
+  fi
+}
+
 follow_up_wait_requested=false
 if [[ -n "$FOLLOW_UP_WAIT_TEXT" ]]; then
   follow_up_wait_requested=true
@@ -169,19 +198,46 @@ if [[ -n "$FOLLOW_UP_INPUT_VALUE" || "$follow_up_input_selector_requested" == "t
   follow_up_input_requested=true
 fi
 
+follow_up_swipe_requested=false
+if [[ -n "$FOLLOW_UP_SWIPE_START_X$FOLLOW_UP_SWIPE_START_Y$FOLLOW_UP_SWIPE_END_X$FOLLOW_UP_SWIPE_END_Y" ]]; then
+  follow_up_swipe_requested=true
+fi
+
 if [[ "$follow_up_input_selector_requested" == "true" && -z "$FOLLOW_UP_INPUT_VALUE" ]]; then
   echo "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_INPUT_VALUE is required when input selectors are set." >&2
   exit 1
 fi
 
+if [[ "$follow_up_swipe_requested" == "true" ]]; then
+  for required_value_name in \
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X \
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y \
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X \
+    OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y; do
+    required_value="${!required_value_name:-}"
+    if [[ -z "$required_value" ]]; then
+      echo "$required_value_name is required when any swipe coordinate is set." >&2
+      exit 1
+    fi
+  done
+  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X" "$FOLLOW_UP_SWIPE_START_X"
+  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y" "$FOLLOW_UP_SWIPE_START_Y"
+  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X" "$FOLLOW_UP_SWIPE_END_X"
+  validate_non_negative_number "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y" "$FOLLOW_UP_SWIPE_END_Y"
+  validate_non_negative_integer "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS" "$FOLLOW_UP_SWIPE_DURATION_MS"
+fi
+
 follow_up_requested=false
-if [[ "$follow_up_wait_requested" == "true" || "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
+if [[ "$follow_up_wait_requested" == "true" || "$follow_up_swipe_requested" == "true" || "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
   follow_up_requested=true
 fi
 
 follow_up_mode_parts=()
 if [[ "$follow_up_wait_requested" == "true" ]]; then
   follow_up_mode_parts+=("wait")
+fi
+if [[ "$follow_up_swipe_requested" == "true" ]]; then
+  follow_up_mode_parts+=("swipe")
 fi
 if [[ "$follow_up_tap_requested" == "true" ]]; then
   follow_up_mode_parts+=("tap")
@@ -223,10 +279,16 @@ if [[ "$DESCRIBE_ONLY" == "true" ]]; then
   printf 'cross_app.follow_up.wait_requested=%s\n' "$follow_up_wait_requested"
   printf 'cross_app.follow_up.tap_requested=%s\n' "$follow_up_tap_requested"
   printf 'cross_app.follow_up.input_requested=%s\n' "$follow_up_input_requested"
+  printf 'cross_app.follow_up.swipe_requested=%s\n' "$follow_up_swipe_requested"
   printf 'cross_app.follow_up.input_selector_requested=%s\n' "$follow_up_input_selector_requested"
   printf 'cross_app.follow_up.wait_match_mode=%s\n' "$FOLLOW_UP_WAIT_MATCH_MODE"
   printf 'cross_app.follow_up.tap_match_mode=%s\n' "$FOLLOW_UP_TAP_MATCH_MODE"
   printf 'cross_app.follow_up.input_match_mode=%s\n' "$FOLLOW_UP_INPUT_MATCH_MODE"
+  printf 'cross_app.follow_up.swipe_start_x=%s\n' "${FOLLOW_UP_SWIPE_START_X:-<empty>}"
+  printf 'cross_app.follow_up.swipe_start_y=%s\n' "${FOLLOW_UP_SWIPE_START_Y:-<empty>}"
+  printf 'cross_app.follow_up.swipe_end_x=%s\n' "${FOLLOW_UP_SWIPE_END_X:-<empty>}"
+  printf 'cross_app.follow_up.swipe_end_y=%s\n' "${FOLLOW_UP_SWIPE_END_Y:-<empty>}"
+  printf 'cross_app.follow_up.swipe_duration_ms=%s\n' "$FOLLOW_UP_SWIPE_DURATION_MS"
   printf 'cross_app.follow_up.foreground_timeout_ms=%s\n' "$FOLLOW_UP_FOREGROUND_TIMEOUT_MS"
   printf 'cross_app.follow_up.foreground_poll_interval_ms=%s\n' "$FOLLOW_UP_FOREGROUND_POLL_INTERVAL_MS"
   printf 'cross_app.follow_up.settle_ms=%s\n' "$FOLLOW_UP_SETTLE_MS"
@@ -254,6 +316,9 @@ require_cmd adb
 
 follow_up_requested_count=0
 if [[ "$follow_up_wait_requested" == "true" ]]; then
+  follow_up_requested_count=$((follow_up_requested_count + 1))
+fi
+if [[ "$follow_up_swipe_requested" == "true" ]]; then
   follow_up_requested_count=$((follow_up_requested_count + 1))
 fi
 if [[ "$follow_up_tap_requested" == "true" ]]; then
@@ -284,6 +349,8 @@ LAUNCH_SELF_JSON="$ARTIFACT_DIR/ui-launch-self.json"
 LAUNCH_TARGET_JSON="$ARTIFACT_DIR/ui-launch-target.json"
 TIMELINE_JSONL="$ARTIFACT_DIR/timeline.jsonl"
 FOLLOW_UP_WAIT_JSON="$ARTIFACT_DIR/ui-follow-up-wait.json"
+FOLLOW_UP_PRE_SWIPE_STATE_JSON="$ARTIFACT_DIR/ui-follow-up-pre-swipe-state.json"
+FOLLOW_UP_SWIPE_JSON="$ARTIFACT_DIR/ui-follow-up-swipe.json"
 FOLLOW_UP_TAP_JSON="$ARTIFACT_DIR/ui-follow-up-tap.json"
 FOLLOW_UP_INPUT_JSON="$ARTIFACT_DIR/ui-follow-up-input.json"
 FOLLOW_UP_FOREGROUND_STATE_JSON="$ARTIFACT_DIR/ui-follow-up-foreground-state.json"
@@ -373,6 +440,11 @@ assert_allowed_command() {
   fi
 }
 
+extract_visible_text_sample_json() {
+  local snapshot_file=$1
+  jq -c '[.payload.visibleText[]? | strings | select(length > 0)][0:8]' "$snapshot_file" 2>/dev/null || printf '%s' '[]'
+}
+
 echo "local_host.base_url=$BASE_URL"
 echo "local_host.ui_cross_app_probe=starting"
 echo "artifacts.dir=$ARTIFACT_DIR"
@@ -400,6 +472,9 @@ for required_command in ui.launchApp ui.state; do
 done
 if [[ "$follow_up_wait_requested" == "true" ]]; then
   assert_allowed_command "ui.waitForText"
+fi
+if [[ "$follow_up_swipe_requested" == "true" ]]; then
+  assert_allowed_command "ui.swipe"
 fi
 if [[ "$follow_up_tap_requested" == "true" ]]; then
   assert_allowed_command "ui.tap"
@@ -434,6 +509,17 @@ fi
 
 follow_up_wait_ok=false
 follow_up_wait_matched_text=""
+follow_up_swipe_ok=false
+follow_up_swipe_strategy=""
+follow_up_swipe_pre_package=""
+follow_up_swipe_start_x_json='null'
+follow_up_swipe_start_y_json='null'
+follow_up_swipe_end_x_json='null'
+follow_up_swipe_end_y_json='null'
+follow_up_swipe_duration_ms_json='null'
+follow_up_swipe_before_visible_text_json='null'
+follow_up_swipe_after_visible_text_json='null'
+follow_up_swipe_visible_text_changed_json='null'
 follow_up_tap_ok=false
 follow_up_tap_strategy=""
 follow_up_input_ok=false
@@ -499,6 +585,59 @@ if [[ "$follow_up_requested" == "true" ]]; then
     fi
     follow_up_wait_ok=true
     follow_up_wait_matched_text="$(jq -r '.payload.wait.matchedText // ""' "$FOLLOW_UP_WAIT_JSON" 2>/dev/null || printf '%s' "")"
+  fi
+
+  if [[ "$follow_up_swipe_requested" == "true" ]]; then
+    invoke_command "ui.state" "" "$FOLLOW_UP_PRE_SWIPE_STATE_JSON"
+    if ! jq -e --arg package "$TARGET_PACKAGE" '
+      .ok == true and
+      .payload.packageName == $package
+    ' "$FOLLOW_UP_PRE_SWIPE_STATE_JSON" >/dev/null; then
+      echo "Cross-app follow-up pre-swipe state no longer reports the target package on top." >&2
+      jq '.' "$FOLLOW_UP_PRE_SWIPE_STATE_JSON" >&2
+      exit 1
+    fi
+    follow_up_swipe_pre_package="$(jq -r '.payload.packageName // ""' "$FOLLOW_UP_PRE_SWIPE_STATE_JSON" 2>/dev/null || printf '%s' "")"
+    follow_up_swipe_before_visible_text_json="$(extract_visible_text_sample_json "$FOLLOW_UP_PRE_SWIPE_STATE_JSON")"
+    follow_up_swipe_start_x_json="$FOLLOW_UP_SWIPE_START_X"
+    follow_up_swipe_start_y_json="$FOLLOW_UP_SWIPE_START_Y"
+    follow_up_swipe_end_x_json="$FOLLOW_UP_SWIPE_END_X"
+    follow_up_swipe_end_y_json="$FOLLOW_UP_SWIPE_END_Y"
+    follow_up_swipe_duration_ms_json="$FOLLOW_UP_SWIPE_DURATION_MS"
+
+    invoke_command \
+      "ui.swipe" \
+      "$(jq -cn \
+        --arg startX "$FOLLOW_UP_SWIPE_START_X" \
+        --arg startY "$FOLLOW_UP_SWIPE_START_Y" \
+        --arg endX "$FOLLOW_UP_SWIPE_END_X" \
+        --arg endY "$FOLLOW_UP_SWIPE_END_Y" \
+        --arg durationMs "$FOLLOW_UP_SWIPE_DURATION_MS" \
+        --arg packageName "$TARGET_PACKAGE" \
+        '{
+          startX: ($startX | tonumber),
+          startY: ($startY | tonumber),
+          endX: ($endX | tonumber),
+          endY: ($endY | tonumber),
+          durationMs: ($durationMs | tonumber),
+          packageName: $packageName
+        }')" \
+      "$FOLLOW_UP_SWIPE_JSON"
+    if ! jq -e --arg package "$TARGET_PACKAGE" '
+      .ok == true and
+      .payload.action == "swipe" and
+      .payload.performed == true and
+      .payload.packageName == $package
+    ' "$FOLLOW_UP_SWIPE_JSON" >/dev/null; then
+      echo "Cross-app follow-up swipe did not complete inside the target package." >&2
+      jq '.' "$FOLLOW_UP_SWIPE_JSON" >&2
+      exit 1
+    fi
+    follow_up_swipe_ok=true
+    follow_up_swipe_strategy="$(jq -r '.payload.strategy // ""' "$FOLLOW_UP_SWIPE_JSON" 2>/dev/null || printf '%s' "")"
+    if [[ "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
+      sleep "$(sleep_seconds_from_ms "$FOLLOW_UP_SETTLE_MS")"
+    fi
   fi
 
   if [[ "$follow_up_tap_requested" == "true" ]]; then
@@ -569,7 +708,7 @@ if [[ "$follow_up_requested" == "true" ]]; then
     follow_up_input_strategy="$(jq -r '.payload.strategy // ""' "$FOLLOW_UP_INPUT_JSON" 2>/dev/null || printf '%s' "")"
   fi
 
-  if [[ "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
+  if [[ "$follow_up_swipe_requested" == "true" || "$follow_up_tap_requested" == "true" || "$follow_up_input_requested" == "true" ]]; then
     sleep "$(sleep_seconds_from_ms "$FOLLOW_UP_SETTLE_MS")"
   fi
 
@@ -584,6 +723,15 @@ if [[ "$follow_up_requested" == "true" ]]; then
   fi
   follow_up_state_ok=true
   follow_up_state_package="$(jq -r '.payload.packageName // ""' "$FOLLOW_UP_STATE_JSON" 2>/dev/null || printf '%s' "")"
+  if [[ "$follow_up_swipe_requested" == "true" ]]; then
+    follow_up_swipe_after_visible_text_json="$(extract_visible_text_sample_json "$FOLLOW_UP_STATE_JSON")"
+    follow_up_swipe_visible_text_changed_json="$(
+      jq -en \
+        --argjson before "$follow_up_swipe_before_visible_text_json" \
+        --argjson after "$follow_up_swipe_after_visible_text_json" \
+        '$before != $after'
+    )"
+  fi
 fi
 
 rounds=$(( (OBSERVE_WINDOW_MS + POLL_INTERVAL_MS - 1) / POLL_INTERVAL_MS ))
@@ -682,6 +830,8 @@ jq -n \
   --arg recoveredPackage "$recovered_package" \
   --arg followUpWaitText "$FOLLOW_UP_WAIT_TEXT" \
   --arg followUpWaitMatchedText "$follow_up_wait_matched_text" \
+  --arg followUpSwipeStrategy "$follow_up_swipe_strategy" \
+  --arg followUpSwipePrePackage "$follow_up_swipe_pre_package" \
   --arg followUpTapText "$FOLLOW_UP_TAP_TEXT" \
   --arg followUpTapContentDescription "$FOLLOW_UP_TAP_CONTENT_DESCRIPTION" \
   --arg followUpTapResourceId "$FOLLOW_UP_TAP_RESOURCE_ID" \
@@ -696,6 +846,16 @@ jq -n \
   --argjson followUpRequested "$( [[ "$follow_up_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpWaitRequested "$( [[ "$follow_up_wait_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpWaitOk "$( [[ "$follow_up_wait_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpSwipeRequested "$( [[ "$follow_up_swipe_requested" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpSwipeOk "$( [[ "$follow_up_swipe_ok" == "true" ]] && printf 'true' || printf 'false' )" \
+  --argjson followUpSwipeStartX "$follow_up_swipe_start_x_json" \
+  --argjson followUpSwipeStartY "$follow_up_swipe_start_y_json" \
+  --argjson followUpSwipeEndX "$follow_up_swipe_end_x_json" \
+  --argjson followUpSwipeEndY "$follow_up_swipe_end_y_json" \
+  --argjson followUpSwipeDurationMs "$follow_up_swipe_duration_ms_json" \
+  --argjson followUpSwipeVisibleTextBefore "$follow_up_swipe_before_visible_text_json" \
+  --argjson followUpSwipeVisibleTextAfter "$follow_up_swipe_after_visible_text_json" \
+  --argjson followUpSwipeVisibleTextChanged "$follow_up_swipe_visible_text_changed_json" \
   --argjson followUpTapRequested "$( [[ "$follow_up_tap_requested" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpTapOk "$( [[ "$follow_up_tap_ok" == "true" ]] && printf 'true' || printf 'false' )" \
   --argjson followUpInputRequested "$( [[ "$follow_up_input_requested" == "true" ]] && printf 'true' || printf 'false' )" \
@@ -723,25 +883,37 @@ jq -n \
       requested: $followUpRequested,
       requestedCount: $followUpRequestedCount,
       waitRequested: $followUpWaitRequested,
-      waitText: ($followUpWaitText | select(length > 0)),
-      waitMatchedText: ($followUpWaitMatchedText | select(length > 0)),
+      waitText: (if $followUpWaitText == "" then null else $followUpWaitText end),
+      waitMatchedText: (if $followUpWaitMatchedText == "" then null else $followUpWaitMatchedText end),
       waitOk: $followUpWaitOk,
+      swipeRequested: $followUpSwipeRequested,
+      swipeStartX: $followUpSwipeStartX,
+      swipeStartY: $followUpSwipeStartY,
+      swipeEndX: $followUpSwipeEndX,
+      swipeEndY: $followUpSwipeEndY,
+      swipeDurationMs: $followUpSwipeDurationMs,
+      swipeStrategy: (if $followUpSwipeStrategy == "" then null else $followUpSwipeStrategy end),
+      swipeOk: $followUpSwipeOk,
+      swipePrePackage: (if $followUpSwipePrePackage == "" then null else $followUpSwipePrePackage end),
+      swipeVisibleTextBefore: $followUpSwipeVisibleTextBefore,
+      swipeVisibleTextAfter: $followUpSwipeVisibleTextAfter,
+      swipeVisibleTextChanged: $followUpSwipeVisibleTextChanged,
       foregroundReady: $followUpForegroundReady,
       foregroundAttempts: (if $followUpRequested then $followUpForegroundAttempts else null end),
       foregroundTimeoutMs: (if $followUpRequested then $followUpForegroundTimeoutMs else null end),
       foregroundPollIntervalMs: (if $followUpRequested then $followUpForegroundPollIntervalMs else null end),
       foregroundPackage: (if $followUpForegroundPackage == "" then null else $followUpForegroundPackage end),
       tapRequested: $followUpTapRequested,
-      tapText: ($followUpTapText | select(length > 0)),
-      tapContentDescription: ($followUpTapContentDescription | select(length > 0)),
-      tapResourceId: ($followUpTapResourceId | select(length > 0)),
-      tapStrategy: ($followUpTapStrategy | select(length > 0)),
+      tapText: (if $followUpTapText == "" then null else $followUpTapText end),
+      tapContentDescription: (if $followUpTapContentDescription == "" then null else $followUpTapContentDescription end),
+      tapResourceId: (if $followUpTapResourceId == "" then null else $followUpTapResourceId end),
+      tapStrategy: (if $followUpTapStrategy == "" then null else $followUpTapStrategy end),
       tapOk: $followUpTapOk,
       inputRequested: $followUpInputRequested,
-      inputText: ($followUpInputText | select(length > 0)),
-      inputContentDescription: ($followUpInputContentDescription | select(length > 0)),
-      inputResourceId: ($followUpInputResourceId | select(length > 0)),
-      inputStrategy: ($followUpInputStrategy | select(length > 0)),
+      inputText: (if $followUpInputText == "" then null else $followUpInputText end),
+      inputContentDescription: (if $followUpInputContentDescription == "" then null else $followUpInputContentDescription end),
+      inputResourceId: (if $followUpInputResourceId == "" then null else $followUpInputResourceId end),
+      inputStrategy: (if $followUpInputStrategy == "" then null else $followUpInputStrategy end),
       inputValueLength: (if $followUpInputRequested then $followUpInputValueLength else null end),
       inputOk: $followUpInputOk,
       stateOk: $followUpStateOk,
@@ -759,9 +931,9 @@ printf 'cross_app.target=%s classification=%s target_top_rounds=%s status_succes
 printf 'cross_app.first_target_round=%s first_status_failure_round=%s\n' \
   "$first_target_round" "$first_status_failure_round"
 if [[ "$follow_up_requested" == "true" ]]; then
-  printf 'cross_app.follow_up_mode=%s foreground_ready=%s wait_ok=%s tap_ok=%s input_ok=%s state_ok=%s\n' \
+  printf 'cross_app.follow_up_mode=%s foreground_ready=%s wait_ok=%s swipe_ok=%s tap_ok=%s input_ok=%s swipe_text_changed=%s state_ok=%s\n' \
     "$follow_up_mode" \
-    "$follow_up_foreground_ready" "$follow_up_wait_ok" "$follow_up_tap_ok" "$follow_up_input_ok" "$follow_up_state_ok"
+    "$follow_up_foreground_ready" "$follow_up_wait_ok" "$follow_up_swipe_ok" "$follow_up_tap_ok" "$follow_up_input_ok" "$follow_up_swipe_visible_text_changed_json" "$follow_up_state_ok"
 fi
 printf 'recovery.http_code=%s recovery.ok=%s recovered_package=%s\n' \
   "$recovery_http_code" "$recovery_ok" "${recovered_package:-unknown}"

@@ -31,6 +31,17 @@ function runDescribe(env: NodeJS.ProcessEnv = {}) {
   return values;
 }
 
+function runDescribeFailure(env: NodeJS.ProcessEnv = {}) {
+  return spawnSync("bash", [scriptPath, "--describe"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env,
+    },
+  });
+}
+
 describe("local-host-ui-cross-app-probe --describe", () => {
   it("reports the base preset when no follow-up is configured", () => {
     const values = runDescribe();
@@ -74,5 +85,33 @@ describe("local-host-ui-cross-app-probe --describe", () => {
     expect(values.get("cross_app.follow_up.tap_text")).toBe("Search settings");
     expect(values.get("cross_app.follow_up.tap_resource_id")).toBe("<empty>");
     expect(values.get("cross_app.follow_up.input_value")).toBe("codex");
+  });
+
+  it("reports swipe follow-up configuration when coordinates are provided", () => {
+    const values = runDescribe({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X: "720",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y: "2600",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_X: "720",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_END_Y: "900",
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_DURATION_MS: "350",
+    });
+
+    expect(values.get("cross_app.preset")).toBe("follow-up:swipe");
+    expect(values.get("cross_app.follow_up_mode")).toBe("swipe");
+    expect(values.get("cross_app.follow_up.swipe_requested")).toBe("true");
+    expect(values.get("cross_app.follow_up.swipe_start_x")).toBe("720");
+    expect(values.get("cross_app.follow_up.swipe_end_y")).toBe("900");
+    expect(values.get("cross_app.follow_up.swipe_duration_ms")).toBe("350");
+  });
+
+  it("fails clearly when swipe coordinates are incomplete", () => {
+    const result = runDescribeFailure({
+      OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_X: "720",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      "OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_SWIPE_START_Y is required",
+    );
   });
 });
