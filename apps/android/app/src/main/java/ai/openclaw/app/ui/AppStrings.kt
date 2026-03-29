@@ -477,16 +477,23 @@ private fun localizeRuntimeErrorCode(
 ): String {
   val trimmed = code.trim()
   return when (trimmed) {
+    "ACTION_FAILED" -> language.pick(trimmed, "操作失败")
     "ACTION_UNAVAILABLE" -> language.pick(trimmed, "操作不可用")
     "A2UI_HOST_UNAVAILABLE" -> language.pick(trimmed, "A2UI Host 不可用")
     "CALENDAR_UNAVAILABLE" -> language.pick(trimmed, "日历不可用")
+    "CAMERA_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要相机权限")
+    "CAMERA_TOO_LARGE" -> language.pick(trimmed, "相机内容过大")
     "CALL_LOG_UNAVAILABLE" -> language.pick(trimmed, "通话记录不可用")
     "CONTACTS_UNAVAILABLE" -> language.pick(trimmed, "联系人不可用")
     "INVALID_REQUEST" -> language.pick(trimmed, "请求无效")
     "LOCATION_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台定位不可用")
     "LOCATION_UNAVAILABLE" -> language.pick(trimmed, "位置不可用")
+    "MIC_PERMISSION_REQUIRED" -> language.pick(trimmed, "需要麦克风权限")
     "MOTION_UNAVAILABLE" -> language.pick(trimmed, "运动不可用")
     "NODE_BACKGROUND_UNAVAILABLE" -> language.pick(trimmed, "后台节点不可用")
+    "NOTIFICATIONS_DISABLED" -> language.pick(trimmed, "通知访问未启用")
+    "NOTIFICATION_NOT_CLEARABLE" -> language.pick(trimmed, "通知不可清除")
+    "NOTIFICATION_NOT_FOUND" -> language.pick(trimmed, "未找到通知")
     "NOTIFICATIONS_UNAVAILABLE" -> language.pick(trimmed, "通知不可用")
     "PEDOMETER_UNAVAILABLE" -> language.pick(trimmed, "计步器不可用")
     "PHOTOS_UNAVAILABLE" -> language.pick(trimmed, "照片不可用")
@@ -512,16 +519,37 @@ private fun localizeRuntimeErrorDetail(
     "accessibility service is enabled but not yet bound" ->
       language.pick(trimmed, "无障碍服务已启用，但尚未绑定")
     "canvas unavailable" -> language.pick(trimmed, "Canvas 不可用")
+    "camera not ready" -> language.pick(trimmed, "相机尚未就绪")
+    "dismiss failed" -> language.pick(trimmed, "清除失败")
+    "enable notification access in system Settings" ->
+      language.pick(trimmed, "请在系统设置中启用通知访问权限")
+    "failed to decode captured image" -> language.pick(trimmed, "无法解码拍摄图像")
+    "failed to encode JPEG" -> language.pick(trimmed, "无法编码 JPEG")
+    "grant Camera permission" -> language.pick(trimmed, "请授予相机权限")
+    "grant Microphone permission" -> language.pick(trimmed, "请授予麦克风权限")
     "message or attachment required" -> language.pick(trimmed, "需要提供消息或附件")
     "not connected" -> language.pick(trimmed, "未连接")
+    "notification has no open action" -> language.pick(trimmed, "通知没有可打开的操作")
+    "notification is ongoing or protected" -> language.pick(trimmed, "通知正在进行中或受系统保护")
+    "notification key not found" -> language.pick(trimmed, "未找到通知 key")
+    "notification listener not connected" -> language.pick(trimmed, "通知监听服务未连接")
+    "open failed" -> language.pick(trimmed, "打开失败")
     "paramsJSON required" -> language.pick(trimmed, "需要提供 paramsJSON")
     "Permission denied" -> language.pick(trimmed, "权限被拒绝")
     "request failed" -> language.pick(trimmed, "请求失败")
+    "reply failed" -> language.pick(trimmed, "回复失败")
     "runId required" -> language.pick(trimmed, "需要提供 runId")
     "SMS not available on this device" -> language.pick(trimmed, "此设备不支持短信")
     "unknown command" -> language.pick(trimmed, "未知命令")
     else ->
       when {
+        trimmed.startsWith("camera clip failed (", ignoreCase = true) && trimmed.endsWith(")") ->
+          language.pick(
+            trimmed,
+            "相机视频录制失败（${trimmed.substringAfter("camera clip failed (").removeSuffix(")")}）",
+          )
+        trimmed.equals("camera clip finalize timed out", ignoreCase = true) ->
+          language.pick(trimmed, "相机视频收尾超时")
         trimmed.startsWith("expected JSON object with ", ignoreCase = true) ->
           language.pick(
             trimmed,
@@ -529,6 +557,8 @@ private fun localizeRuntimeErrorDetail(
           )
         trimmed.equals("expected JSON object", ignoreCase = true) ->
           language.pick(trimmed, "需要 JSON 对象")
+        trimmed.startsWith("unknown camera deviceId ", ignoreCase = true) ->
+          language.pick(trimmed, "未知相机 ${trimmed.substringAfter("unknown ").trim()}")
         else -> trimmed
       }
   }

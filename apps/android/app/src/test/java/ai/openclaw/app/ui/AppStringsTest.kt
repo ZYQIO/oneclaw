@@ -220,6 +220,110 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesNotificationAccessDisabled() {
+    assertEquals(
+      "通知访问未启用：请在系统设置中启用通知访问权限",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "NOTIFICATIONS_DISABLED: enable notification access in system Settings",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesNotificationListenerUnavailable() {
+    assertEquals(
+      "通知不可用：通知监听服务未连接",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "NOTIFICATIONS_UNAVAILABLE: notification listener not connected",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesNotificationNotFound() {
+    assertEquals(
+      "未找到通知：未找到通知 key",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "NOTIFICATION_NOT_FOUND: notification key not found",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesNotificationNotClearable() {
+    assertEquals(
+      "通知不可清除：通知正在进行中或受系统保护",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "NOTIFICATION_NOT_CLEARABLE: notification is ongoing or protected",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesNotificationDismissFailure() {
+    assertEquals(
+      "操作失败：清除失败",
+      localizeChatError(AppLanguage.SimplifiedChinese, "ACTION_FAILED: dismiss failed"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraPermissionRequirement() {
+    assertEquals(
+      "需要相机权限：请授予相机权限",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "CAMERA_PERMISSION_REQUIRED: grant Camera permission",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesMicrophonePermissionRequirement() {
+    assertEquals(
+      "需要麦克风权限：请授予麦克风权限",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "MIC_PERMISSION_REQUIRED: grant Microphone permission",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraNotReady() {
+    assertEquals(
+      "不可用：相机尚未就绪",
+      localizeChatError(AppLanguage.SimplifiedChinese, "UNAVAILABLE: camera not ready"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraClipFailure() {
+    assertEquals(
+      "不可用：相机视频录制失败（error=ERROR_RECORDER_ERROR）",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "UNAVAILABLE: camera clip failed (error=ERROR_RECORDER_ERROR)",
+      ),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesCameraTooLargeCode() {
+    assertEquals(
+      "相机内容过大：6291456 bytes > 5242880 bytes",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "CAMERA_TOO_LARGE: 6291456 bytes > 5242880 bytes",
+      ),
+    )
+  }
+
+  @Test
   fun localizeVoiceConversationText_translatesDefaultFailure() {
     assertEquals(
       "语音请求失败。",
@@ -334,6 +438,17 @@ class AppStringsTest {
     assertEquals(
       "语音错误（11）",
       localizeTalkModeStatus(AppLanguage.SimplifiedChinese, "Speech error (11)"),
+    )
+  }
+
+  @Test
+  fun localizeChatError_translatesUnknownCameraDeviceId() {
+    assertEquals(
+      "请求无效：未知相机 camera deviceId 'rear-2'",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "INVALID_REQUEST: unknown camera deviceId 'rear-2'",
+      ),
     )
   }
 }
