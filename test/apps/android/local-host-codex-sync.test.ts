@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AuthProfileStore, OAuthCredential } from "../../../src/agents/auth-profiles/types.js";
 import {
+  countConnectedAdbDevicesFromOutput,
   parseCli,
   planCodexSync,
   runCodexSyncWatch,
@@ -92,6 +93,9 @@ describe("parseCli", () => {
     const options = parseCli([
       "--token",
       "secret-token",
+      "--wait-for-device",
+      "--device-poll-interval-ms",
+      "2000",
       "--watch",
       "--watch-interval-ms",
       "45000",
@@ -99,9 +103,28 @@ describe("parseCli", () => {
       "3",
     ]);
 
+    expect(options.waitForDevice).toBe(true);
+    expect(options.devicePollIntervalMs).toBe(2_000);
     expect(options.watch).toBe(true);
     expect(options.watchIntervalMs).toBe(45_000);
     expect(options.watchMaxRuns).toBe(3);
+  });
+});
+
+describe("countConnectedAdbDevicesFromOutput", () => {
+  it("counts only fully connected adb devices", () => {
+    const count = countConnectedAdbDevicesFromOutput(
+      [
+        "List of devices attached",
+        "emulator-5554\tdevice",
+        "R5CX1234ABC\tunauthorized",
+        "192.168.1.2:5555\toffline",
+        "ZX1G22\tdevice product:pixel model:Pixel transport_id:3",
+        "",
+      ].join("\n"),
+    );
+
+    expect(count).toBe(2);
   });
 });
 
@@ -109,6 +132,7 @@ describe("runCodexSyncWatch", () => {
   it("runs the requested number of watch iterations and only sleeps between them", async () => {
     const seenIterations: number[] = [];
     const sleepCalls: number[] = [];
+    const preparedIterations: number[] = [];
 
     await runCodexSyncWatch(
       {
@@ -116,6 +140,8 @@ describe("runCodexSyncWatch", () => {
         baseUrl: "http://127.0.0.1:3945",
         port: 3945,
         useAdbForward: false,
+        waitForDevice: false,
+        devicePollIntervalMs: 3_000,
         watch: true,
         watchIntervalMs: 12_000,
         watchMaxRuns: 3,
@@ -124,6 +150,9 @@ describe("runCodexSyncWatch", () => {
         source: "desktop-codex-sync",
       },
       {
+        async prepareTransport() {
+          preparedIterations.push(preparedIterations.length + 1);
+        },
         async executeSync() {
           return {
             baseUrl: "http://127.0.0.1:3945",
@@ -154,6 +183,74 @@ describe("runCodexSyncWatch", () => {
     );
 
     expect(seenIterations).toEqual([1, 2, 3]);
+    expect(preparedIterations).toEqual([1, 2, 3]);
     expect(sleepCalls).toEqual([12_000, 12_000]);
+  });
+
+  it("continues after recoverable watch errors", async () => {
+    const successIterations: number[] = [];
+    const errorIterations: Array<{ iteration: number; error: string }> = [];
+    let attempts = 0;
+
+    await runCodexSyncWatch(
+      {
+        token: "secret-token",
+        baseUrl: "http://127.0.0.1:3945",
+        port: 3945,
+        useAdbForward: false,
+        waitForDevice: false,
+        devicePollIntervalMs: 3_000,
+        watch: true,
+        watchIntervalMs: 5_000,
+        watchMaxRuns: 2,
+        force: false,
+        json: false,
+        source: "desktop-codex-sync",
+      },
+      {
+        async executeSync() {
+          attempts += 1;
+          if (attempts === 1) {
+            throw new Error("fetch failed");
+          }
+          return {
+            baseUrl: "http://127.0.0.1:3945",
+            adbForwarded: false,
+            desktop: {
+              profileId: "openai-codex:oauth",
+              expiresAt: 200_000,
+              refreshRecommended: false,
+            },
+            phoneBefore: {
+              configured: true,
+              expired: false,
+              refreshRecommended: false,
+            },
+            action: "skip",
+            reason: "phone-auth-healthy",
+            imported: false,
+            refreshedAfterImport: false,
+          };
+        },
+        async sleep() {},
+        onIteration(summary) {
+          successIterations.push(summary.iteration);
+        },
+        onIterationError(summary) {
+          errorIterations.push({
+            iteration: summary.iteration,
+            error: summary.error,
+          });
+        },
+      },
+    );
+
+    expect(errorIterations).toEqual([
+      {
+        iteration: 1,
+        error: "fetch failed",
+      },
+    ]);
+    expect(successIterations).toEqual([2]);
   });
 });

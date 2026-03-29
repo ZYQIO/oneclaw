@@ -12,6 +12,8 @@ export type SyncCliOptions = {
   token: string;
   port: number;
   useAdbForward: boolean;
+  waitForDevice: boolean;
+  devicePollIntervalMs: number;
   watch: boolean;
   watchIntervalMs: number;
   watchMaxRuns?: number;
@@ -77,15 +79,25 @@ type SyncSummary = {
 };
 
 export type WatchIterationSummary = SyncSummary & {
+  ok: true;
   iteration: number;
   timestamp: string;
+};
+
+export type WatchIterationError = {
+  ok: false;
+  iteration: number;
+  timestamp: string;
+  error: string;
 };
 
 const DEFAULT_PORT = 3945;
 const DEFAULT_SOURCE = "desktop-codex-sync";
 const DESKTOP_REFRESH_WINDOW_MS = 30_000;
 const DEFAULT_WATCH_INTERVAL_MS = 30_000;
+const DEFAULT_DEVICE_POLL_INTERVAL_MS = 3_000;
 const MIN_WATCH_INTERVAL_MS = 1_000;
+const MIN_DEVICE_POLL_INTERVAL_MS = 250;
 
 function usage(): string {
   return [
@@ -101,6 +113,8 @@ function usage(): string {
     "  --port <port>",
     "  --agent-dir <dir>",
     "  --use-adb-forward",
+    "  --wait-for-device",
+    "  --device-poll-interval-ms <ms>",
     "  --watch",
     "  --watch-interval-ms <ms>",
     "  --watch-max-runs <count>",
@@ -114,6 +128,7 @@ function usage(): string {
     "  3. Imports desktop auth to the phone only when phone auth is missing/stale, or when --force is used",
     "  4. Optionally refreshes on-phone auth immediately when the desktop credential is already near expiry",
     "  5. With --watch, keeps polling and auto-refills again whenever the phone auth later goes stale",
+    "  6. With --wait-for-device, blocks until adb sees a connected phone before trying the sync",
   ].join("\n");
 }
 
@@ -192,6 +207,8 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
       token: { type: "string" },
       port: { type: "string" },
       "use-adb-forward": { type: "boolean", default: false },
+      "wait-for-device": { type: "boolean", default: false },
+      "device-poll-interval-ms": { type: "string" },
       watch: { type: "boolean", default: false },
       "watch-interval-ms": { type: "string" },
       "watch-max-runs": { type: "string" },
@@ -211,6 +228,15 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
   const port = parsePort(parsed.values.port ?? env.OPENCLAW_ANDROID_LOCAL_HOST_PORT);
   const useAdbForward =
     parsed.values["use-adb-forward"] || readBoolEnv(env.OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD);
+  const waitForDevice =
+    parsed.values["wait-for-device"] ||
+    readBoolEnv(env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_WAIT_FOR_DEVICE);
+  const devicePollIntervalMs = parseOptionalPositiveInteger(
+    parsed.values["device-poll-interval-ms"] ??
+      env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_DEVICE_POLL_INTERVAL_MS,
+    "--device-poll-interval-ms",
+    MIN_DEVICE_POLL_INTERVAL_MS,
+  ) ?? DEFAULT_DEVICE_POLL_INTERVAL_MS;
   const watch =
     parsed.values.watch || readBoolEnv(env.OPENCLAW_ANDROID_LOCAL_HOST_CODEX_SYNC_WATCH);
   const watchIntervalMs = parseOptionalPositiveInteger(
@@ -238,6 +264,8 @@ export function parseCli(argv: string[], env: NodeJS.ProcessEnv = process.env): 
     token,
     port,
     useAdbForward,
+    waitForDevice,
+    devicePollIntervalMs,
     watch,
     watchIntervalMs,
     ...(watchMaxRuns != null ? { watchMaxRuns } : {}),
@@ -384,17 +412,25 @@ function requireAdb(): void {
   }
 }
 
-function ensureAdbForward(port: number): void {
-  requireAdb();
-  const devices = execFileSync("adb", ["devices"], {
-    encoding: "utf8",
-  });
-  const connected = devices
+export function countConnectedAdbDevicesFromOutput(output: string): number {
+  return output
     .split("\n")
     .slice(1)
     .map((line) => line.trim())
     .filter(Boolean)
-    .filter((line) => /\sdevice$/.test(line)).length;
+    .filter((line) => line.split(/\s+/)[1] === "device").length;
+}
+
+function connectedAdbDeviceCount(): number {
+  requireAdb();
+  const devices = execFileSync("adb", ["devices"], {
+    encoding: "utf8",
+  });
+  return countConnectedAdbDevicesFromOutput(devices);
+}
+
+function ensureAdbForward(port: number): void {
+  const connected = connectedAdbDeviceCount();
   if (connected < 1) {
     throw new Error("No connected Android device (adb state=device).");
   }
@@ -477,8 +513,51 @@ function printSummary(
   }
 }
 
-function prepareTransport(options: SyncCliOptions): void {
+function printWatchError(summary: WatchIterationError): void {
+  console.log(`watch.iteration=${summary.iteration} timestamp=${summary.timestamp} ok=false`);
+  console.log(`watch.error=${summary.error}`);
+}
+
+function isRecoverableWatchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const recoverableMarkers = [
+    "No connected Android device",
+    "fetch failed",
+    "ECONNREFUSED",
+    "ECONNRESET",
+    "EPIPE",
+    "socket hang up",
+    "network socket disconnected",
+  ];
+  return recoverableMarkers.some((marker) => message.includes(marker));
+}
+
+async function waitForAdbDevice(
+  options: SyncCliOptions,
+  deps: {
+    sleep?: (delayMs: number) => Promise<void>;
+    connectedDeviceCount?: () => number;
+  } = {},
+): Promise<void> {
+  const sleep = deps.sleep ?? sleepMs;
+  const getConnectedDeviceCount = deps.connectedDeviceCount ?? connectedAdbDeviceCount;
+  requireAdb();
+  while (getConnectedDeviceCount() < 1) {
+    await sleep(options.devicePollIntervalMs);
+  }
+}
+
+async function prepareTransport(
+  options: SyncCliOptions,
+  deps: {
+    sleep?: (delayMs: number) => Promise<void>;
+    connectedDeviceCount?: () => number;
+  } = {},
+): Promise<void> {
   if (options.useAdbForward) {
+    if (options.waitForDevice) {
+      await waitForAdbDevice(options, deps);
+    }
     ensureAdbForward(options.port);
   }
 }
@@ -550,7 +629,7 @@ async function executeCodexSync(options: SyncCliOptions): Promise<SyncSummary> {
 }
 
 export async function runCodexSync(options: SyncCliOptions): Promise<SyncSummary> {
-  prepareTransport(options);
+  await prepareTransport(options);
   return await executeCodexSync(options);
 }
 
@@ -561,12 +640,14 @@ async function sleepMs(delayMs: number): Promise<void> {
 export async function runCodexSyncWatch(
   options: SyncCliOptions,
   deps: {
+    prepareTransport?: (options: SyncCliOptions) => Promise<void>;
     executeSync?: (options: SyncCliOptions) => Promise<SyncSummary>;
     sleep?: (delayMs: number) => Promise<void>;
     onIteration?: (summary: WatchIterationSummary) => void | Promise<void>;
+    onIterationError?: (summary: WatchIterationError) => void | Promise<void>;
   } = {},
 ): Promise<void> {
-  prepareTransport(options);
+  const prepare = deps.prepareTransport ?? (async (nextOptions: SyncCliOptions) => await prepareTransport(nextOptions, deps));
   const executeSync = deps.executeSync ?? executeCodexSync;
   const sleep = deps.sleep ?? sleepMs;
   const watchMaxRuns = options.watchMaxRuns;
@@ -574,13 +655,28 @@ export async function runCodexSyncWatch(
 
   while (true) {
     iteration += 1;
-    const summary = await executeSync(options);
-    const iterationSummary: WatchIterationSummary = {
-      ...summary,
-      iteration,
-      timestamp: new Date().toISOString(),
-    };
-    await deps.onIteration?.(iterationSummary);
+    try {
+      await prepare(options);
+      const summary = await executeSync(options);
+      const iterationSummary: WatchIterationSummary = {
+        ...summary,
+        ok: true,
+        iteration,
+        timestamp: new Date().toISOString(),
+      };
+      await deps.onIteration?.(iterationSummary);
+    } catch (error) {
+      if (!isRecoverableWatchError(error)) {
+        throw error;
+      }
+      const errorSummary: WatchIterationError = {
+        ok: false,
+        iteration,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      };
+      await deps.onIterationError?.(errorSummary);
+    }
 
     if (watchMaxRuns != null && iteration >= watchMaxRuns) {
       return;
@@ -594,7 +690,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (options.watch) {
     if (!options.json) {
       console.log(
-        `watch.enabled=true interval_ms=${options.watchIntervalMs} max_runs=${options.watchMaxRuns ?? "unbounded"}`,
+        `watch.enabled=true interval_ms=${options.watchIntervalMs} max_runs=${options.watchMaxRuns ?? "unbounded"} wait_for_device=${String(options.waitForDevice)} device_poll_interval_ms=${options.devicePollIntervalMs}`,
       );
     }
     await runCodexSyncWatch(options, {
@@ -607,6 +703,13 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           iteration: summary.iteration,
           timestamp: summary.timestamp,
         });
+      },
+      onIterationError(summary) {
+        if (options.json) {
+          console.log(JSON.stringify(summary));
+          return;
+        }
+        printWatchError(summary);
       },
     });
     return;
