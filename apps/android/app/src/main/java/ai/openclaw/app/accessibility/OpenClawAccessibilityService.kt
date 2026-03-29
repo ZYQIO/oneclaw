@@ -117,8 +117,8 @@ class OpenClawAccessibilityService : AccessibilityService() {
   }
 
   companion object {
-    private const val maxUiStateNodes = 60
-    private const val maxVisibleTextItems = 12
+    private const val maxUiStateNodes = 180
+    private const val maxVisibleTextItems = 24
     private const val maxTextChars = 160
 
     @Volatile private var activeService: OpenClawAccessibilityService? = null
@@ -312,6 +312,16 @@ class OpenClawAccessibilityService : AccessibilityService() {
 
     val tapCenter = nodeCenter(matchedNode)
     val clickTarget = findClickableAncestor(matchedNode) ?: matchedNode
+    if (shouldPreferGestureTap(matchedNode, clickTarget) && tapCenter != null) {
+      if (dispatchTapGesture(tapCenter.first, tapCenter.second)) {
+        return buildTapSuccessResult(
+          strategy = "gesture_tap",
+          packageName = activePackageName,
+          node = matchedNode,
+          center = tapCenter,
+        )
+      }
+    }
     if (clickTarget.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
       return buildTapSuccessResult(
         strategy = "node_click",
@@ -805,6 +815,11 @@ class OpenClawAccessibilityService : AccessibilityService() {
     }
     return rect.exactCenterX().toDouble() to rect.exactCenterY().toDouble()
   }
+
+  private fun shouldPreferGestureTap(
+    matchedNode: AccessibilityNodeInfo,
+    clickTarget: AccessibilityNodeInfo,
+  ): Boolean = !matchedNode.isClickable && clickTarget !== matchedNode
 
   private fun dispatchTapGesture(
     x: Double,
