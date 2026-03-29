@@ -12,6 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -140,6 +141,42 @@ class OpenAICodexOAuthApiTest {
       assertEquals("acct_fallback", credential.accountId)
       assertEquals("next@example.com", credential.email)
       assertEquals("refresh-next", credential.refresh)
+    } finally {
+      server.shutdown()
+    }
+  }
+
+  @Test
+  fun exchangeAuthorizationCode_surfacesStructuredOauthFailure() {
+    val server = MockWebServer()
+    server.enqueue(
+      MockResponse().setResponseCode(401).setBody(
+        """
+          {
+            "error":"access_denied",
+            "error_description":"The resource owner denied the request"
+          }
+        """.trimIndent(),
+      ),
+    )
+    server.start()
+
+    try {
+      val api =
+        OpenAICodexOAuthApi(
+          json = json,
+          client = OkHttpClient(),
+          tokenUrl = server.url("/oauth/token").toString(),
+        )
+
+      try {
+        api.exchangeAuthorizationCode(code = "code-123", verifier = "verifier-123")
+        fail("Expected exchangeAuthorizationCode to throw on a 401 response")
+      } catch (error: IllegalStateException) {
+        assertTrue(error.message.orEmpty().contains("OpenAI Codex OAuth failed (401)"))
+        assertTrue(error.message.orEmpty().contains("The resource owner denied the request"))
+        assertTrue(error.message.orEmpty().contains("error=access_denied"))
+      }
     } finally {
       server.shutdown()
     }

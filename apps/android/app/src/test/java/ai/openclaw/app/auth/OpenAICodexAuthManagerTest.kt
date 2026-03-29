@@ -41,6 +41,16 @@ class OpenAICodexAuthManagerTest {
   }
 
   @Test
+  fun localizeOpenAICodexAuthCopy_translatesStructuredOauthFailure() {
+    assertEquals(
+      "OpenAI Codex OAuth 失败（401） | 访问被拒绝 | error=访问被拒绝 | message=请求无效",
+      localizeOpenAICodexAuthCopy(
+        "OpenAI Codex OAuth failed (401) | access_denied | error=access_denied | message=Bad Request",
+      ),
+    )
+  }
+
+  @Test
   fun oauthSuccessHtml_includesReturnToOpenClawCta() {
     val html = oauthSuccessHtml("OpenAI authentication completed. You can close this window.")
 

@@ -67,6 +67,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
 import ai.openclaw.app.auth.OpenAICodexAuthUiState
+import ai.openclaw.app.auth.translateOpenAICodexMessage
 
 private enum class ConnectInputMode {
   SetupCode,
@@ -1410,50 +1411,5 @@ internal fun translateKnownCodexMessage(
   language: AppLanguage,
   message: String,
 ): String {
-  val trimmed = message.trim()
-  return when {
-    trimmed.startsWith("OpenAI Codex OAuth failed (") && trimmed.endsWith(")") ->
-      language.pick(trimmed, "OpenAI Codex OAuth 失败（${trimmed.substringAfterLast("(").removeSuffix(")")}）")
-    trimmed.startsWith("Invalid OpenAI authorize URL: ") ->
-      language.pick(
-        trimmed,
-        "OpenAI authorize URL 无效：${trimmed.removePrefix("Invalid OpenAI authorize URL: ")}",
-      )
-    else ->
-      when (trimmed) {
-        "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below." ->
-          language.pick(
-            trimmed,
-            "浏览器已打开，请在其中完成登录。回调完成后 OpenClaw 应该会自动返回；如果没有，请使用浏览器页面里的 Return to OpenClaw，或者把回跳 URL / 授权码粘贴到下方。",
-          )
-        "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below." ->
-          language.pick(
-            trimmed,
-            "无法绑定 localhost 回调。请在浏览器中完成登录，然后把回跳 URL 或授权码粘贴到下方。",
-          )
-        "No browser is available for OpenAI sign-in." ->
-          language.pick(trimmed, "没有可用于 OpenAI 登录的浏览器。")
-        "No OpenAI sign-in is currently running." ->
-          language.pick(trimmed, "当前没有正在进行的 OpenAI 登录流程。")
-        "State mismatch. Start sign-in again and retry." ->
-          language.pick(trimmed, "state 不匹配。请重新开始登录后再重试。")
-        "Paste the redirect URL or authorization code from the browser." ->
-          language.pick(trimmed, "请粘贴浏览器中的回跳 URL 或授权码。")
-        "Exchanging authorization code…" ->
-          language.pick(trimmed, "正在交换授权码…")
-        "OpenAI Codex is connected." ->
-          language.pick(trimmed, "OpenAI Codex 已连接。")
-        "Failed to open the OpenAI sign-in page." ->
-          language.pick(trimmed, "无法打开 OpenAI 登录页面。")
-        "OpenAI Codex OAuth returned invalid JSON" ->
-          language.pick(trimmed, "OpenAI Codex OAuth 返回了无效 JSON。")
-        "OpenAI Codex OAuth response was missing required fields" ->
-          language.pick(trimmed, "OpenAI Codex OAuth 响应缺少必需字段。")
-        "Failed to extract accountId from token" ->
-          language.pick(trimmed, "无法从 token 中提取 accountId。")
-        "OpenAI sign-in failed." ->
-          language.pick(trimmed, "OpenAI 登录失败。")
-        else -> message
-      }
-  }
+  return translateOpenAICodexMessage(language, message)
 }

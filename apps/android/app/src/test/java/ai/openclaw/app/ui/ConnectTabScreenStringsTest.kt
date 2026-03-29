@@ -31,4 +31,15 @@ class ConnectTabScreenStringsTest {
       translateKnownCodexMessage(AppLanguage.SimplifiedChinese, "Failed to open the OpenAI sign-in page."),
     )
   }
+
+  @Test
+  fun translateKnownCodexMessage_translatesStructuredOauthFailure() {
+    assertEquals(
+      "OpenAI Codex OAuth 失败（401） | 访问被拒绝 | error=访问被拒绝 | message=请求无效",
+      translateKnownCodexMessage(
+        AppLanguage.SimplifiedChinese,
+        "OpenAI Codex OAuth failed (401) | access_denied | error=access_denied | message=Bad Request",
+      ),
+    )
+  }
 }

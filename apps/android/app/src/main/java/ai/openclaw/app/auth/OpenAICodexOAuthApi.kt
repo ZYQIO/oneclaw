@@ -165,17 +165,34 @@ class OpenAICodexOAuthApi(
   }
 
   private fun parseOAuthError(statusCode: Int, body: String): String {
+    fun formatFailure(vararg parts: String?): String {
+      val prefix = "OpenAI Codex OAuth failed ($statusCode)"
+      val detailParts =
+        parts
+          .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
+          .distinct()
+      return if (detailParts.isEmpty()) {
+        prefix
+      } else {
+        "$prefix | ${detailParts.joinToString(separator = " | ")}"
+      }
+    }
+
     if (body.isBlank()) {
-      return "OpenAI Codex OAuth failed ($statusCode)"
+      return formatFailure()
     }
     return try {
       val root = json.parseToJsonElement(body) as? JsonObject
-      val error = root?.get("error").asObjectOrNull()
-      error?.get("message").asStringOrNull()
-        ?: root?.get("message").asStringOrNull()
-        ?: "OpenAI Codex OAuth failed ($statusCode)"
+      val errorObject = root?.get("error").asObjectOrNull()
+      val errorCode = errorObject?.get("code").asStringOrNull() ?: root?.get("error").asStringOrNull()
+      val message =
+        errorObject?.get("message").asStringOrNull()
+          ?: root?.get("message").asStringOrNull()
+          ?: root?.get("error_description").asStringOrNull()
+      val detailText = errorObject?.get("details").asStringOrNull() ?: root?.get("details").asStringOrNull()
+      formatFailure(message, detailText, errorCode?.let { "error=$it" })
     } catch (_: Throwable) {
-      body.take(200)
+      formatFailure("body=${body.take(200)}")
     }
   }
 

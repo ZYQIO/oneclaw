@@ -130,6 +130,17 @@ class AppStringsTest {
   }
 
   @Test
+  fun localizeChatError_translatesStructuredCodexFailureSegments() {
+    assertEquals(
+      "OpenAI Codex 请求失败（400） | 必须提供 instructions。 | errorType=invalid_request_error | message=请求无效",
+      localizeChatError(
+        AppLanguage.SimplifiedChinese,
+        "OpenAI Codex request failed (400) | instructions must be set | errorType=invalid_request_error | message=Bad Request",
+      ),
+    )
+  }
+
+  @Test
   fun localizeChatError_reusesKnownGatewayTranslation() {
     assertEquals(
       "网关错误：未授权：gateway token 不匹配（提供 gateway auth token）",

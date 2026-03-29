@@ -304,6 +304,72 @@ class OpenAICodexResponsesClientTest {
     }
 
   @Test
+  fun streamReply_surfacesStructuredStreamFailureEvents() =
+    runTest {
+      val server = MockWebServer()
+      server.enqueue(
+        MockResponse()
+          .setResponseCode(200)
+          .addHeader("Content-Type", "text/event-stream")
+          .setBody(
+            """
+            data: {"type":"response.failed","response":{"error":{"message":"The usage limit has been reached","type":"invalid_request_error","code":"usage_limit_reached"}}}
+
+            """.trimIndent(),
+          ),
+      )
+      server.start()
+
+      try {
+        val context = RuntimeEnvironment.getApplication()
+        val prefs = securePrefs(context, name = "openclaw.node.secure.test.codex.responses.stream.error")
+        prefs.saveOpenAICodexCredential(
+          OpenAICodexCredential(
+            access = fakeJwt(accountId = "acct_123", email = "person@example.com"),
+            refresh = "refresh-token",
+            expires = System.currentTimeMillis() + 60_000,
+            accountId = "acct_123",
+            email = "person@example.com",
+          ),
+        )
+
+        val client =
+          OpenAICodexResponsesClient(
+            prefs = prefs,
+            json = json,
+            client = OkHttpClient(),
+            responsesUrl = server.url("/backend-api/codex/responses").toString(),
+          )
+
+        try {
+          client.streamReply(
+            role = "operator",
+            sessionId = "session-123",
+            messages =
+              listOf(
+                LocalHostMessage(
+                  role = "user",
+                  content = listOf(ChatMessageContent(type = "text", text = "Reply exactly once.")),
+                  timestampMs = 1L,
+                ),
+              ),
+            thinkingLevel = "off",
+            onTextDelta = {},
+            onToolEvent = {},
+          )
+          fail("Expected streamReply to throw on a response.failed SSE event")
+        } catch (error: IllegalStateException) {
+          assertTrue(error.message.orEmpty().contains("OpenAI Codex request failed"))
+          assertTrue(error.message.orEmpty().contains("The usage limit has been reached"))
+          assertTrue(error.message.orEmpty().contains("errorType=invalid_request_error"))
+          assertTrue(error.message.orEmpty().contains("errorCode=usage_limit_reached"))
+        }
+      } finally {
+        server.shutdown()
+      }
+    }
+
+  @Test
   fun streamReply_replaysToolImagesAsInputImages() =
     runTest {
       val server = MockWebServer()

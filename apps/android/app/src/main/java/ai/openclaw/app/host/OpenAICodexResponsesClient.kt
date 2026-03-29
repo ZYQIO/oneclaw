@@ -332,12 +332,31 @@ class OpenAICodexResponsesClient(
           }
           "response.failed" -> {
             val error = root["response"].asObjectOrNull()?.get("error").asObjectOrNull()
-            val message = error?.get("message").asStringOrNull() ?: "OpenAI Codex request failed"
-            throw IllegalStateException(message)
+            val message = error?.get("message").asStringOrNull()
+            throw IllegalStateException(
+              formatCodexRequestFailure(
+                message = message,
+                detailSegments =
+                  buildList {
+                    error?.get("details").asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add(it) }
+                    error?.get("type").asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("errorType=$it") }
+                    error?.get("code").asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("errorCode=$it") }
+                  },
+              ),
+            )
           }
           "error" -> {
-            val message = root["message"].asStringOrNull() ?: "OpenAI Codex request failed"
-            throw IllegalStateException(message)
+            val message = root["message"].asStringOrNull()
+            throw IllegalStateException(
+              formatCodexRequestFailure(
+                message = message,
+                detailSegments =
+                  buildList {
+                    root["type"].asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("type=$it") }
+                    root["code"].asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("errorCode=$it") }
+                  },
+              ),
+            )
           }
         }
       }
@@ -635,6 +654,33 @@ class OpenAICodexResponsesClient(
     }.joinToString(separator = "")
   }
 
+  private fun formatCodexRequestFailure(
+    statusCode: Int? = null,
+    message: String? = null,
+    detailSegments: List<String> = emptyList(),
+    metadataSegments: List<String> = emptyList(),
+    bodyPreview: String? = null,
+  ): String {
+    val prefix =
+      if (statusCode != null) {
+        "OpenAI Codex request failed ($statusCode)"
+      } else {
+        "OpenAI Codex request failed"
+      }
+    val segments =
+      buildList {
+        message?.trim()?.takeIf { it.isNotEmpty() && !it.equals(prefix, ignoreCase = true) }?.let { add(it) }
+        detailSegments.mapNotNull { it.trim().takeIf(String::isNotEmpty) }.forEach { add(it) }
+        metadataSegments.mapNotNull { it.trim().takeIf(String::isNotEmpty) }.forEach { add(it) }
+        bodyPreview?.trim()?.takeIf(String::isNotEmpty)?.let { add("body=$it") }
+      }.distinct()
+    return if (segments.isEmpty()) {
+      prefix
+    } else {
+      "$prefix | ${segments.joinToString(separator = " | ")}"
+    }
+  }
+
   private fun parseCodexError(
     statusCode: Int,
     body: String,
@@ -647,13 +693,9 @@ class OpenAICodexResponsesClient(
         requestId?.trim()?.takeIf { it.isNotEmpty() }?.let { add("requestId=$it") }
         contentType?.trim()?.takeIf { it.isNotEmpty() }?.let { add("contentType=$it") }
         responseMessage?.trim()?.takeIf { it.isNotEmpty() }?.let { add("message=$it") }
-      }.joinToString(separator = ", ")
-    if (body.isBlank()) {
-      return if (metadata.isNotEmpty()) {
-        "OpenAI Codex request failed ($statusCode; $metadata)"
-      } else {
-        "OpenAI Codex request failed ($statusCode)"
       }
+    if (body.isBlank()) {
+      return formatCodexRequestFailure(statusCode = statusCode, metadataSegments = metadata)
     }
     return try {
       val root = json.parseToJsonElement(body) as? JsonObject
@@ -664,37 +706,23 @@ class OpenAICodexResponsesClient(
           error?.get("code").asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("errorCode=$it") }
           error?.get("param").asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("param=$it") }
           root?.get("type").asStringOrNull()?.takeIf { it.isNotEmpty() }?.let { add("type=$it") }
-        }.joinToString(separator = ", ")
+        }
       val detailText = error?.get("details").asStringOrNull() ?: root?.get("details").asStringOrNull()
       val message = error?.get("message").asStringOrNull() ?: root?.get("message").asStringOrNull()
-      if (!message.isNullOrBlank()) {
-        return buildList {
-          add(message)
-          if (detailText?.isNotBlank() == true) add(detailText)
-          if (detailParts.isNotEmpty()) add(detailParts)
-          if (metadata.isNotEmpty()) add(metadata)
-        }.joinToString(separator = " | ")
-      }
-
-      val bodyPreview = body.take(240)
-      buildList {
-        add("OpenAI Codex request failed ($statusCode)")
-        if (detailText?.isNotBlank() == true) add(detailText)
-        if (detailParts.isNotEmpty()) add(detailParts)
-        if (metadata.isNotEmpty()) add(metadata)
-        add("body=$bodyPreview")
-      }.joinToString(separator = " | ")
+      formatCodexRequestFailure(
+        statusCode = statusCode,
+        message = message,
+        detailSegments = listOfNotNull(detailText) + detailParts,
+        metadataSegments = metadata,
+        bodyPreview = if (message.isNullOrBlank() && detailText.isNullOrBlank() && detailParts.isEmpty()) body.take(240) else null,
+      )
     } catch (_: Throwable) {
-      if (statusCode == 429) {
-        "OpenAI Codex request was rate limited"
-      } else {
-        val bodyPreview = body.take(200)
-        if (metadata.isNotEmpty()) {
-          "$bodyPreview ($metadata)"
-        } else {
-          bodyPreview
-        }
-      }
+      formatCodexRequestFailure(
+        statusCode = statusCode,
+        detailSegments = if (statusCode == 429) listOf("Too Many Requests") else emptyList(),
+        metadataSegments = metadata,
+        bodyPreview = body.take(200),
+      )
     }
   }
 }

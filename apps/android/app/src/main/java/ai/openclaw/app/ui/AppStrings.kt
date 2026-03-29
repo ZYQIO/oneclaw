@@ -11,7 +11,7 @@ private val gatewayErrorRegex = Regex("""^Gateway error: (.+)$""", RegexOption.I
 private val gatewayClosedRegex = Regex("""^Gateway closed: (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayClosedWithCodeRegex = Regex("""^gateway closed \((\d+)\): (.+)$""", RegexOption.IGNORE_CASE)
 private val gatewayAuthHintRegex = Regex("""^unauthorized: gateway (token|password) (missing|mismatch) \((.+)\)$""", RegexOption.IGNORE_CASE)
-private val codexRequestFailedRegex = Regex("""^OpenAI Codex request failed \((.+)\)$""")
+private val codexRequestFailedRegex = Regex("""^OpenAI Codex request failed(?: \(([^)]+)\))?(?:\s*\|\s*(.+))?$""")
 private val usageLimitRegex = Regex("""^The usage limit has been reached(?:\s*\|\s*errorType=(.+))?$""", RegexOption.IGNORE_CASE)
 
 internal val LocalAppLanguage = staticCompositionLocalOf { AppLanguage.English }
@@ -422,7 +422,32 @@ internal fun localizeChatError(
   translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed }?.let { return it }
 
   codexRequestFailedRegex.matchEntire(trimmed)?.let { match ->
-    return language.pick(trimmed, "OpenAI Codex 请求失败（${match.groupValues[1]}）")
+    val statusMetadata = match.groupValues.getOrNull(1)?.trim().orEmpty()
+    val detailText = match.groupValues.getOrNull(2)?.trim().orEmpty()
+    val localizedPrefix =
+      if (statusMetadata.isNotEmpty()) {
+        "OpenAI Codex 请求失败（$statusMetadata）"
+      } else {
+        "OpenAI Codex 请求失败"
+      }
+    if (detailText.isEmpty()) {
+      return language.pick(trimmed, localizedPrefix)
+    }
+    val localizedDetail =
+      detailText
+        .split("|")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString(separator = " | ") { segment ->
+          when {
+            segment.startsWith("message=") ->
+              "message=${localizeChatErrorSegmentValue(language, segment.substringAfter("="))}"
+            segment.startsWith("body=") ->
+              "响应正文=${segment.substringAfter("=")}"
+            else -> localizeChatErrorSegmentValue(language, segment)
+          }
+        }
+    return language.pick(trimmed, "$localizedPrefix | $localizedDetail")
   }
   usageLimitRegex.matchEntire(trimmed)?.let { match ->
     val errorType = match.groupValues.getOrNull(1)?.trim().orEmpty()
@@ -456,5 +481,22 @@ internal fun localizeChatError(
     "OpenAI Codex request was rate limited" ->
       language.pick(trimmed, "OpenAI Codex 请求触发了速率限制。")
     else -> trimmed
+  }
+}
+
+private fun localizeChatErrorSegmentValue(
+  language: AppLanguage,
+  raw: String,
+): String {
+  val trimmed = raw.trim()
+  return when (trimmed) {
+    "Bad Request" -> language.pick(trimmed, "请求无效")
+    "Forbidden" -> language.pick(trimmed, "已拒绝")
+    "instructions must be set" -> language.pick(trimmed, "必须提供 instructions。")
+    "Internal Server Error" -> language.pick(trimmed, "服务器内部错误")
+    "The usage limit has been reached" -> language.pick(trimmed, "已达到使用额度上限")
+    "Too Many Requests" -> language.pick(trimmed, "请求过多")
+    "Unauthorized" -> language.pick(trimmed, "未授权")
+    else -> translateKnownCodexMessage(language, trimmed).takeIf { it != trimmed } ?: trimmed
   }
 }

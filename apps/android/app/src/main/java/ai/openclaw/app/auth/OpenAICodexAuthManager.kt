@@ -521,42 +521,6 @@ private fun localizeOauthBrowserMessage(message: String): String? {
   return localizeOpenAICodexAuthCopy(message)
 }
 
-internal fun localizeOpenAICodexAuthCopy(message: String): String? {
-  return when (message.trim()) {
-    "Browser opened. Finish sign-in there. OpenClaw should return automatically after the callback. If it doesn't, use Return to OpenClaw in the browser page or paste the redirect URL or code below." ->
-      "浏览器已打开，请在浏览器中完成登录。回调后 OpenClaw 应该会自动返回。如果没有返回，请在浏览器页点击“返回 OpenClaw”或在下方粘贴重定向 URL 或代码。"
-    "Couldn't bind the localhost callback. Finish sign-in in the browser, then paste the redirect URL or code below." ->
-      "无法绑定本地回调。请在浏览器中完成登录，然后粘贴重定向 URL 或代码。"
-    "No browser is available for OpenAI sign-in." ->
-      "当前没有可用的浏览器来完成 OpenAI 登录。"
-    "Failed to open the OpenAI sign-in page." ->
-      "无法打开 OpenAI 登录页面。"
-    "No OpenAI sign-in is currently running." ->
-      "当前没有正在进行的 OpenAI 登录。"
-    "State mismatch. Start sign-in again and retry." ->
-      "state 不匹配，请重新开始登录后再试。"
-    "Paste the redirect URL or authorization code from the browser." ->
-      "请粘贴浏览器中的重定向 URL 或授权码。"
-    "Exchanging authorization code…" ->
-      "正在交换授权码…"
-    "OpenAI Codex is connected." ->
-      "OpenAI Codex 已连接。"
-    "OpenAI sign-in failed." ->
-      "OpenAI 登录失败。"
-    "OpenAI authentication completed. You can close this window." ->
-      "OpenAI 授权已完成。你可以关闭这个窗口。"
-    "Only loopback callbacks are allowed." ->
-      "只允许 loopback 回调。"
-    "Callback route not found." ->
-      "未找到回调路由。"
-    "State mismatch." ->
-      "state 不匹配。"
-    "Missing authorization code." ->
-      "缺少授权码。"
-    else -> null
-  }
-}
-
 private fun escapeHtml(value: String): String {
   return value
     .replace("&", "&amp;")
