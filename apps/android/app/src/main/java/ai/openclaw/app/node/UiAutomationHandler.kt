@@ -3,6 +3,7 @@ package ai.openclaw.app.node
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.SystemClock
 import ai.openclaw.app.accessibility.LocalHostUiAutomationStatus
 import ai.openclaw.app.accessibility.UiAutomationInputTextRequest
@@ -143,23 +144,24 @@ class UiAutomationHandler(
     ): UiAutomationLaunchAppResult {
       val normalizedPackageName = packageName.trim()
       val packageManager = appContext.packageManager
-      if (!isPackageInstalled(packageManager, normalizedPackageName)) {
+      val launchIntent =
+        resolveLaunchIntentForPackage(packageManager, normalizedPackageName)
+      if (launchIntent == null) {
+        if (!isPackageInstalled(packageManager, normalizedPackageName)) {
+          return UiAutomationLaunchAppResult(
+            launched = false,
+            packageName = normalizedPackageName,
+            errorCode = "APP_NOT_INSTALLED",
+            reason = "Package `$normalizedPackageName` is not installed on this device.",
+          )
+        }
         return UiAutomationLaunchAppResult(
           launched = false,
           packageName = normalizedPackageName,
-          errorCode = "APP_NOT_INSTALLED",
-          reason = "Package `$normalizedPackageName` is not installed on this device.",
+          errorCode = "APP_NOT_LAUNCHABLE",
+          reason = "Package `$normalizedPackageName` is installed but has no launchable activity.",
         )
       }
-
-      val launchIntent =
-        packageManager.getLaunchIntentForPackage(normalizedPackageName)
-          ?: return UiAutomationLaunchAppResult(
-            launched = false,
-            packageName = normalizedPackageName,
-            errorCode = "APP_NOT_LAUNCHABLE",
-            reason = "Package `$normalizedPackageName` is installed but has no launchable activity.",
-          )
       val intent =
         Intent(launchIntent).apply {
           addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -184,6 +186,30 @@ class UiAutomationHandler(
       }
     }
 
+    internal fun resolveLaunchIntentForPackage(
+      packageManager: PackageManager,
+      packageName: String,
+    ): Intent? {
+      packageManager.getLaunchIntentForPackage(packageName)?.let { return Intent(it) }
+
+      val queryIntent =
+        Intent(Intent.ACTION_MAIN).apply {
+          addCategory(Intent.CATEGORY_LAUNCHER)
+          setPackage(packageName)
+        }
+      val launcherActivity =
+        queryIntentActivitiesCompat(packageManager, queryIntent)
+          .firstNotNullOfOrNull { it.activityInfo }
+          ?: return null
+      val activityPackageName = launcherActivity.packageName.ifBlank { packageName }
+
+      return Intent(Intent.ACTION_MAIN).apply {
+        addCategory(Intent.CATEGORY_LAUNCHER)
+        setClassName(activityPackageName, launcherActivity.name)
+        `package` = activityPackageName
+      }
+    }
+
     @Suppress("DEPRECATION")
     private fun isPackageInstalled(
       packageManager: PackageManager,
@@ -195,6 +221,19 @@ class UiAutomationHandler(
       } catch (_: PackageManager.NameNotFoundException) {
         false
       }
+    }
+
+    private fun queryIntentActivitiesCompat(
+      packageManager: PackageManager,
+      intent: Intent,
+    ) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      packageManager.queryIntentActivities(
+        intent,
+        PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+      )
+    } else {
+      @Suppress("DEPRECATION")
+      packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
     }
   }
 

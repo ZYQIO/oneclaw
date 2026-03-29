@@ -343,6 +343,7 @@ The UI smoke script verifies `/status` plus `/invoke/capabilities`, foregrounds 
 - Use `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=...` only when you also want an optional follow-up probe for the current cross-app freeze boundary.
 - On March 28, 2026, the dedicated 5-second cross-app probe against `com.android.settings` classified as `foregrounded_host_reachable`: the target package reached the true foreground, all 10 `/status` probes still succeeded, and adb recovery brought OpenClaw cleanly back. Treat any later timeouts after a longer background stay as a separate OEM boundary, not as evidence that the in-app smoke regressed.
 - On March 29, 2026, the same in-app smoke needed one selector hardening on the current OPPO / ColorOS phone: tapping the bottom-nav `text=Chat` label stopped switching tabs reliably, while `contentDescription=Chat` remained stable. The repo baseline now uses that selector so `pnpm android:local-host:ui` stays green on-device.
+- Later on March 29, 2026, `ui.launchApp` was also hardened for vendor system apps: the Android manifest now declares `MAIN/LAUNCHER` package-visibility `queries`, and the app-side resolver now falls back to an explicit launcher query when `getLaunchIntentForPackage` misses. On the current OPPO / ColorOS phone, that turned prior false `APP_NOT_INSTALLED` results for `com.coloros.calculator` and `com.coloros.filemanager` back into successful launches, and Calculator then also passed a 4-second cross-app probe as `foregrounded_host_reachable`.
 
 ## Local Host Cross-App Probe
 
