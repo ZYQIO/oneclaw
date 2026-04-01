@@ -12,12 +12,16 @@ POST_STDOUT="$ARTIFACT_DIR/post-provision.stdout.txt"
 NEXT_STDOUT="$ARTIFACT_DIR/next.stdout.txt"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
 JSON=false
+DESCRIBE_ONLY=false
+ASSUME_ACTION=""
 
 usage() {
   cat <<'EOF'
 Usage:
   ./apps/android/scripts/local-host-dedicated-post-provision-next.sh
   ./apps/android/scripts/local-host-dedicated-post-provision-next.sh --json
+  ./apps/android/scripts/local-host-dedicated-post-provision-next.sh --describe
+  ./apps/android/scripts/local-host-dedicated-post-provision-next.sh --describe --assume-action launch-openclaw
 
 What it does:
   1. Runs the dedicated post-provision checker
@@ -28,6 +32,7 @@ What it does:
 Notes:
   - The wrapper only runs dry-run-safe follow-up commands
   - Stateful flags like `--apply` still need to be run manually on the underlying helper
+  - --describe stays offline and previews the wrapper layout plus optional assumed next action
 EOF
 }
 
@@ -40,6 +45,18 @@ while [[ $# -gt 0 ]]; do
     --json)
       JSON=true
       shift
+      ;;
+    --describe)
+      DESCRIBE_ONLY=true
+      shift
+      ;;
+    --assume-action)
+      if [[ $# -lt 2 ]]; then
+        echo "--assume-action requires a value." >&2
+        exit 1
+      fi
+      ASSUME_ACTION=$2
+      shift 2
       ;;
     --)
       shift
@@ -66,6 +83,26 @@ bool_json() {
   else
     printf 'false'
   fi
+}
+
+command_for_action() {
+  case "${1:-}" in
+    testdpc-qr)
+      printf 'pnpm android:local-host:dedicated:testdpc-qr'
+      ;;
+    testdpc-kiosk)
+      printf 'pnpm android:local-host:dedicated:testdpc-kiosk'
+      ;;
+    launch-openclaw)
+      printf 'pnpm android:local-host:dedicated:post-provision -- --launch'
+      ;;
+    healthy)
+      printf ''
+      ;;
+    *)
+      printf ''
+      ;;
+  esac
 }
 
 script_for_action() {
@@ -98,6 +135,93 @@ args_for_action() {
 
 require_cmd bash
 require_cmd jq
+
+if [[ -n "$ASSUME_ACTION" ]]; then
+  if [[ "$DESCRIBE_ONLY" != "true" ]]; then
+    echo "--assume-action is only supported together with --describe." >&2
+    exit 1
+  fi
+  case "$ASSUME_ACTION" in
+    testdpc-qr|testdpc-kiosk|launch-openclaw|healthy)
+      ;;
+    *)
+      echo "Unsupported assumed action: $ASSUME_ACTION" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+if [[ "$DESCRIBE_ONLY" == "true" ]]; then
+  jq -n \
+    --arg script "local-host-dedicated-post-provision-next.sh" \
+    --arg command "./apps/android/scripts/local-host-dedicated-post-provision-next.sh" \
+    --arg packageCommand "pnpm android:local-host:dedicated:post-provision:next" \
+    --arg artifactRoot "$ARTIFACT_DIR" \
+    --arg summaryPath "$SUMMARY_JSON" \
+    --arg postProvisionScript "$POST_PROVISION_SCRIPT" \
+    --arg postProvisionPackageCommand "pnpm android:local-host:dedicated:post-provision" \
+    --arg postProvisionSummaryPath "$POST_DIR/summary.json" \
+    --arg postProvisionStdoutPath "$POST_STDOUT" \
+    --arg nextSummaryPath "$NEXT_DIR/summary.json" \
+    --arg nextStdoutPath "$NEXT_STDOUT" \
+    --arg assumedAction "$ASSUME_ACTION" \
+    --arg assumedCommand "$(command_for_action "$ASSUME_ACTION")" \
+    --arg assumedScript "$(script_for_action "$ASSUME_ACTION")" \
+    --arg assumedScriptArg "$(args_for_action "$ASSUME_ACTION")" \
+    --arg testdpcQrScript "$TESTDPC_QR_SCRIPT" \
+    --arg testdpcKioskScript "$TESTDPC_KIOSK_SCRIPT" \
+    '{
+      script: $script,
+      command: $command,
+      packageCommand: $packageCommand,
+      mode: "post-provision-next",
+      artifactRoot: $artifactRoot,
+      summaryPath: $summaryPath,
+      describeOnly: true,
+      note: "Actual recommendedAction and recommendedCommand come from the post-provision summary at runtime.",
+      postProvision: {
+        packageCommand: $postProvisionPackageCommand,
+        scriptPath: $postProvisionScript,
+        summaryPath: $postProvisionSummaryPath,
+        stdoutPath: $postProvisionStdoutPath
+      },
+      next: {
+        assumedAction: (if $assumedAction == "" then null else $assumedAction end),
+        assumedCommand: (if $assumedCommand == "" then null else $assumedCommand end),
+        scriptPath: (if $assumedScript == "" then null else $assumedScript end),
+        scriptArg: (if $assumedScriptArg == "" then null else $assumedScriptArg end),
+        summaryPath: $nextSummaryPath,
+        stdoutPath: $nextStdoutPath
+      },
+      actionMap: {
+        "testdpc-qr": {
+          packageCommand: "pnpm android:local-host:dedicated:testdpc-qr",
+          scriptPath: $testdpcQrScript,
+          scriptArg: null
+        },
+        "testdpc-kiosk": {
+          packageCommand: "pnpm android:local-host:dedicated:testdpc-kiosk",
+          scriptPath: $testdpcKioskScript,
+          scriptArg: null
+        },
+        "launch-openclaw": {
+          packageCommand: "pnpm android:local-host:dedicated:post-provision -- --launch",
+          scriptPath: $postProvisionScript,
+          scriptArg: "--launch"
+        },
+        healthy: {
+          packageCommand: null,
+          scriptPath: null,
+          scriptArg: null
+        }
+      },
+      artifacts: {
+        postProvisionDir: "post-provision",
+        nextDir: "next"
+      }
+    }'
+  exit 0
+fi
 
 mkdir -p "$ARTIFACT_DIR" "$POST_DIR"
 
@@ -154,6 +278,12 @@ fi
 
 jq "${jq_args[@]}" '
   {
+    script: "local-host-dedicated-post-provision-next.sh",
+    command: "./apps/android/scripts/local-host-dedicated-post-provision-next.sh",
+    packageCommand: "pnpm android:local-host:dedicated:post-provision:next",
+    mode: "post-provision-next",
+    artifactRoot: $artifactDir,
+    describeOnly: false,
     postProvision: $postSummary[0],
     next: {
       action: (if $recommendedAction == "" then null else $recommendedAction end),

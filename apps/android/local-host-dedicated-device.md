@@ -2,7 +2,7 @@
 
 Purpose / 用途: turn the vague question of "can we make a spare phone more system-like?" into a concrete deployment ladder and an operator checklist. / 把“能不能把闲置手机做得更像系统级部署”这个模糊问题，整理成具体的部署梯度和操作清单。
 
-Last updated / 最后更新: March 28, 2026 / 2026 年 3 月 28 日
+Last updated / 最后更新: April 1, 2026 / 2026 年 4 月 1 日
 
 ## Short Answer / 简短结论
 
@@ -28,6 +28,8 @@ For the factory-reset path that Android officially prefers on dedicated devices,
 There is now also a post-provision checker at `apps/android/scripts/local-host-dedicated-post-provision-check.sh`, exposed as `pnpm android:local-host:dedicated:post-provision`. It inspects adb owner state, lock-task state, launcher resolution, and OpenClaw's plain `shared_prefs` via `run-as` when available, so the project can tell whether the remaining gap is still DPC provisioning or already inside the app. / 现在还新增了一条 post-provision checker：`apps/android/scripts/local-host-dedicated-post-provision-check.sh`，命令入口为 `pnpm android:local-host:dedicated:post-provision`。它会同时检查 adb 的 owner / lock-task 状态、launcher resolution，以及在可用时通过 `run-as` 读取 OpenClaw 的明文 `shared_prefs`，从而把“剩余差距还在 DPC provisioning”还是“已经进入 app 内部问题”区分开。
 
 There is now also a TestDPC kiosk helper at `apps/android/scripts/local-host-dedicated-testdpc-kiosk.sh`, exposed as `pnpm android:local-host:dedicated:testdpc-kiosk`. It defaults to dry-run mode, reuses the post-provision checker, prints the exact adb commands for TestDPC's kiosk flow, and only mutates the device when `--apply` is passed explicitly. / 现在还新增了一条 TestDPC kiosk helper：`apps/android/scripts/local-host-dedicated-testdpc-kiosk.sh`，命令入口为 `pnpm android:local-host:dedicated:testdpc-kiosk`。它默认只做 dry-run，会复用 post-provision checker，输出 TestDPC kiosk 流程所需的精确 adb 命令，只有显式传入 `--apply` 时才会真正修改设备状态。
+
+The two wrapper entrypoints `pnpm android:local-host:dedicated:next` and `pnpm android:local-host:dedicated:post-provision:next` now also support `-- --describe` for an offline preview of their wrapper layout, artifact paths, and downstream action map. Add `-- --assume-action <action>` when you want to inspect one specific dry-run lane such as `testdpc-install` or `launch-openclaw` without running adb-dependent checks first. / 两个 wrapper 入口 `pnpm android:local-host:dedicated:next` 和 `pnpm android:local-host:dedicated:post-provision:next` 现在也都支持 `-- --describe`，可离线预览 wrapper 结构、artifact 路径和下游 action map；如果想在不跑 adb 依赖检查的前提下预览某一条具体 dry-run 路径，还可以加 `-- --assume-action <action>`，例如 `testdpc-install` 或 `launch-openclaw`。
 
 Its March 28, 2026 run on the currently connected spare OPPO phone produced: / 2026 年 3 月 28 日它在当前接入的闲置 OPPO 手机上跑出的结果是：
 
@@ -179,6 +181,13 @@ Dedicated readiness:
 pnpm android:local-host:dedicated:readiness
 ```
 
+Preview the readiness wrapper offline:
+
+```bash
+pnpm android:local-host:dedicated:next -- --describe
+pnpm android:local-host:dedicated:next -- --describe --assume-action testdpc-install
+```
+
 Device-owner dry-run:
 
 ```bash
@@ -222,6 +231,13 @@ Check post-provision dedicated readiness:
 
 ```bash
 pnpm android:local-host:dedicated:post-provision
+```
+
+Preview the post-provision wrapper offline:
+
+```bash
+pnpm android:local-host:dedicated:post-provision:next -- --describe
+pnpm android:local-host:dedicated:post-provision:next -- --describe --assume-action launch-openclaw
 ```
 
 Check post-provision dedicated readiness and relaunch OpenClaw:

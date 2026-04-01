@@ -22,6 +22,19 @@ const scriptPath = path.join(
 );
 const tempRoots: string[] = [];
 
+function runDescribe(args: string[] = [], env: NodeJS.ProcessEnv = {}) {
+  const result = spawnSync("bash", [scriptPath, "--describe", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env,
+    },
+  });
+  expect(result.status).toBe(0);
+  return JSON.parse(result.stdout);
+}
+
 function writeExecutableScript(filePath: string, content: string) {
   writeFileSync(filePath, content);
   chmodSync(filePath, 0o755);
@@ -126,6 +139,36 @@ afterEach(() => {
 });
 
 describe("local-host-dedicated-next", () => {
+  it("describes the wrapper layout without touching adb-dependent helpers", () => {
+    const summary = runDescribe([], {
+      OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR: "/tmp/openclaw-dedicated-next-describe",
+      OPENCLAW_ANDROID_LOCAL_HOST_DEDICATED_READINESS_SCRIPT: "/tmp/readiness.sh",
+      OPENCLAW_ANDROID_LOCAL_HOST_DEDICATED_TESTDPC_INSTALL_SCRIPT:
+        "/tmp/testdpc-install.sh",
+    });
+
+    expect(summary.describeOnly).toBe(true);
+    expect(summary.packageCommand).toBe("pnpm android:local-host:dedicated:next");
+    expect(summary.readiness.scriptPath).toBe("/tmp/readiness.sh");
+    expect(summary.next.assumedAction).toBeNull();
+    expect(summary.actionMap["testdpc-install"].scriptPath).toBe(
+      "/tmp/testdpc-install.sh",
+    );
+    expect(summary.artifacts.readinessDir).toBe("readiness");
+  });
+
+  it("can preview an assumed next action offline", () => {
+    const summary = runDescribe(["--assume-action", "testdpc-qr"], {
+      OPENCLAW_ANDROID_LOCAL_HOST_DEDICATED_TESTDPC_QR_SCRIPT: "/tmp/testdpc-qr.sh",
+    });
+
+    expect(summary.next.assumedAction).toBe("testdpc-qr");
+    expect(summary.next.assumedCommand).toBe(
+      "pnpm android:local-host:dedicated:testdpc-qr",
+    );
+    expect(summary.next.scriptPath).toBe("/tmp/testdpc-qr.sh");
+  });
+
   it("reuses readiness and runs the recommended device-owner dry-run", () => {
     const { result, summary } = runScenario({
       readinessSummary: {
@@ -186,6 +229,7 @@ describe("local-host-dedicated-next", () => {
     });
 
     const parsed = JSON.parse(result.stdout);
+    expect(parsed.packageCommand).toBe("pnpm android:local-host:dedicated:next");
     expect(parsed.next.action).toBe("testdpc-qr");
     expect(parsed.next.summary.checksumMode).toBe("package");
   });

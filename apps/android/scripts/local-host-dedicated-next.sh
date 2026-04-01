@@ -14,12 +14,16 @@ READINESS_STDOUT="$ARTIFACT_DIR/readiness.stdout.txt"
 NEXT_STDOUT="$ARTIFACT_DIR/next.stdout.txt"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
 JSON=false
+DESCRIBE_ONLY=false
+ASSUME_ACTION=""
 
 usage() {
   cat <<'EOF'
 Usage:
   ./apps/android/scripts/local-host-dedicated-next.sh
   ./apps/android/scripts/local-host-dedicated-next.sh --json
+  ./apps/android/scripts/local-host-dedicated-next.sh --describe
+  ./apps/android/scripts/local-host-dedicated-next.sh --describe --assume-action testdpc-install
 
 What it does:
   1. Runs the dedicated readiness probe
@@ -31,6 +35,7 @@ Notes:
   - This wrapper keeps the recommended next step in dry-run mode
   - Stateful flags such as --apply still need to be run manually on the underlying command
   - Artifacts live under OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR or a temp directory
+  - --describe stays offline and only previews the wrapper layout plus optional assumed next action
 EOF
 }
 
@@ -43,6 +48,18 @@ while [[ $# -gt 0 ]]; do
     --json)
       JSON=true
       shift
+      ;;
+    --describe)
+      DESCRIBE_ONLY=true
+      shift
+      ;;
+    --assume-action)
+      if [[ $# -lt 2 ]]; then
+        echo "--assume-action requires a value." >&2
+        exit 1
+      fi
+      ASSUME_ACTION=$2
+      shift 2
       ;;
     --)
       shift
@@ -71,6 +88,26 @@ bool_json() {
   fi
 }
 
+command_for_action() {
+  case "${1:-}" in
+    device-owner)
+      printf 'pnpm android:local-host:dedicated:device-owner'
+      ;;
+    testdpc-install)
+      printf 'pnpm android:local-host:dedicated:testdpc-install'
+      ;;
+    testdpc-qr)
+      printf 'pnpm android:local-host:dedicated:testdpc-qr'
+      ;;
+    post-provision)
+      printf 'pnpm android:local-host:dedicated:post-provision'
+      ;;
+    *)
+      printf ''
+      ;;
+  esac
+}
+
 script_for_action() {
   case "${1:-}" in
     device-owner)
@@ -93,6 +130,87 @@ script_for_action() {
 
 require_cmd bash
 require_cmd jq
+
+if [[ -n "$ASSUME_ACTION" ]]; then
+  if [[ "$DESCRIBE_ONLY" != "true" ]]; then
+    echo "--assume-action is only supported together with --describe." >&2
+    exit 1
+  fi
+  if [[ -z "$(script_for_action "$ASSUME_ACTION")" ]]; then
+    echo "Unsupported assumed action: $ASSUME_ACTION" >&2
+    exit 1
+  fi
+fi
+
+if [[ "$DESCRIBE_ONLY" == "true" ]]; then
+  jq -n \
+    --arg script "local-host-dedicated-next.sh" \
+    --arg command "./apps/android/scripts/local-host-dedicated-next.sh" \
+    --arg packageCommand "pnpm android:local-host:dedicated:next" \
+    --arg artifactRoot "$ARTIFACT_DIR" \
+    --arg summaryPath "$SUMMARY_JSON" \
+    --arg readinessScript "$READINESS_SCRIPT" \
+    --arg readinessPackageCommand "pnpm android:local-host:dedicated:readiness" \
+    --arg readinessSummaryPath "$READINESS_DIR/summary.json" \
+    --arg readinessStdoutPath "$READINESS_STDOUT" \
+    --arg nextDir "$NEXT_DIR" \
+    --arg nextSummaryPath "$NEXT_DIR/summary.json" \
+    --arg nextStdoutPath "$NEXT_STDOUT" \
+    --arg assumedAction "$ASSUME_ACTION" \
+    --arg assumedCommand "$(command_for_action "$ASSUME_ACTION")" \
+    --arg assumedScript "$(script_for_action "$ASSUME_ACTION")" \
+    --arg deviceOwnerScript "$DEVICE_OWNER_SCRIPT" \
+    --arg testdpcInstallScript "$TESTDPC_INSTALL_SCRIPT" \
+    --arg testdpcQrScript "$TESTDPC_QR_SCRIPT" \
+    --arg postProvisionScript "$POST_PROVISION_SCRIPT" \
+    '{
+      script: $script,
+      command: $command,
+      packageCommand: $packageCommand,
+      mode: "readiness-next",
+      artifactRoot: $artifactRoot,
+      summaryPath: $summaryPath,
+      describeOnly: true,
+      note: "Actual recommendedAction and recommendedCommand come from the readiness summary at runtime.",
+      readiness: {
+        packageCommand: $readinessPackageCommand,
+        scriptPath: $readinessScript,
+        summaryPath: $readinessSummaryPath,
+        stdoutPath: $readinessStdoutPath
+      },
+      next: {
+        assumedAction: (if $assumedAction == "" then null else $assumedAction end),
+        assumedCommand: (if $assumedCommand == "" then null else $assumedCommand end),
+        scriptPath: (if $assumedScript == "" then null else $assumedScript end),
+        scriptArg: null,
+        summaryPath: $nextSummaryPath,
+        stdoutPath: $nextStdoutPath
+      },
+      actionMap: {
+        "device-owner": {
+          packageCommand: "pnpm android:local-host:dedicated:device-owner",
+          scriptPath: $deviceOwnerScript
+        },
+        "testdpc-install": {
+          packageCommand: "pnpm android:local-host:dedicated:testdpc-install",
+          scriptPath: $testdpcInstallScript
+        },
+        "testdpc-qr": {
+          packageCommand: "pnpm android:local-host:dedicated:testdpc-qr",
+          scriptPath: $testdpcQrScript
+        },
+        "post-provision": {
+          packageCommand: "pnpm android:local-host:dedicated:post-provision",
+          scriptPath: $postProvisionScript
+        }
+      },
+      artifacts: {
+        readinessDir: "readiness",
+        nextDir: "next"
+      }
+    }'
+  exit 0
+fi
 
 mkdir -p "$ARTIFACT_DIR" "$READINESS_DIR"
 
@@ -142,6 +260,12 @@ fi
 
 jq "${jq_args[@]}" '
   {
+    script: "local-host-dedicated-next.sh",
+    command: "./apps/android/scripts/local-host-dedicated-next.sh",
+    packageCommand: "pnpm android:local-host:dedicated:next",
+    mode: "readiness-next",
+    artifactRoot: $artifactDir,
+    describeOnly: false,
     readiness: $readiness[0],
     next: {
       action: (if $recommendedAction == "" then null else $recommendedAction end),

@@ -22,6 +22,19 @@ const scriptPath = path.join(
 );
 const tempRoots: string[] = [];
 
+function runDescribe(args: string[] = [], env: NodeJS.ProcessEnv = {}) {
+  const result = spawnSync("bash", [scriptPath, "--describe", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env,
+    },
+  });
+  expect(result.status).toBe(0);
+  return JSON.parse(result.stdout);
+}
+
 function writeExecutableScript(filePath: string, content: string) {
   writeFileSync(filePath, content);
   chmodSync(filePath, 0o755);
@@ -124,6 +137,42 @@ afterEach(() => {
 });
 
 describe("local-host-dedicated-post-provision-next", () => {
+  it("describes the wrapper layout without requiring a connected device", () => {
+    const summary = runDescribe([], {
+      OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:
+        "/tmp/openclaw-dedicated-post-provision-describe",
+      OPENCLAW_ANDROID_LOCAL_HOST_DEDICATED_POST_PROVISION_SCRIPT:
+        "/tmp/post-provision.sh",
+      OPENCLAW_ANDROID_LOCAL_HOST_DEDICATED_TESTDPC_KIOSK_SCRIPT:
+        "/tmp/testdpc-kiosk.sh",
+    });
+
+    expect(summary.describeOnly).toBe(true);
+    expect(summary.packageCommand).toBe(
+      "pnpm android:local-host:dedicated:post-provision:next",
+    );
+    expect(summary.postProvision.scriptPath).toBe("/tmp/post-provision.sh");
+    expect(summary.next.assumedAction).toBeNull();
+    expect(summary.actionMap["testdpc-kiosk"].scriptPath).toBe(
+      "/tmp/testdpc-kiosk.sh",
+    );
+    expect(summary.artifacts.postProvisionDir).toBe("post-provision");
+  });
+
+  it("can preview a launch-openclaw follow-up offline", () => {
+    const summary = runDescribe(["--assume-action", "launch-openclaw"], {
+      OPENCLAW_ANDROID_LOCAL_HOST_DEDICATED_POST_PROVISION_SCRIPT:
+        "/tmp/post-provision.sh",
+    });
+
+    expect(summary.next.assumedAction).toBe("launch-openclaw");
+    expect(summary.next.assumedCommand).toBe(
+      "pnpm android:local-host:dedicated:post-provision -- --launch",
+    );
+    expect(summary.next.scriptPath).toBe("/tmp/post-provision.sh");
+    expect(summary.next.scriptArg).toBe("--launch");
+  });
+
   it("routes testdpc-kiosk recommendations through the kiosk dry-run", () => {
     const { result, summary } = runScenario({
       postProvisionSummary: {
@@ -184,6 +233,9 @@ describe("local-host-dedicated-post-provision-next", () => {
     });
 
     const parsed = JSON.parse(result.stdout);
+    expect(parsed.packageCommand).toBe(
+      "pnpm android:local-host:dedicated:post-provision:next",
+    );
     expect(parsed.next.action).toBe("testdpc-qr");
     expect(parsed.next.summary.checksumMode).toBe("package");
   });
