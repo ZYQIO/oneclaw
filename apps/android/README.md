@@ -8,6 +8,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - Self-check gate / 自检门槛: `apps/android/local-host-self-check.md`
 - Session handoff / 接续手册: `apps/android/local-host-handoff.md`
 - Dedicated-device plan / 专机部署方案: `apps/android/local-host-dedicated-device.md`
+- Desktop-runtime packaging feasibility / 桌面运行时封装评估: `apps/android/local-host-desktop-runtime-feasibility.md`
 
 ### Local Host Scope Today / 当前 Local Host 范围
 
