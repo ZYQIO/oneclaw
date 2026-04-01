@@ -9,6 +9,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - Session handoff / 接续手册: `apps/android/local-host-handoff.md`
 - Dedicated-device plan / 专机部署方案: `apps/android/local-host-dedicated-device.md`
 - Desktop-runtime packaging feasibility / 桌面运行时封装评估: `apps/android/local-host-desktop-runtime-feasibility.md`
+- Embedded-runtime pod plan / 嵌入式运行时 Pod 方案: `apps/android/local-host-embedded-runtime-pod-plan.md`
 
 ### Local Host Scope Today / 当前 Local Host 范围
 
@@ -16,6 +17,8 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - When the phone is connected to a trusted desktop, the desktop can now inspect its own `openai-codex` OAuth state and push that credential into the phone's guarded local-host API so the phone can recover from missing / stale auth without another browser login.
 - The app now supports a settings-driven English / Simplified Chinese toggle across the tab bar, Connect tab, Settings tab, onboarding flow, Chat / Voice primary surfaces, Voice runtime/microphone status copy, Voice reply / TTS detail status copy, common gateway auth/pairing edge states, the browser-based Codex auth success/failure page, and several runtime/auth status strings. Some deeper secondary copy still remains to be localized.
 - It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
+- Local-host `/status` now also reports `embeddedRuntimePodAvailable` plus an `embeddedRuntimePod` object, so callers can tell whether the current build ships a pod manifest and whether that version has been extracted into the app-private pod directory yet.
+- The repo now also has a build-time pod-prep spike at `pnpm android:local-host:embedded-runtime-pod:prepare`; it emits `manifest.json`, `layout.json`, and a staged asset tree under `.tmp/android-runtime-pod/`, but that output is still a packaging input rather than a full runtime integration.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
 
 ### Dedicated Host Deployment / 专用 Host 部署

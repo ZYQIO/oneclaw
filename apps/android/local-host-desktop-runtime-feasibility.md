@@ -84,6 +84,7 @@ Project name / 项目名: `Android Embedded Runtime Pod` / `Android 嵌入式运
 - Goal: bring a selected desktop-runtime slice onto the phone without importing the entire desktop `shell/browser/plugin` surface. / 目标：把一小段精选桌面运行时能力带到手机上，而不是整套导入桌面 `shell/browser/plugin` 能力面。
 - Recommended first lane: internal or sideloaded `Embedded Runtime Pod`, updated only through app releases. / 推荐第一条线：internal 或 sideload 形态的 `Embedded Runtime Pod`，只通过 app 发版更新。
 - Keep the Android app as the primary host and control plane. The embedded pod should remain a bounded capability provider, not a second product hidden inside the APK. / 继续让 Android app 本身作为主 host 和控制平面；嵌入式 pod 只做有边界的能力提供者，而不是藏在 APK 里的第二套产品。
+- The follow-up design note now lives in `apps/android/local-host-embedded-runtime-pod-plan.md`, which freezes the first slice as a build-time packaged `helper pod v0` instead of a promise of full desktop parity. / 后续细化方案现在收在 `apps/android/local-host-embedded-runtime-pod-plan.md`，并把第一切片冻结成构建期打包的 `helper pod v0`，而不是承诺完整桌面对齐。
 
 ## Non Goals For The First Spike / 第一轮 spike 的非目标
 
