@@ -244,6 +244,14 @@ class LocalHostRuntimeTest {
               put("batteryOptimizationIgnored", JsonPrimitive(false))
             }
           },
+          embeddedRuntimePodStatusProvider = {
+            buildJsonObject {
+              put("available", JsonPrimitive(true))
+              put("ready", JsonPrimitive(false))
+              put("reason", JsonPrimitive("not_extracted"))
+              put("assetManifestPresent", JsonPrimitive(true))
+            }
+          },
           uiAutomationStatusProvider = {
             buildJsonObject {
               put("enabled", JsonPrimitive(true))
@@ -258,9 +266,12 @@ class LocalHostRuntimeTest {
 
       val snapshot = runtime.statusSnapshot()
       val deployment = snapshot.getValue("deployment").jsonObject
+      val embeddedRuntimePod = snapshot.getValue("embeddedRuntimePod").jsonObject
       val uiAutomation = snapshot.getValue("uiAutomation").jsonObject
       assertEquals(true, deployment.getValue("dedicatedEnabled").jsonPrimitive.boolean)
       assertEquals(false, deployment.getValue("batteryOptimizationIgnored").jsonPrimitive.boolean)
+      assertEquals(true, snapshot.getValue("embeddedRuntimePodAvailable").jsonPrimitive.boolean)
+      assertEquals("not_extracted", embeddedRuntimePod.getValue("reason").jsonPrimitive.content)
       assertEquals(true, snapshot.getValue("uiAutomationAvailable").jsonPrimitive.boolean)
       assertEquals(true, uiAutomation.getValue("enabled").jsonPrimitive.boolean)
       assertEquals(true, uiAutomation.getValue("serviceConnected").jsonPrimitive.boolean)

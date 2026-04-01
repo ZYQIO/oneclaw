@@ -53,6 +53,7 @@ class LocalHostRuntime(
   private val json: Json,
   private val codexClient: LocalHostResponsesClient = OpenAICodexResponsesClient(prefs, json),
   private val deploymentStatusProvider: (() -> JsonObject)? = null,
+  private val embeddedRuntimePodStatusProvider: (() -> JsonObject)? = null,
   private val uiAutomationStatusProvider: (() -> JsonObject)? = null,
   private val codexAuthController: LocalHostCodexAuthController =
     LocalHostCodexAuthController(
@@ -165,6 +166,7 @@ class LocalHostRuntime(
         .map(::snapshotSession)
         .sortedByDescending { it.updatedAtMs }
     val codexAuth = codexAuthStatusSnapshot()
+    val embeddedRuntimePod = embeddedRuntimePodStatusProvider?.invoke()
     val uiAutomation = uiAutomationStatusProvider?.invoke()
 
     return buildJsonObject {
@@ -173,6 +175,11 @@ class LocalHostRuntime(
       put("mainSessionKey", JsonPrimitive(mainSessionKey))
       put("codexAuthConfigured", JsonPrimitive(codexAuth["configured"].asBooleanOrNull() == true))
       put("codexAuth", codexAuth)
+      put(
+        "embeddedRuntimePodAvailable",
+        JsonPrimitive(embeddedRuntimePod?.get("available").asBooleanOrNull() == true),
+      )
+      embeddedRuntimePod?.let { put("embeddedRuntimePod", it) }
       put("uiAutomationAvailable", JsonPrimitive(uiAutomation?.get("available").asBooleanOrNull() == true))
       uiAutomation?.let { put("uiAutomation", it) }
       put("sessionCount", JsonPrimitive(orderedSessions.size))

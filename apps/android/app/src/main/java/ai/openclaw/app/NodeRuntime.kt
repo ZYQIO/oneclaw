@@ -234,6 +234,9 @@ class NodeRuntime(
     deploymentStatusProvider = {
       dedicatedHostDeploymentStatusSnapshot(appContext, prefs)
     },
+    embeddedRuntimePodStatusProvider = {
+      embeddedRuntimePodStatusSnapshot(appContext)
+    },
     uiAutomationStatusProvider = {
       localHostUiAutomationStatusSnapshot(appContext).toJson()
     },
