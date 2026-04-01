@@ -1,0 +1,9 @@
+{
+  "stage": "bridge",
+  "purpose": "Runtime bridge metadata for the Android embedded pod spike.",
+  "exposes": [
+    "manifest",
+    "layout",
+    "assetInventory"
+  ]
+}

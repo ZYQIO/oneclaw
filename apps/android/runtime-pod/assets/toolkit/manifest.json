@@ -1,0 +1,8 @@
+{
+  "stage": "toolkit",
+  "purpose": "Tool surface metadata for the Android embedded pod spike.",
+  "exposes": [
+    "toolDescriptors",
+    "commandPolicy"
+  ]
+}

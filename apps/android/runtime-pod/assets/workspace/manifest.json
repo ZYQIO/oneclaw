@@ -1,0 +1,8 @@
+{
+  "stage": "workspace",
+  "purpose": "Workspace asset metadata for the Android embedded pod spike.",
+  "exposes": [
+    "stagedWorkspace",
+    "contentIndex"
+  ]
+}
