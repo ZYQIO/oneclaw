@@ -38,6 +38,7 @@ class LocalHostNodesToolingTest {
 
     assertTrue("device_status" in actions)
     assertTrue("device_permissions" in actions)
+    assertTrue("pod_health" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
     assertFalse("ui_launch_app" in actions)

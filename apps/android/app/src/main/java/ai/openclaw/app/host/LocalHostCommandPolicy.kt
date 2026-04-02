@@ -8,6 +8,7 @@ import ai.openclaw.app.protocol.OpenClawDeviceCommand
 import ai.openclaw.app.protocol.OpenClawLocationCommand
 import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
+import ai.openclaw.app.protocol.OpenClawPodCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
@@ -46,6 +47,7 @@ internal object LocalHostCommandPolicy {
       OpenClawMotionCommand.Activity.rawValue,
       OpenClawMotionCommand.Pedometer.rawValue,
       OpenClawNotificationsCommand.List.rawValue,
+      OpenClawPodCommand.Health.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
       OpenClawUiCommand.State.rawValue,

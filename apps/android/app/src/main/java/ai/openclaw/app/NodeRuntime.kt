@@ -105,6 +105,10 @@ class NodeRuntime(
     appContext = appContext,
   )
 
+  private val podHandler: PodHandler = PodHandler(
+    appContext = appContext,
+  )
+
   private val notificationsHandler: NotificationsHandler = NotificationsHandler(
     appContext = appContext,
   )
@@ -172,6 +176,7 @@ class NodeRuntime(
     cameraHandler = cameraHandler,
     locationHandler = locationHandler,
     deviceHandler = deviceHandler,
+    podHandler = podHandler,
     notificationsHandler = notificationsHandler,
     systemHandler = systemHandler,
     uiAutomationHandler = uiAutomationHandler,

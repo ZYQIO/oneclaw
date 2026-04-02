@@ -81,6 +81,15 @@ enum class OpenClawDeviceCommand(val rawValue: String) {
   }
 }
 
+enum class OpenClawPodCommand(val rawValue: String) {
+  Health("pod.health"),
+  ;
+
+  companion object {
+    const val NamespacePrefix: String = "pod."
+  }
+}
+
 enum class OpenClawNotificationsCommand(val rawValue: String) {
   List("notifications.list"),
   Actions("notifications.actions"),

@@ -9,6 +9,7 @@ import ai.openclaw.app.protocol.OpenClawDeviceCommand
 import ai.openclaw.app.protocol.OpenClawLocationCommand
 import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
+import ai.openclaw.app.protocol.OpenClawPodCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
@@ -86,6 +87,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_info", command = OpenClawDeviceCommand.Info.rawValue),
       NodesActionSpec(name = "device_permissions", command = OpenClawDeviceCommand.Permissions.rawValue),
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
+      NodesActionSpec(name = "pod_health", command = OpenClawPodCommand.Health.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
       NodesActionSpec(name = "ui_launch_app", command = OpenClawUiCommand.LaunchApp.rawValue),

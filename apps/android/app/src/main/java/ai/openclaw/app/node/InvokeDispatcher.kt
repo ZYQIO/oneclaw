@@ -11,6 +11,7 @@ import ai.openclaw.app.protocol.OpenClawDeviceCommand
 import ai.openclaw.app.protocol.OpenClawLocationCommand
 import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
+import ai.openclaw.app.protocol.OpenClawPodCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
 import ai.openclaw.app.protocol.OpenClawUiCommand
@@ -21,6 +22,7 @@ class InvokeDispatcher(
   private val cameraHandler: CameraHandler,
   private val locationHandler: LocationHandler,
   private val deviceHandler: DeviceHandler,
+  private val podHandler: PodHandler,
   private val notificationsHandler: NotificationsHandler,
   private val systemHandler: SystemHandler,
   private val uiAutomationHandler: UiAutomationHandler,
@@ -138,6 +140,7 @@ class InvokeDispatcher(
       OpenClawDeviceCommand.Info.rawValue -> deviceHandler.handleDeviceInfo(paramsJson)
       OpenClawDeviceCommand.Permissions.rawValue -> deviceHandler.handleDevicePermissions(paramsJson)
       OpenClawDeviceCommand.Health.rawValue -> deviceHandler.handleDeviceHealth(paramsJson)
+      OpenClawPodCommand.Health.rawValue -> podHandler.handlePodHealth(paramsJson)
 
       // Notifications command
       OpenClawNotificationsCommand.List.rawValue -> notificationsHandler.handleNotificationsList(paramsJson)

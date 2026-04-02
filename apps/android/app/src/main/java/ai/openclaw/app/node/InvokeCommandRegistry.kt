@@ -11,6 +11,7 @@ import ai.openclaw.app.protocol.OpenClawDeviceCommand
 import ai.openclaw.app.protocol.OpenClawLocationCommand
 import ai.openclaw.app.protocol.OpenClawMotionCommand
 import ai.openclaw.app.protocol.OpenClawNotificationsCommand
+import ai.openclaw.app.protocol.OpenClawPodCommand
 import ai.openclaw.app.protocol.OpenClawPhotosCommand
 import ai.openclaw.app.protocol.OpenClawSmsCommand
 import ai.openclaw.app.protocol.OpenClawSystemCommand
@@ -180,6 +181,9 @@ object InvokeCommandRegistry {
       ),
       InvokeCommandSpec(
         name = OpenClawDeviceCommand.Health.rawValue,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawPodCommand.Health.rawValue,
       ),
       InvokeCommandSpec(
         name = OpenClawNotificationsCommand.List.rawValue,

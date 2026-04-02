@@ -19,7 +19,8 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
 - Local-host `/status` now also reports `embeddedRuntimePodAvailable` plus an `embeddedRuntimePod` object, and app startup now attempts to extract the shipped pod into `filesDir/openclaw/embedded-runtime-pod/<version>/`, verify checksums, and report `verifiedFileCount` plus extracted-version readiness instead of only manifest presence.
 - The repo now has both `pnpm android:local-host:embedded-runtime-pod:prepare` and `pnpm android:local-host:embedded-runtime-pod:sync-assets`: `prepare` emits the raw `.tmp/android-runtime-pod/manifest.json`, `layout.json`, and staged tree, while `sync-assets` rewrites that payload into APK-safe asset metadata and staged files that the Android build now wires into generated assets automatically.
-- This is now a real packaging-plus-extraction path, but it is still not a full embedded desktop runtime yet: the next step is a first deterministic helper such as `pod.health`, not shell/browser/plugin parity.
+- The first deterministic helper is now also landed as `pod.health`: it is exposed as a read-only `invoke` command and a `nodes` action, returning the embedded-pod readiness snapshot plus `localExecutionAvailable` so remote callers can verify the packaged pod without touching any shell/browser path.
+- This is now a real packaging-plus-extraction-plus-first-helper path, but it is still not a full embedded desktop runtime yet: the next step is deciding whether a second offline helper is worth adding, not jumping to shell/browser/plugin parity.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
 
 ### Dedicated Host Deployment / 专用 Host 部署

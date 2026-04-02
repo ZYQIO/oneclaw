@@ -2,7 +2,7 @@
 
 Purpose / 用途: define the first shippable slice for packaging a desktop-like runtime into OpenClaw Android without derailing the current Android Local Host roadmap. / 定义“把类桌面运行时封装进 OpenClaw Android”时第一条可交付切片，且不打断当前 Android Local Host 主线。
 
-Last updated / 最后更新: April 1, 2026 / 2026 年 4 月 1 日
+Last updated / 最后更新: April 2, 2026 / 2026 年 4 月 2 日
 
 ## Decision / 结论
 
@@ -67,6 +67,7 @@ If we need a second command later, it should still be offline and deterministic.
 - `apps/android/runtime-pod/` holds the source manifest, helper metadata, and packaging inputs. / `apps/android/runtime-pod/` 存放 source manifest、helper 元数据和打包输入。
 - `apps/android/app/build/generated/embedded-runtime-pod-assets/<variant>/embedded-runtime-pod/` holds the generated packaged assets produced by `pnpm android:local-host:embedded-runtime-pod:sync-assets` during Android builds. / `apps/android/app/build/generated/embedded-runtime-pod-assets/<variant>/embedded-runtime-pod/` 存放 Android 构建时由 `pnpm android:local-host:embedded-runtime-pod:sync-assets` 生成的打包资产。
 - `apps/android/app/src/main/java/ai/openclaw/app/EmbeddedRuntimePodManager.kt` holds the Android-side extractor, verifier, and status adapter. / `apps/android/app/src/main/java/ai/openclaw/app/EmbeddedRuntimePodManager.kt` 存放 Android 侧的解包器、校验器和状态适配层。
+- `apps/android/app/src/main/java/ai/openclaw/app/node/PodHandler.kt` now holds the first helper entrypoint, `pod.health`, which exposes that verified state through `invoke`. / `apps/android/app/src/main/java/ai/openclaw/app/node/PodHandler.kt` 现在承载第一条 helper 入口 `pod.health`，并通过 `invoke` 暴露这份校验状态。
 
 ### Suggested runtime location / 建议运行时位置
 
@@ -124,6 +125,7 @@ Exit criteria / 退出标准:
 - Add the pod assets to the Android build. / 把 pod 资产接进 Android 构建。
 - Extract to versioned app-private storage. / 解压到带版本号的 app 私有目录。
 - Verify checksum and manifest. / 校验 checksum 与 manifest。
+- Status after April 2, 2026: landed. / 截至 2026 年 4 月 2 日：已落地。
 
 Exit criteria / 退出标准:
 
@@ -133,6 +135,7 @@ Exit criteria / 退出标准:
 
 - Land one deterministic helper command such as `pod.health`. / 落地一条确定性 helper 命令，例如 `pod.health`。
 - Surface its result in the app and the local-host status snapshot. / 将结果同时展示在 app 和 local-host status 快照里。
+- Status after April 2, 2026: `pod.health` is landed through read-only `invoke` plus the `nodes` action surface, while `/status` continues to expose the same underlying readiness snapshot. / 截至 2026 年 4 月 2 日：`pod.health` 已通过只读 `invoke` 与 `nodes` action 落地，而 `/status` 继续暴露同一份底层 readiness 快照。
 
 Exit criteria / 退出标准:
 
@@ -151,5 +154,5 @@ Exit criteria / 退出标准:
 
 - Keep the current phone-control and dedicated-device tracks moving as the primary product work. / 继续把当前 phone-control 和 dedicated-device 作为主产品工作推进。
 - Treat the pod as a parallel spike, not a blocker. / 把这个 pod 视为并行 spike，而不是 blocker。
-- First implement the packaging/extraction/verifier path, then decide whether `pod.health` is the right first helper or whether the app-private workspace needs a different offline command first. / 先实现打包 / 解包 / 校验路径，再决定 `pod.health` 是否真的是第一条 helper，还是 app-private workspace 需要先有别的离线命令。
+- The packaging/extraction/verifier path plus the first helper `pod.health` are now landed; the next decision is whether a second offline helper such as `pod.manifest.describe` or `pod.workspace.scan` really reduces duplicated logic enough to justify itself. / 打包 / 解包 / 校验路径加第一条 helper `pod.health` 现在都已经落地；下一步要判断的是第二条离线 helper，例如 `pod.manifest.describe` 或 `pod.workspace.scan`，是否真的值得做、并且足以减少重复逻辑。
 - Do not move to browser or shell parity until the first slice is already boringly reliable on a real phone. / 在第一切片还没在真机上变得“无聊地可靠”之前，不要往 browser 或 shell 对齐上走。
