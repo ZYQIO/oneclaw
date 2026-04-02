@@ -41,7 +41,8 @@ What it does:
   3. Calls /invoke/capabilities and checks pod helper allowlisting
   4. Calls /invoke pod.health
   5. Calls /invoke pod.workspace.scan
-  6. Verifies the phone-side results against repo pod-spec.json and content-index.json
+  6. Calls /invoke pod.workspace.read
+  7. Verifies the phone-side results against repo pod-spec.json and content-index.json
 
 Requirements:
   - curl
@@ -90,6 +91,12 @@ fi
 QUERY="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_QUERY:-$DEFAULT_QUERY}"
 LIMIT="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT:-5}"
 EXPECTED_PATH="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH:-$DEFAULT_EXPECTED_PATH}"
+EXPECTED_WORKSPACE_FILE=""
+EXPECTED_WORKSPACE_FILE_SIZE=""
+if [[ -n "$EXPECTED_PATH" && -f "$RUNTIME_POD_DIR/assets/workspace/$EXPECTED_PATH" ]]; then
+  EXPECTED_WORKSPACE_FILE="$RUNTIME_POD_DIR/assets/workspace/$EXPECTED_PATH"
+  EXPECTED_WORKSPACE_FILE_SIZE="$(wc -c <"$EXPECTED_WORKSPACE_FILE" | tr -d '[:space:]')"
+fi
 
 if [[ "$USE_ADB_FORWARD" == "1" ]]; then
   require_cmd adb
@@ -122,6 +129,7 @@ status_json="$ARTIFACT_DIR/status.json"
 capabilities_json="$ARTIFACT_DIR/capabilities.json"
 health_json="$ARTIFACT_DIR/pod-health.json"
 workspace_json="$ARTIFACT_DIR/pod-workspace-scan.json"
+workspace_read_json="$ARTIFACT_DIR/pod-workspace-read.json"
 summary_json="$ARTIFACT_DIR/summary.json"
 
 smoke_failed=0
@@ -173,20 +181,25 @@ status_pod_verified_count="$(jq -r '.host.embeddedRuntimePod.verifiedFileCount /
 
 cap_has_health="$(jq -r --arg command 'pod.health' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_scan="$(jq -r --arg command 'pod.workspace.scan' '(.commands // []) | index($command) != null' "$capabilities_json")"
+cap_has_workspace_read="$(jq -r --arg command 'pod.workspace.read' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
 
 [[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
 [[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
+[[ "$cap_has_workspace_read" == "true" ]] || record_failure "capabilities_missing_pod_workspace_read"
 
-if [[ "$cap_has_health" != "true" || "$cap_has_workspace_scan" != "true" ]]; then
+if [[ "$cap_has_health" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
   skip_helper_invocations=1
   failure_hint="install the current debug app on the device, rerun pnpm android:local-host:token -- --json, then rerun pnpm android:local-host:embedded-runtime-pod:smoke"
   printf '{}\n' >"$health_json"
   printf '{}\n' >"$workspace_json"
+  printf '{}\n' >"$workspace_read_json"
 else
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
   workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
+  workspace_read_body="$(jq -cn --arg path "$EXPECTED_PATH" '{command:"pod.workspace.read", params:{path:$path, maxChars:4096}}')"
+  post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_read_body" | tee "$workspace_read_json" >/dev/null
 fi
 
 health_ok="$(jq -r '.ok // false' "$health_json")"
@@ -211,6 +224,14 @@ workspace_expected_path_found="false"
 if [[ -n "$EXPECTED_PATH" ]]; then
   workspace_expected_path_found="$(jq -r --arg path "$EXPECTED_PATH" '(.payload.files // []) | map(.relativePath) | index($path) != null' "$workspace_json")"
 fi
+
+workspace_read_ok="$(jq -r '.ok // false' "$workspace_read_json")"
+workspace_read_command="$(jq -r '.payload.command // ""' "$workspace_read_json")"
+workspace_read_relative_path="$(jq -r '.payload.relativePath // ""' "$workspace_read_json")"
+workspace_read_text="$(jq -r '.payload.text // ""' "$workspace_read_json")"
+workspace_read_text_truncated="$(jq -r '.payload.textTruncated // false' "$workspace_read_json")"
+workspace_read_size_bytes="$(jq -r '.payload.sizeBytes // -1' "$workspace_read_json")"
+workspace_read_document_kind="$(jq -r '.payload.document.kind // ""' "$workspace_read_json")"
 
 [[ "$status_ok" == "true" ]] || record_failure "status_not_ok"
 [[ "$status_pod_available" == "true" ]] || record_failure "status_pod_unavailable"
@@ -239,6 +260,14 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   if [[ -n "$EXPECTED_PATH" ]]; then
     [[ "$workspace_expected_path_found" == "true" ]] || record_failure "pod_workspace_expected_path_missing"
   fi
+
+  [[ "$workspace_read_ok" == "true" ]] || record_failure "pod_workspace_read_not_ok"
+  [[ "$workspace_read_command" == "pod.workspace.read" ]] || record_failure "pod_workspace_read_command_mismatch"
+  [[ "$workspace_read_relative_path" == "$EXPECTED_PATH" ]] || record_failure "pod_workspace_read_path_mismatch"
+  [[ -n "$workspace_read_text" ]] || record_failure "pod_workspace_read_missing_text"
+  if [[ -n "$EXPECTED_WORKSPACE_FILE_SIZE" ]]; then
+    [[ "$workspace_read_size_bytes" == "$EXPECTED_WORKSPACE_FILE_SIZE" ]] || record_failure "pod_workspace_read_size_mismatch"
+  fi
 fi
 
 failed_checks_json='[]'
@@ -265,6 +294,7 @@ jq -n \
   --arg statusPodVerifiedCount "$status_pod_verified_count" \
   --arg capHasHealth "$cap_has_health" \
   --arg capHasWorkspaceScan "$cap_has_workspace_scan" \
+  --arg capHasWorkspaceRead "$cap_has_workspace_read" \
   --arg capWriteEnabled "$cap_write_enabled" \
   --arg healthOk "$health_ok" \
   --arg healthCommand "$health_command" \
@@ -284,6 +314,13 @@ jq -n \
   --arg workspaceExpectedPathFound "$workspace_expected_path_found" \
   --arg workspaceFirstPath "$workspace_first_path" \
   --arg workspaceFirstPreview "$workspace_first_preview" \
+  --arg workspaceReadOk "$workspace_read_ok" \
+  --arg workspaceReadCommand "$workspace_read_command" \
+  --arg workspaceReadRelativePath "$workspace_read_relative_path" \
+  --arg workspaceReadText "$workspace_read_text" \
+  --arg workspaceReadTextTruncated "$workspace_read_text_truncated" \
+  --arg workspaceReadSizeBytes "$workspace_read_size_bytes" \
+  --arg workspaceReadDocumentKind "$workspace_read_document_kind" \
   '{
     ok: ($failedChecks | length == 0),
     baseUrl: $baseUrl,
@@ -311,6 +348,7 @@ jq -n \
     capabilities: {
       hasPodHealth: ($capHasHealth == "true"),
       hasPodWorkspaceScan: ($capHasWorkspaceScan == "true"),
+      hasPodWorkspaceRead: ($capHasWorkspaceRead == "true"),
       writeEnabled: ($capWriteEnabled == "true")
     },
     podHealth: {
@@ -334,6 +372,15 @@ jq -n \
       expectedPathFound: ($workspaceExpectedPathFound == "true"),
       firstPath: (if $workspaceFirstPath == "" then null else $workspaceFirstPath end),
       firstPreview: (if $workspaceFirstPreview == "" then null else $workspaceFirstPreview end)
+    },
+    podWorkspaceRead: {
+      ok: ($workspaceReadOk == "true"),
+      command: (if $workspaceReadCommand == "" then null else $workspaceReadCommand end),
+      relativePath: (if $workspaceReadRelativePath == "" then null else $workspaceReadRelativePath end),
+      sizeBytes: ($workspaceReadSizeBytes | tonumber),
+      textPresent: ($workspaceReadText != ""),
+      textTruncated: ($workspaceReadTextTruncated == "true"),
+      documentKind: (if $workspaceReadDocumentKind == "" then null else $workspaceReadDocumentKind end)
     }
   }' >"$summary_json"
 
@@ -343,6 +390,8 @@ printf 'runtime_pod.health ok=%s ready=%s local=%s version=%s verified=%s\n' \
   "$health_ok" "$health_ready" "$health_local_execution" "$health_version" "$health_verified_count"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \
   "$workspace_ok" "$workspace_stage_present" "$workspace_document_count" "$workspace_matched_file_count" "$workspace_returned_file_count" "$workspace_first_path"
+printf 'runtime_pod.workspace_read ok=%s path=%s size=%s truncated=%s kind=%s\n' \
+  "$workspace_read_ok" "$workspace_read_relative_path" "$workspace_read_size_bytes" "$workspace_read_text_truncated" "$workspace_read_document_kind"
 if [[ -n "$failure_hint" ]]; then
   echo "runtime_pod.hint=$failure_hint"
 fi
@@ -359,4 +408,5 @@ echo "artifacts.status=$status_json"
 echo "artifacts.capabilities=$capabilities_json"
 echo "artifacts.health=$health_json"
 echo "artifacts.workspace_scan=$workspace_json"
+echo "artifacts.workspace_read=$workspace_read_json"
 echo "artifacts.summary=$summary_json"

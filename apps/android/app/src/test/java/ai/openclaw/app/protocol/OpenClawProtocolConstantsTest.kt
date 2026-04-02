@@ -62,6 +62,7 @@ class OpenClawProtocolConstantsTest {
   fun podCommandsUseStableStrings() {
     assertEquals("pod.health", OpenClawPodCommand.Health.rawValue)
     assertEquals("pod.workspace.scan", OpenClawPodCommand.WorkspaceScan.rawValue)
+    assertEquals("pod.workspace.read", OpenClawPodCommand.WorkspaceRead.rawValue)
   }
 
   @Test

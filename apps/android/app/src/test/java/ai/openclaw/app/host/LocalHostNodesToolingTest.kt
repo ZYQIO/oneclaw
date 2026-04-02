@@ -40,6 +40,7 @@ class LocalHostNodesToolingTest {
     assertTrue("device_permissions" in actions)
     assertTrue("pod_health" in actions)
     assertTrue("pod_workspace_scan" in actions)
+    assertTrue("pod_workspace_read" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
     assertFalse("ui_launch_app" in actions)
@@ -163,6 +164,35 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("workspaceStagePresent"))
       assertTrue(result.outputText.contains("matchedFileCount"))
+    }
+
+  @Test
+  fun podWorkspaceRead_mapsPathAndMaxCharsForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.workspace.read", command)
+            assertTrue(paramsJson.orEmpty().contains("\"path\":\"templates/handoff-template.md\""))
+            assertTrue(paramsJson.orEmpty().contains("\"maxChars\":512"))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"relativePath":"templates/handoff-template.md","text":"# Embedded Runtime Handoff"}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_workspace_read","path":"templates/handoff-template.md","maxChars":512}""",
+        )
+
+      assertTrue(result.outputText.contains("templates/handoff-template.md"))
+      assertTrue(result.outputText.contains("Embedded Runtime Handoff"))
     }
 
   @Test

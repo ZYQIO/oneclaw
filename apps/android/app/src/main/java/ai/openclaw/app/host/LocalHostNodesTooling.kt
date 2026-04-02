@@ -89,6 +89,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
       NodesActionSpec(name = "pod_health", command = OpenClawPodCommand.Health.rawValue),
       NodesActionSpec(name = "pod_workspace_scan", command = OpenClawPodCommand.WorkspaceScan.rawValue),
+      NodesActionSpec(name = "pod_workspace_read", command = OpenClawPodCommand.WorkspaceRead.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
       NodesActionSpec(name = "ui_launch_app", command = OpenClawUiCommand.LaunchApp.rawValue),
@@ -232,11 +233,13 @@ internal class LocalHostNodesToolBridge(
           putStringEnumProperty("notificationAction", listOf("open", "dismiss", "reply"))
           putStringProperty("notificationReplyText")
           putStringProperty("query")
+          putStringProperty("path")
           putStringProperty("text")
           putStringProperty("value")
           putStringProperty("contentDescription")
           putStringProperty("resourceId")
           putNumberProperty("limit")
+          putNumberProperty("maxChars")
           putNumberProperty("timeoutMs")
           putNumberProperty("pollIntervalMs")
           putNumberProperty("x")
@@ -327,6 +330,11 @@ internal class LocalHostNodesToolBridge(
         buildJsonObject {
           copyString(params, "query")
           copyNumber(params, "limit")
+        }
+      "pod_workspace_read" ->
+        buildJsonObject {
+          copyString(params, "path")
+          copyNumber(params, "maxChars")
         }
       "ui_launch_app" ->
         buildJsonObject {

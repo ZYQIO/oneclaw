@@ -26,6 +26,7 @@ Recommended first helper workflow / 推荐的首条 helper 工作流:
 
 - `pod.health`: verify manifest, version, checksum, and local execution availability. / `pod.health`：校验 manifest、版本、校验和与本地执行可用性。
 - Landed second helper: `pod.workspace.scan` over the app-private workspace, with no network and no browser. / 已落地的第二个 helper：对 app-private workspace 做 `pod.workspace.scan`，不访问网络、不启动浏览器。
+- Landed third helper: `pod.workspace.read` for one app-private workspace document by relative path, with no network and no browser. / 已落地的第三个 helper：按相对路径读取一份 app-private workspace 文档的 `pod.workspace.read`，不访问网络、不启动浏览器。
 
 ## What This Slice Is / 这条切片是什么
 
@@ -56,6 +57,7 @@ Suggested command contract / 建议的命令契约:
 
 - `pod.health`
 - `pod.workspace.scan`
+- `pod.workspace.read`
 - `pod.manifest.describe`
 
 If we need a third command later, it should still be offline and deterministic. / 如果后面还要补第三条命令，也应保持离线和确定性。
@@ -67,7 +69,7 @@ If we need a third command later, it should still be offline and deterministic. 
 - `apps/android/runtime-pod/` holds the source manifest, helper metadata, and packaging inputs. / `apps/android/runtime-pod/` 存放 source manifest、helper 元数据和打包输入。
 - `apps/android/app/build/generated/embedded-runtime-pod-assets/<variant>/embedded-runtime-pod/` holds the generated packaged assets produced by `pnpm android:local-host:embedded-runtime-pod:sync-assets` during Android builds. / `apps/android/app/build/generated/embedded-runtime-pod-assets/<variant>/embedded-runtime-pod/` 存放 Android 构建时由 `pnpm android:local-host:embedded-runtime-pod:sync-assets` 生成的打包资产。
 - `apps/android/app/src/main/java/ai/openclaw/app/EmbeddedRuntimePodManager.kt` holds the Android-side extractor, verifier, and status adapter. / `apps/android/app/src/main/java/ai/openclaw/app/EmbeddedRuntimePodManager.kt` 存放 Android 侧的解包器、校验器和状态适配层。
-- `apps/android/app/src/main/java/ai/openclaw/app/node/PodHandler.kt` now holds the read-only helper entrypoints, `pod.health` and `pod.workspace.scan`, which expose pod readiness plus the packaged workspace inventory through `invoke`. / `apps/android/app/src/main/java/ai/openclaw/app/node/PodHandler.kt` 现在承载只读 helper 入口 `pod.health` 与 `pod.workspace.scan`，并通过 `invoke` 暴露 pod readiness 与打包 workspace inventory。
+- `apps/android/app/src/main/java/ai/openclaw/app/node/PodHandler.kt` now holds the read-only helper entrypoints `pod.health`, `pod.workspace.scan`, and `pod.workspace.read`, which expose pod readiness, packaged workspace inventory, and one packaged workspace document through `invoke`. / `apps/android/app/src/main/java/ai/openclaw/app/node/PodHandler.kt` 现在承载只读 helper 入口 `pod.health`、`pod.workspace.scan` 与 `pod.workspace.read`，并通过 `invoke` 暴露 pod readiness、打包 workspace inventory 和一份打包 workspace 文档。
 
 ### Suggested runtime location / 建议运行时位置
 
@@ -135,7 +137,7 @@ Exit criteria / 退出标准:
 
 - Land `pod.health` first, then add only one more offline helper when it proves its value. / 先落地 `pod.health`，再只在第二条离线 helper 真的有价值时补上它。
 - Surface helper results in the app and the local-host status snapshot or nodes surface. / 将 helper 结果同时展示在 app 和 local-host status 快照或 nodes 能力面里。
-- Status after April 2, 2026: both `pod.health` and `pod.workspace.scan` are landed through read-only `invoke` plus the `nodes` action surface, while `/status` continues to expose the same underlying readiness snapshot; `pod.workspace.scan` now returns the extracted workspace stage manifest, `content-index`, filtered file inventory, and preview text from the packaged `0.2.0` payload. / 截至 2026 年 4 月 2 日：`pod.health` 与 `pod.workspace.scan` 都已通过只读 `invoke` 与 `nodes` action 落地，而 `/status` 继续暴露同一份底层 readiness 快照；`pod.workspace.scan` 现在还能从打包后的 `0.2.0` payload 中返回解包 workspace 的 stage manifest、`content-index`、过滤后的文件清单和 preview text。
+- Status after April 2, 2026: `pod.health`, `pod.workspace.scan`, and `pod.workspace.read` are all landed through read-only `invoke` plus the `nodes` action surface, while `/status` continues to expose the same underlying readiness snapshot; `pod.workspace.scan` returns the extracted workspace stage manifest, `content-index`, filtered file inventory, and preview text from the packaged `0.2.0` payload, while `pod.workspace.read` returns one packaged workspace document by relative path with text and metadata. / 截至 2026 年 4 月 2 日：`pod.health`、`pod.workspace.scan` 与 `pod.workspace.read` 都已通过只读 `invoke` 与 `nodes` action 落地，而 `/status` 继续暴露同一份底层 readiness 快照；`pod.workspace.scan` 现在会从打包后的 `0.2.0` payload 中返回解包 workspace 的 stage manifest、`content-index`、过滤后的文件清单和 preview text，而 `pod.workspace.read` 会按相对路径返回一份打包 workspace 文档及其文本与元数据。
 - Real-device replay proof now exists as well: after reinstalling the current debug build on the connected OPPO / ColorOS phone, `pnpm android:local-host:token -- --json` plus `pnpm android:local-host:embedded-runtime-pod:smoke` returned `manifestVersion=0.2.0`, `verifiedFileCount=7`, `documentCount=2`, and `firstPath=templates/handoff-template.md`. / 真机复跑证据现在也已经补齐：在连接的 OPPO / ColorOS 手机上重装当前 debug 包后，`pnpm android:local-host:token -- --json` 加 `pnpm android:local-host:embedded-runtime-pod:smoke` 已返回 `manifestVersion=0.2.0`、`verifiedFileCount=7`、`documentCount=2` 与 `firstPath=templates/handoff-template.md`。
 
 Exit criteria / 退出标准:
@@ -155,5 +157,6 @@ Exit criteria / 退出标准:
 
 - Keep the current phone-control and dedicated-device tracks moving as the primary product work. / 继续把当前 phone-control 和 dedicated-device 作为主产品工作推进。
 - Treat the pod as a parallel spike, not a blocker. / 把这个 pod 视为并行 spike，而不是 blocker。
-- The packaging/extraction/verifier path plus the helper pair `pod.health` and `pod.workspace.scan` are now landed and already have a first boring real-device proof; before adding a third offline helper such as `pod.manifest.describe`, keep the current pair replayable with `pnpm android:local-host:embedded-runtime-pod:smoke`, keep stale-build diagnostics obvious, and only then expand the helper surface. / 打包 / 解包 / 校验路径加 helper pair `pod.health` 与 `pod.workspace.scan` 现在都已经落地，并且已有第一份“无聊地可靠”的真机证据；在考虑第三条离线 helper，例如 `pod.manifest.describe` 之前，先继续用 `pnpm android:local-host:embedded-runtime-pod:smoke` 把当前 helper pair 维持成可复跑基线，把 stale build 诊断保持清晰，然后再扩 helper 面。
+- The packaging/extraction/verifier path plus the helper trio `pod.health`, `pod.workspace.scan`, and `pod.workspace.read` are now landed and already have a first boring real-device proof; before adding a fourth offline helper such as `pod.manifest.describe`, keep the current trio replayable with `pnpm android:local-host:embedded-runtime-pod:smoke`, keep stale-build diagnostics obvious, and only then expand the helper surface. / 打包 / 解包 / 校验路径加 helper trio `pod.health`、`pod.workspace.scan` 与 `pod.workspace.read` 现在都已经落地，并且已有第一份“无聊地可靠”的真机证据；在考虑第四条离线 helper，例如 `pod.manifest.describe` 之前，先继续用 `pnpm android:local-host:embedded-runtime-pod:smoke` 把当前 trio 维持成可复跑基线，把 stale build 诊断保持清晰，然后再扩 helper 面。
+- The next bounded expansion should now optimize for removing duplicated pod metadata logic rather than basic file consumption, because `pod.workspace.read` already proves the phone can read packaged templates and notes by relative path. / 既然 `pod.workspace.read` 已经证明手机可以按相对路径读取打包模板和说明，下一条有边界的扩展现在应优先考虑减少重复的 pod 元数据逻辑，而不是继续补最基础的文件消费能力。
 - Do not move to browser or shell parity until the first slice is already boringly reliable on a real phone. / 在第一切片还没在真机上变得“无聊地可靠”之前，不要往 browser 或 shell 对齐上走。

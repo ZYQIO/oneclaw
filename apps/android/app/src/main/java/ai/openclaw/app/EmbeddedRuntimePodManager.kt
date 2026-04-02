@@ -5,6 +5,7 @@ import java.io.File
 import java.security.MessageDigest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -13,8 +14,11 @@ import kotlinx.serialization.json.buildJsonObject
 private const val embeddedRuntimePodManifestAssetPath = "embedded-runtime-pod/manifest.json"
 private const val embeddedRuntimePodLayoutAssetPath = "embedded-runtime-pod/layout.json"
 private const val embeddedRuntimePodInstallRootDisplayPath = "filesDir/openclaw/embedded-runtime-pod"
+private const val embeddedRuntimePodWorkspaceReadDefaultChars = 4000
+private const val embeddedRuntimePodWorkspaceReadMaxChars = 16000
 
 private val embeddedRuntimePodJson = Json { ignoreUnknownKeys = true }
+private val embeddedRuntimePodTextExtensions = setOf("json", "md", "txt", "yaml", "yml")
 
 @Serializable
 private data class EmbeddedRuntimePodAssetManifestStage(
@@ -90,6 +94,13 @@ data class EmbeddedRuntimePodInspection(
     }
   }
 }
+
+data class EmbeddedRuntimePodWorkspaceReadResult(
+  val ok: Boolean,
+  val payload: JsonObject? = null,
+  val code: String? = null,
+  val message: String? = null,
+)
 
 fun ensureEmbeddedRuntimePodInstalled(context: Context): EmbeddedRuntimePodInspection {
   val manifest = loadEmbeddedRuntimePodManifest(context) ?: return inspectEmbeddedRuntimePod(context)
@@ -220,6 +231,106 @@ fun scanEmbeddedRuntimePodWorkspace(
   }
 }
 
+fun readEmbeddedRuntimePodWorkspaceFile(
+  context: Context,
+  relativePath: String,
+  maxChars: Int = embeddedRuntimePodWorkspaceReadDefaultChars,
+): EmbeddedRuntimePodWorkspaceReadResult {
+  val inspection = inspectEmbeddedRuntimePod(context)
+  val manifestVersion = inspection.manifestVersion
+  if (!inspection.ready || manifestVersion == null) {
+    return EmbeddedRuntimePodWorkspaceReadResult(
+      ok = false,
+      code = "POD_NOT_READY",
+      message = "POD_NOT_READY: workspace stage not available",
+    )
+  }
+
+  val workspaceRoot = embeddedRuntimePodInstallRoot(context).resolve(manifestVersion).resolve("workspace")
+  if (!workspaceRoot.isDirectory) {
+    return EmbeddedRuntimePodWorkspaceReadResult(
+      ok = false,
+      code = "POD_NOT_READY",
+      message = "POD_NOT_READY: workspace stage not available",
+    )
+  }
+
+  val normalizedRequest = normalizeWorkspaceRelativePath(relativePath)
+  if (normalizedRequest.isEmpty()) {
+    return EmbeddedRuntimePodWorkspaceReadResult(
+      ok = false,
+      code = "INVALID_REQUEST",
+      message = "INVALID_REQUEST: path required",
+    )
+  }
+  val target =
+    resolveWorkspaceRelativePath(workspaceRoot, normalizedRequest)
+      ?: return EmbeddedRuntimePodWorkspaceReadResult(
+        ok = false,
+        code = "INVALID_REQUEST",
+        message = "INVALID_REQUEST: path escapes workspace",
+      )
+  if (target == workspaceRoot || !target.exists()) {
+    return EmbeddedRuntimePodWorkspaceReadResult(
+      ok = false,
+      code = "NOT_FOUND",
+      message = "NOT_FOUND: workspace file not found",
+    )
+  }
+  if (!target.isFile) {
+    return EmbeddedRuntimePodWorkspaceReadResult(
+      ok = false,
+      code = "INVALID_REQUEST",
+      message = "INVALID_REQUEST: readable file path required",
+    )
+  }
+  if (!isWorkspaceTextFile(target)) {
+    return EmbeddedRuntimePodWorkspaceReadResult(
+      ok = false,
+      code = "UNSUPPORTED_MEDIA_TYPE",
+      message = "UNSUPPORTED_MEDIA_TYPE: workspace read supports only text files",
+    )
+  }
+
+  val text =
+    runCatching { target.readText(Charsets.UTF_8) }.getOrElse {
+      return EmbeddedRuntimePodWorkspaceReadResult(
+        ok = false,
+        code = "UNAVAILABLE",
+        message = "UNAVAILABLE: failed to read workspace file",
+      )
+    }
+  val normalizedMaxChars = maxChars.coerceIn(1, embeddedRuntimePodWorkspaceReadMaxChars)
+  val truncated = text.length > normalizedMaxChars
+  val stageManifest = workspaceRoot.resolve("manifest.json").takeIf { it.isFile }?.let(::readJsonObjectOrNull)
+  val contentIndex = workspaceRoot.resolve("content-index.json").takeIf { it.isFile }?.let(::readJsonObjectOrNull)
+  val relative = toPodRelativePath(workspaceRoot, target)
+  val indexedDocument = indexedWorkspaceDocument(contentIndex = contentIndex, relativePath = relative)
+
+  return EmbeddedRuntimePodWorkspaceReadResult(
+    ok = true,
+    payload =
+      buildJsonObject {
+        put("workspaceStagePath", JsonPrimitive("workspace"))
+        put("workspaceStagePresent", JsonPrimitive(true))
+        put("stageManifestPresent", JsonPrimitive(stageManifest != null))
+        put("contentIndexPresent", JsonPrimitive(contentIndex != null))
+        put("requestedPath", JsonPrimitive(relativePath.trim()))
+        put("relativePath", JsonPrimitive(relative))
+        put("maxChars", JsonPrimitive(normalizedMaxChars))
+        put("sizeBytes", JsonPrimitive(target.length()))
+        put("sha256", JsonPrimitive(sha256(target)))
+        put("isManifest", JsonPrimitive(relative == "manifest.json"))
+        put("isContentIndex", JsonPrimitive(relative == "content-index.json"))
+        put("text", JsonPrimitive(text.take(normalizedMaxChars)))
+        put("textTruncated", JsonPrimitive(truncated))
+        stageManifest?.let { put("stageManifest", it) }
+        contentIndex?.let { put("contentIndex", it) }
+        indexedDocument?.let { put("document", it) }
+      },
+  )
+}
+
 private fun embeddedRuntimePodInstallRoot(context: Context): File =
   context.filesDir.resolve("openclaw/embedded-runtime-pod")
 
@@ -264,7 +375,30 @@ private fun walkFiles(rootDir: File): List<File> {
 }
 
 private fun toPodRelativePath(rootDir: File, file: File): String =
-  file.relativeTo(rootDir).invariantSeparatorsPath
+  file.canonicalFile.relativeTo(rootDir.canonicalFile).invariantSeparatorsPath
+
+private fun normalizeWorkspaceRelativePath(rawPath: String): String =
+  rawPath
+    .replace('\\', '/')
+    .trim()
+    .removePrefix("./")
+    .trimStart('/')
+
+private fun resolveWorkspaceRelativePath(rootDir: File, rawPath: String): File? {
+  val normalized = normalizeWorkspaceRelativePath(rawPath)
+  val candidate =
+    if (normalized.isEmpty()) {
+      rootDir
+    } else {
+      File(rootDir, normalized)
+    }.canonicalFile
+  val rootPath = rootDir.canonicalPath
+  return if (candidate.path == rootPath || candidate.path.startsWith("$rootPath${File.separator}")) {
+    candidate
+  } else {
+    null
+  }
+}
 
 private fun readJsonObjectOrNull(file: File): JsonObject? {
   return runCatching {
@@ -299,9 +433,7 @@ private data class WorkspaceTextPreview(
 private fun readWorkspaceTextPreview(
   file: File,
 ): WorkspaceTextPreview? {
-  val extension = file.extension.lowercase()
-  val previewable = extension in setOf("json", "md", "txt", "yaml", "yml")
-  if (!previewable) return null
+  if (!isWorkspaceTextFile(file)) return null
   val text = runCatching { file.readText(Charsets.UTF_8) }.getOrNull() ?: return null
   val trimmed = text.trim()
   if (trimmed.isEmpty()) return WorkspaceTextPreview(text = "", truncated = false)
@@ -311,6 +443,21 @@ private fun readWorkspaceTextPreview(
     text = trimmed.take(maxChars),
     truncated = truncated,
   )
+}
+
+private fun isWorkspaceTextFile(file: File): Boolean =
+  file.extension.lowercase() in embeddedRuntimePodTextExtensions
+
+private fun indexedWorkspaceDocument(
+  contentIndex: JsonObject?,
+  relativePath: String,
+): JsonObject? {
+  val documents = contentIndex?.get("documents") as? JsonArray ?: return null
+  return documents
+    .mapNotNull { it as? JsonObject }
+    .firstOrNull { doc ->
+      doc["path"]?.let { value -> value as? JsonPrimitive }?.content == relativePath
+    }
 }
 
 private fun sha256(file: File): String {

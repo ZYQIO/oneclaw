@@ -104,6 +104,37 @@ class PodHandlerTest {
     assertFalse(payload.containsKey("contentIndex"))
   }
 
+  @Test
+  fun handlePodWorkspaceRead_returnsPackagedDocumentAfterInstall() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodWorkspaceRead("""{"path":"templates/handoff-template.md","maxChars":4096}""")
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("pod.workspace.read", payload.getValue("command").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("localExecutionAvailable").jsonPrimitive.boolean)
+    assertEquals("templates/handoff-template.md", payload.getValue("relativePath").jsonPrimitive.content)
+    assertEquals(false, payload.getValue("textTruncated").jsonPrimitive.boolean)
+    assertTrue(payload.getValue("text").jsonPrimitive.content.contains("# Embedded Runtime Handoff"))
+    val document = payload.getValue("document").jsonObject
+    assertEquals("template", document.getValue("kind").jsonPrimitive.content)
+  }
+
+  @Test
+  fun handlePodWorkspaceRead_requiresPath() {
+    val context = RuntimeEnvironment.getApplication()
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodWorkspaceRead("""{"maxChars":256}""")
+
+    assertFalse(result.ok)
+    assertEquals("INVALID_REQUEST", result.error?.code)
+  }
+
   private fun parsePayload(payloadJson: String?) =
     json.parseToJsonElement(payloadJson ?: error("expected payload")).jsonObject
 }
