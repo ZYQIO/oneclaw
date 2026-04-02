@@ -212,6 +212,35 @@ The smoke script validates `/status`, `/chat/send-wait`, `/invoke/capabilities`,
 - Each run now writes `summary.json` and emits compact `chat.error_class`, `chat.error_host`, `chat.error_address_family`, and `chat.hint` fields when it can classify an upstream failure.
 - On March 29, 2026, a fresh adb-forward retest on the current OPPO / ColorOS device still reached `status.ok=true` plus `invoke.ok=true`, but `chat` classified as `openai_connect_timeout` with `chat.error_address_family=ipv6`; treat that as an outbound Codex network boundary rather than a local-host token or write-gate regression. A follow-up `pnpm android:local-host:openai-network` run then showed the deeper truth on the same device: both IPv4 and IPv6 `443` to `chatgpt.com` time out, while `auth.openai.com` still reaches both families successfully.
 
+## Embedded Runtime Pod Smoke
+
+Use this when you want a bounded, no-chat smoke for the packaged pod helper pair itself.
+
+USB-friendly flow with `adb forward`:
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
+pnpm android:local-host:embedded-runtime-pod:smoke
+```
+
+The pod smoke validates:
+
+- `/status` reports `embeddedRuntimePod` as ready
+- `/invoke/capabilities` advertises `pod.health` and `pod.workspace.scan`
+- `pod.health` matches the repo's current `pod-spec.json` version and asset file count
+- `pod.workspace.scan` matches the repo's current `content-index.json` document count and can read the packaged handoff template out of the extracted app-private workspace
+
+Optional overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL=http://127.0.0.1:3945`
+- `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
+- `OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_QUERY=handoff`
+- `OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT=5`
+- `OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH=templates/handoff-template.md`
+
+Each run writes `status.json`, `capabilities.json`, `pod-health.json`, `pod-workspace-scan.json`, and `summary.json` into the artifact directory so the phone-side pod state is easy to inspect after the fact.
+
 ## Local Host Doctor
 
 Use this when you want one repo command to bootstrap the debug token, rerun smoke, and automatically fall through to the OpenAI network probe only when the failure really looks like upstream Codex connectivity.

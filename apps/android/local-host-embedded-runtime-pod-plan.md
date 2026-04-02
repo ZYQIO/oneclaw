@@ -154,5 +154,5 @@ Exit criteria / 退出标准:
 
 - Keep the current phone-control and dedicated-device tracks moving as the primary product work. / 继续把当前 phone-control 和 dedicated-device 作为主产品工作推进。
 - Treat the pod as a parallel spike, not a blocker. / 把这个 pod 视为并行 spike，而不是 blocker。
-- The packaging/extraction/verifier path plus the helper pair `pod.health` and `pod.workspace.scan` are now landed; the next decision is whether a third offline helper such as `pod.manifest.describe` really reduces duplicated logic enough to justify itself. / 打包 / 解包 / 校验路径加 helper pair `pod.health` 与 `pod.workspace.scan` 现在都已经落地；下一步要判断的是第三条离线 helper，例如 `pod.manifest.describe`，是否真的值得做、并且足以减少重复逻辑。
+- The packaging/extraction/verifier path plus the helper pair `pod.health` and `pod.workspace.scan` are now landed; before adding a third offline helper such as `pod.manifest.describe`, keep the current pair replayable with `pnpm android:local-host:embedded-runtime-pod:smoke` and gather boring real-device proof first. / 打包 / 解包 / 校验路径加 helper pair `pod.health` 与 `pod.workspace.scan` 现在都已经落地；在考虑第三条离线 helper，例如 `pod.manifest.describe` 之前，先用 `pnpm android:local-host:embedded-runtime-pod:smoke` 把当前 helper pair 维持成可复跑基线，并补齐“无聊地可靠”的真机证据。
 - Do not move to browser or shell parity until the first slice is already boringly reliable on a real phone. / 在第一切片还没在真机上变得“无聊地可靠”之前，不要往 browser 或 shell 对齐上走。
