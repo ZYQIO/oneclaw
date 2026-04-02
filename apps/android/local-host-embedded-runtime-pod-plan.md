@@ -135,7 +135,7 @@ Exit criteria / 退出标准:
 
 - Land `pod.health` first, then add only one more offline helper when it proves its value. / 先落地 `pod.health`，再只在第二条离线 helper 真的有价值时补上它。
 - Surface helper results in the app and the local-host status snapshot or nodes surface. / 将 helper 结果同时展示在 app 和 local-host status 快照或 nodes 能力面里。
-- Status after April 2, 2026: both `pod.health` and `pod.workspace.scan` are landed through read-only `invoke` plus the `nodes` action surface, while `/status` continues to expose the same underlying readiness snapshot. / 截至 2026 年 4 月 2 日：`pod.health` 与 `pod.workspace.scan` 都已通过只读 `invoke` 与 `nodes` action 落地，而 `/status` 继续暴露同一份底层 readiness 快照。
+- Status after April 2, 2026: both `pod.health` and `pod.workspace.scan` are landed through read-only `invoke` plus the `nodes` action surface, while `/status` continues to expose the same underlying readiness snapshot; `pod.workspace.scan` now returns the extracted workspace stage manifest, `content-index`, filtered file inventory, and preview text from the packaged `0.2.0` payload. / 截至 2026 年 4 月 2 日：`pod.health` 与 `pod.workspace.scan` 都已通过只读 `invoke` 与 `nodes` action 落地，而 `/status` 继续暴露同一份底层 readiness 快照；`pod.workspace.scan` 现在还能从打包后的 `0.2.0` payload 中返回解包 workspace 的 stage manifest、`content-index`、过滤后的文件清单和 preview text。
 
 Exit criteria / 退出标准:
 
