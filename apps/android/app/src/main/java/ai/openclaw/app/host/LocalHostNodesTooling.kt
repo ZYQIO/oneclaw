@@ -88,6 +88,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_permissions", command = OpenClawDeviceCommand.Permissions.rawValue),
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
       NodesActionSpec(name = "pod_health", command = OpenClawPodCommand.Health.rawValue),
+      NodesActionSpec(name = "pod_manifest_describe", command = OpenClawPodCommand.ManifestDescribe.rawValue),
       NodesActionSpec(name = "pod_workspace_scan", command = OpenClawPodCommand.WorkspaceScan.rawValue),
       NodesActionSpec(name = "pod_workspace_read", command = OpenClawPodCommand.WorkspaceRead.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
@@ -323,6 +324,7 @@ internal class LocalHostNodesToolBridge(
       "device_permissions",
       "device_health",
       "pod_health",
+      "pod_manifest_describe",
       "ui_state",
       "ui_back",
       "ui_home" -> buildJsonObject {}

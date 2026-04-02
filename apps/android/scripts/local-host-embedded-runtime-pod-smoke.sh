@@ -40,9 +40,10 @@ What it does:
   2. Calls /status and verifies embeddedRuntimePod readiness
   3. Calls /invoke/capabilities and checks pod helper allowlisting
   4. Calls /invoke pod.health
-  5. Calls /invoke pod.workspace.scan
-  6. Calls /invoke pod.workspace.read
-  7. Verifies the phone-side results against repo pod-spec.json and content-index.json
+  5. Calls /invoke pod.manifest.describe
+  6. Calls /invoke pod.workspace.scan
+  7. Calls /invoke pod.workspace.read
+  8. Verifies the phone-side results against repo pod-spec.json and content-index.json
 
 Requirements:
   - curl
@@ -72,9 +73,11 @@ require_cmd curl
 require_cmd jq
 
 EXPECTED_VERSION="$(jq -r '.version // empty' "$POD_SPEC_PATH")"
+EXPECTED_STAGE_COUNT="$(jq -r '(.stages // []) | length' "$POD_SPEC_PATH")"
 EXPECTED_DOCUMENT_COUNT="$(jq -r '(.documents // []) | length' "$CONTENT_INDEX_PATH")"
 DEFAULT_EXPECTED_PATH="$(jq -r '.documents[0].path // empty' "$CONTENT_INDEX_PATH")"
 EXPECTED_FILE_COUNT="$(find "$RUNTIME_POD_DIR/assets" -type f | wc -l | tr -d '[:space:]')"
+EXPECTED_WORKSPACE_STAGE_FILE_COUNT="$(find "$RUNTIME_POD_DIR/assets/workspace" -type f | wc -l | tr -d '[:space:]')"
 
 if [[ -z "$EXPECTED_VERSION" ]]; then
   echo "Unable to determine expected pod version from $POD_SPEC_PATH" >&2
@@ -128,6 +131,7 @@ mkdir -p "$ARTIFACT_DIR"
 status_json="$ARTIFACT_DIR/status.json"
 capabilities_json="$ARTIFACT_DIR/capabilities.json"
 health_json="$ARTIFACT_DIR/pod-health.json"
+manifest_json="$ARTIFACT_DIR/pod-manifest-describe.json"
 workspace_json="$ARTIFACT_DIR/pod-workspace-scan.json"
 workspace_read_json="$ARTIFACT_DIR/pod-workspace-read.json"
 summary_json="$ARTIFACT_DIR/summary.json"
@@ -163,7 +167,9 @@ post_json() {
 
 echo "runtime_pod.base_url=$BASE_URL"
 echo "runtime_pod.expected_version=$EXPECTED_VERSION"
+echo "runtime_pod.expected_stage_count=$EXPECTED_STAGE_COUNT"
 echo "runtime_pod.expected_file_count=$EXPECTED_FILE_COUNT"
+echo "runtime_pod.expected_workspace_stage_file_count=$EXPECTED_WORKSPACE_STAGE_FILE_COUNT"
 echo "runtime_pod.expected_document_count=$EXPECTED_DOCUMENT_COUNT"
 if [[ -n "$EXPECTED_PATH" ]]; then
   echo "runtime_pod.expected_path=$EXPECTED_PATH"
@@ -180,22 +186,26 @@ status_pod_version="$(jq -r '.host.embeddedRuntimePod.manifestVersion // ""' "$s
 status_pod_verified_count="$(jq -r '.host.embeddedRuntimePod.verifiedFileCount // -1' "$status_json")"
 
 cap_has_health="$(jq -r --arg command 'pod.health' '(.commands // []) | index($command) != null' "$capabilities_json")"
+cap_has_manifest_describe="$(jq -r --arg command 'pod.manifest.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_scan="$(jq -r --arg command 'pod.workspace.scan' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_read="$(jq -r --arg command 'pod.workspace.read' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
 
 [[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
+[[ "$cap_has_manifest_describe" == "true" ]] || record_failure "capabilities_missing_pod_manifest_describe"
 [[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
 [[ "$cap_has_workspace_read" == "true" ]] || record_failure "capabilities_missing_pod_workspace_read"
 
-if [[ "$cap_has_health" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
+if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
   skip_helper_invocations=1
   failure_hint="install the current debug app on the device, rerun pnpm android:local-host:token -- --json, then rerun pnpm android:local-host:embedded-runtime-pod:smoke"
   printf '{}\n' >"$health_json"
+  printf '{}\n' >"$manifest_json"
   printf '{}\n' >"$workspace_json"
   printf '{}\n' >"$workspace_read_json"
 else
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
+  post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.manifest.describe"}' | tee "$manifest_json" >/dev/null
   workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
   workspace_read_body="$(jq -cn --arg path "$EXPECTED_PATH" '{command:"pod.workspace.read", params:{path:$path, maxChars:4096}}')"
@@ -208,6 +218,19 @@ health_ready="$(jq -r '.payload.ready // false' "$health_json")"
 health_local_execution="$(jq -r '.payload.localExecutionAvailable // false' "$health_json")"
 health_version="$(jq -r '.payload.manifestVersion // ""' "$health_json")"
 health_verified_count="$(jq -r '.payload.verifiedFileCount // -1' "$health_json")"
+
+manifest_ok="$(jq -r '.ok // false' "$manifest_json")"
+manifest_command="$(jq -r '.payload.command // ""' "$manifest_json")"
+manifest_source="$(jq -r '.payload.manifestSource // ""' "$manifest_json")"
+manifest_layout_source="$(jq -r '.payload.layoutSource // ""' "$manifest_json")"
+manifest_stage_count="$(jq -r '.payload.stageCount // -1' "$manifest_json")"
+manifest_directory_count="$(jq -r '.payload.directoryCount // -1' "$manifest_json")"
+manifest_file_count="$(jq -r '.payload.fileCount // -1' "$manifest_json")"
+manifest_workspace_declared="$(jq -r '.payload.workspaceStageDeclared // false' "$manifest_json")"
+manifest_workspace_installed="$(jq -r '.payload.workspaceStageInstalled // false' "$manifest_json")"
+manifest_version="$(jq -r '.payload.podManifest.version // ""' "$manifest_json")"
+manifest_layout_version="$(jq -r '.payload.podLayout.version // ""' "$manifest_json")"
+manifest_workspace_stage_file_count="$(jq -r '.payload.fileStageCounts.workspace // -1' "$manifest_json")"
 
 workspace_ok="$(jq -r '.ok // false' "$workspace_json")"
 workspace_command="$(jq -r '.payload.command // ""' "$workspace_json")"
@@ -247,6 +270,19 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$health_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_health_version_mismatch"
   [[ "$health_verified_count" == "$EXPECTED_FILE_COUNT" ]] || record_failure "pod_health_verified_file_count_mismatch"
 
+  [[ "$manifest_ok" == "true" ]] || record_failure "pod_manifest_describe_not_ok"
+  [[ "$manifest_command" == "pod.manifest.describe" ]] || record_failure "pod_manifest_describe_command_mismatch"
+  [[ "$manifest_source" == "installed" ]] || record_failure "pod_manifest_describe_manifest_source_mismatch"
+  [[ "$manifest_layout_source" == "installed" ]] || record_failure "pod_manifest_describe_layout_source_mismatch"
+  [[ "$manifest_stage_count" == "$EXPECTED_STAGE_COUNT" ]] || record_failure "pod_manifest_describe_stage_count_mismatch"
+  [[ "$manifest_directory_count" == "$EXPECTED_STAGE_COUNT" ]] || record_failure "pod_manifest_describe_directory_count_mismatch"
+  [[ "$manifest_file_count" == "$EXPECTED_FILE_COUNT" ]] || record_failure "pod_manifest_describe_file_count_mismatch"
+  [[ "$manifest_workspace_declared" == "true" ]] || record_failure "pod_manifest_describe_workspace_not_declared"
+  [[ "$manifest_workspace_installed" == "true" ]] || record_failure "pod_manifest_describe_workspace_not_installed"
+  [[ "$manifest_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_manifest_describe_manifest_version_mismatch"
+  [[ "$manifest_layout_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_manifest_describe_layout_version_mismatch"
+  [[ "$manifest_workspace_stage_file_count" == "$EXPECTED_WORKSPACE_STAGE_FILE_COUNT" ]] || record_failure "pod_manifest_describe_workspace_file_count_mismatch"
+
   [[ "$workspace_ok" == "true" ]] || record_failure "pod_workspace_scan_not_ok"
   [[ "$workspace_command" == "pod.workspace.scan" ]] || record_failure "pod_workspace_scan_command_mismatch"
   [[ "$workspace_stage_present" == "true" ]] || record_failure "pod_workspace_stage_missing"
@@ -278,8 +314,10 @@ fi
 jq -n \
   --arg baseUrl "$BASE_URL" \
   --arg expectedVersion "$EXPECTED_VERSION" \
+  --argjson expectedStageCount "$EXPECTED_STAGE_COUNT" \
   --argjson expectedDocumentCount "$EXPECTED_DOCUMENT_COUNT" \
   --argjson expectedFileCount "$EXPECTED_FILE_COUNT" \
+  --argjson expectedWorkspaceStageFileCount "$EXPECTED_WORKSPACE_STAGE_FILE_COUNT" \
   --arg expectedPath "$EXPECTED_PATH" \
   --arg query "$QUERY" \
   --argjson limit "$LIMIT" \
@@ -293,6 +331,7 @@ jq -n \
   --arg statusPodVersion "$status_pod_version" \
   --arg statusPodVerifiedCount "$status_pod_verified_count" \
   --arg capHasHealth "$cap_has_health" \
+  --arg capHasManifestDescribe "$cap_has_manifest_describe" \
   --arg capHasWorkspaceScan "$cap_has_workspace_scan" \
   --arg capHasWorkspaceRead "$cap_has_workspace_read" \
   --arg capWriteEnabled "$cap_write_enabled" \
@@ -302,6 +341,18 @@ jq -n \
   --arg healthLocalExecution "$health_local_execution" \
   --arg healthVersion "$health_version" \
   --arg healthVerifiedCount "$health_verified_count" \
+  --arg manifestOk "$manifest_ok" \
+  --arg manifestCommand "$manifest_command" \
+  --arg manifestSource "$manifest_source" \
+  --arg manifestLayoutSource "$manifest_layout_source" \
+  --arg manifestStageCount "$manifest_stage_count" \
+  --arg manifestDirectoryCount "$manifest_directory_count" \
+  --arg manifestFileCount "$manifest_file_count" \
+  --arg manifestWorkspaceDeclared "$manifest_workspace_declared" \
+  --arg manifestWorkspaceInstalled "$manifest_workspace_installed" \
+  --arg manifestVersion "$manifest_version" \
+  --arg manifestLayoutVersion "$manifest_layout_version" \
+  --arg manifestWorkspaceStageFileCount "$manifest_workspace_stage_file_count" \
   --arg workspaceOk "$workspace_ok" \
   --arg workspaceCommand "$workspace_command" \
   --arg workspaceStagePresent "$workspace_stage_present" \
@@ -327,7 +378,9 @@ jq -n \
     hint: (if $failureHint == "" then null else $failureHint end),
     expected: {
       podVersion: $expectedVersion,
+      stageCount: $expectedStageCount,
       assetFileCount: $expectedFileCount,
+      workspaceStageFileCount: $expectedWorkspaceStageFileCount,
       contentIndexDocumentCount: $expectedDocumentCount,
       expectedPath: (if $expectedPath == "" then null else $expectedPath end),
       query: $query,
@@ -347,6 +400,7 @@ jq -n \
     },
     capabilities: {
       hasPodHealth: ($capHasHealth == "true"),
+      hasPodManifestDescribe: ($capHasManifestDescribe == "true"),
       hasPodWorkspaceScan: ($capHasWorkspaceScan == "true"),
       hasPodWorkspaceRead: ($capHasWorkspaceRead == "true"),
       writeEnabled: ($capWriteEnabled == "true")
@@ -358,6 +412,20 @@ jq -n \
       localExecutionAvailable: ($healthLocalExecution == "true"),
       manifestVersion: (if $healthVersion == "" then null else $healthVersion end),
       verifiedFileCount: ($healthVerifiedCount | tonumber)
+    },
+    podManifestDescribe: {
+      ok: ($manifestOk == "true"),
+      command: (if $manifestCommand == "" then null else $manifestCommand end),
+      manifestSource: (if $manifestSource == "" then null else $manifestSource end),
+      layoutSource: (if $manifestLayoutSource == "" then null else $manifestLayoutSource end),
+      stageCount: ($manifestStageCount | tonumber),
+      directoryCount: ($manifestDirectoryCount | tonumber),
+      fileCount: ($manifestFileCount | tonumber),
+      workspaceStageDeclared: ($manifestWorkspaceDeclared == "true"),
+      workspaceStageInstalled: ($manifestWorkspaceInstalled == "true"),
+      manifestVersion: (if $manifestVersion == "" then null else $manifestVersion end),
+      layoutVersion: (if $manifestLayoutVersion == "" then null else $manifestLayoutVersion end),
+      workspaceStageFileCount: ($manifestWorkspaceStageFileCount | tonumber)
     },
     podWorkspaceScan: {
       ok: ($workspaceOk == "true"),
@@ -388,6 +456,8 @@ printf 'runtime_pod.status ok=%s mode=%s ready=%s version=%s verified=%s\n' \
   "$status_ok" "$status_mode" "$status_pod_ready" "$status_pod_version" "$status_pod_verified_count"
 printf 'runtime_pod.health ok=%s ready=%s local=%s version=%s verified=%s\n' \
   "$health_ok" "$health_ready" "$health_local_execution" "$health_version" "$health_verified_count"
+printf 'runtime_pod.manifest ok=%s source=%s layout=%s stages=%s files=%s workspace_files=%s\n' \
+  "$manifest_ok" "$manifest_source" "$manifest_layout_source" "$manifest_stage_count" "$manifest_file_count" "$manifest_workspace_stage_file_count"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \
   "$workspace_ok" "$workspace_stage_present" "$workspace_document_count" "$workspace_matched_file_count" "$workspace_returned_file_count" "$workspace_first_path"
 printf 'runtime_pod.workspace_read ok=%s path=%s size=%s truncated=%s kind=%s\n' \
@@ -407,6 +477,7 @@ echo "artifacts.dir=$ARTIFACT_DIR"
 echo "artifacts.status=$status_json"
 echo "artifacts.capabilities=$capabilities_json"
 echo "artifacts.health=$health_json"
+echo "artifacts.manifest=$manifest_json"
 echo "artifacts.workspace_scan=$workspace_json"
 echo "artifacts.workspace_read=$workspace_read_json"
 echo "artifacts.summary=$summary_json"

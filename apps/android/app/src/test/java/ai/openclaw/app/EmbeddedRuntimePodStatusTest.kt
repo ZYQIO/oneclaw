@@ -2,6 +2,7 @@ package ai.openclaw.app
 
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -53,5 +54,24 @@ class EmbeddedRuntimePodStatusTest {
     assertTrue(versionDir.resolve("layout.json").isFile)
     assertTrue(versionDir.resolve("bridge/manifest.json").isFile)
     assertTrue(versionDir.resolve("workspace/content-index.json").isFile)
+  }
+
+  @Test
+  fun describeEmbeddedRuntimePodManifest_reportsInstalledManifestAndLayout() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+
+    val describeResult = describeEmbeddedRuntimePodManifest(context)
+
+    assertTrue(describeResult.ok)
+    val payload = describeResult.payload ?: error("expected payload")
+    assertEquals("installed", payload.getValue("manifestSource").jsonPrimitive.content)
+    assertEquals("installed", payload.getValue("layoutSource").jsonPrimitive.content)
+    assertEquals(3, payload.getValue("stageCount").jsonPrimitive.int)
+    assertEquals(7, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(true, payload.getValue("workspaceStageDeclared").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
+    assertEquals("0.2.0", payload.getValue("podManifest").jsonObject.getValue("version").jsonPrimitive.content)
   }
 }

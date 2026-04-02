@@ -186,6 +186,9 @@ object InvokeCommandRegistry {
         name = OpenClawPodCommand.Health.rawValue,
       ),
       InvokeCommandSpec(
+        name = OpenClawPodCommand.ManifestDescribe.rawValue,
+      ),
+      InvokeCommandSpec(
         name = OpenClawPodCommand.WorkspaceScan.rawValue,
       ),
       InvokeCommandSpec(

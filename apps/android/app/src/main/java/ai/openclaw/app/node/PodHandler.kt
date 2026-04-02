@@ -1,6 +1,7 @@
 package ai.openclaw.app.node
 
 import android.content.Context
+import ai.openclaw.app.describeEmbeddedRuntimePodManifest
 import ai.openclaw.app.readEmbeddedRuntimePodWorkspaceFile
 import ai.openclaw.app.inspectEmbeddedRuntimePod
 import ai.openclaw.app.scanEmbeddedRuntimePodWorkspace
@@ -23,6 +24,25 @@ class PodHandler(
         command = "pod.health",
         inspection = inspection.toJson(),
         localExecutionAvailable = inspection.ready,
+      ).toString(),
+    )
+  }
+
+  fun handlePodManifestDescribe(_paramsJson: String?): GatewaySession.InvokeResult {
+    val inspection = inspectEmbeddedRuntimePod(appContext)
+    val describeResult = describeEmbeddedRuntimePodManifest(appContext)
+    if (!describeResult.ok) {
+      return GatewaySession.InvokeResult.error(
+        code = describeResult.code ?: "UNAVAILABLE",
+        message = describeResult.message ?: "UNAVAILABLE: manifest metadata unavailable",
+      )
+    }
+    return GatewaySession.InvokeResult.ok(
+      buildPayload(
+        command = "pod.manifest.describe",
+        inspection = inspection.toJson(),
+        localExecutionAvailable = inspection.ready,
+        extra = describeResult.payload ?: buildJsonObject {},
       ).toString(),
     )
   }

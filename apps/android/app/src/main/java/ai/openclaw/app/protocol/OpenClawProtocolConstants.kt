@@ -83,6 +83,7 @@ enum class OpenClawDeviceCommand(val rawValue: String) {
 
 enum class OpenClawPodCommand(val rawValue: String) {
   Health("pod.health"),
+  ManifestDescribe("pod.manifest.describe"),
   WorkspaceScan("pod.workspace.scan"),
   WorkspaceRead("pod.workspace.read"),
   ;

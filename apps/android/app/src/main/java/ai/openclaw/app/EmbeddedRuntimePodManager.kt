@@ -102,6 +102,13 @@ data class EmbeddedRuntimePodWorkspaceReadResult(
   val message: String? = null,
 )
 
+data class EmbeddedRuntimePodManifestDescribeResult(
+  val ok: Boolean,
+  val payload: JsonObject? = null,
+  val code: String? = null,
+  val message: String? = null,
+)
+
 fun ensureEmbeddedRuntimePodInstalled(context: Context): EmbeddedRuntimePodInspection {
   val manifest = loadEmbeddedRuntimePodManifest(context) ?: return inspectEmbeddedRuntimePod(context)
   val version = manifest.version.trim()
@@ -331,6 +338,97 @@ fun readEmbeddedRuntimePodWorkspaceFile(
   )
 }
 
+fun describeEmbeddedRuntimePodManifest(
+  context: Context,
+): EmbeddedRuntimePodManifestDescribeResult {
+  val inspection = inspectEmbeddedRuntimePod(context)
+  val assetManifest = readAssetJsonObjectOrNull(context, embeddedRuntimePodManifestAssetPath)
+    ?: return EmbeddedRuntimePodManifestDescribeResult(
+      ok = false,
+      code = "NOT_FOUND",
+      message = "NOT_FOUND: embedded pod manifest asset missing",
+    )
+  val assetLayout = readAssetJsonObjectOrNull(context, embeddedRuntimePodLayoutAssetPath)
+  val manifestVersion =
+    inspection.manifestVersion
+      ?: primitiveContent(assetManifest, "version")?.trim()?.takeIf { it.isNotEmpty() }
+  val versionDir = manifestVersion?.let { embeddedRuntimePodInstallRoot(context).resolve(it) }
+  val installedManifest = versionDir?.resolve("manifest.json")?.takeIf { it.isFile }?.let(::readJsonObjectOrNull)
+  val installedLayout = versionDir?.resolve("layout.json")?.takeIf { it.isFile }?.let(::readJsonObjectOrNull)
+  val selectedManifest = installedManifest ?: assetManifest
+  val selectedLayout = installedLayout ?: assetLayout
+  val stages = jsonObjectArray(selectedManifest["stages"])
+  val directories = jsonObjectArray(selectedLayout?.get("directories"))
+  val files = jsonObjectArray(selectedManifest["files"]).ifEmpty { jsonObjectArray(selectedLayout?.get("files")) }
+  val fileStageCounts = LinkedHashMap<String, Int>()
+  files.forEach { file ->
+    val stageName = primitiveContent(file, "stage")?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
+    fileStageCounts[stageName] = (fileStageCounts[stageName] ?: 0) + 1
+  }
+  val stageNames =
+    stages.mapNotNull { stage ->
+      primitiveContent(stage, "name")?.trim()?.takeIf { it.isNotEmpty() }
+    }
+  val stageDestinations =
+    stages.mapNotNull { stage ->
+      primitiveContent(stage, "destination")?.trim()?.takeIf { it.isNotEmpty() }
+    }
+  val workspaceDeclared =
+    stages.any { stage ->
+      primitiveContent(stage, "name") == "workspace" || primitiveContent(stage, "destination") == "workspace"
+    }
+  val workspaceInstalled = versionDir?.resolve("workspace")?.isDirectory == true
+
+  return EmbeddedRuntimePodManifestDescribeResult(
+    ok = true,
+    payload =
+      buildJsonObject {
+        put("assetManifestPresent", JsonPrimitive(true))
+        put("assetLayoutPresent", JsonPrimitive(assetLayout != null))
+        put("installedManifestPresent", JsonPrimitive(installedManifest != null))
+        put("installedLayoutPresent", JsonPrimitive(installedLayout != null))
+        put("manifestSource", JsonPrimitive(if (installedManifest != null) "installed" else "bundled"))
+        put(
+          "layoutSource",
+          JsonPrimitive(
+            when {
+              installedLayout != null -> "installed"
+              assetLayout != null -> "bundled"
+              else -> "missing"
+            },
+          ),
+        )
+        put("stageCount", JsonPrimitive(stages.size))
+        put("directoryCount", JsonPrimitive(directories.size))
+        put("fileCount", JsonPrimitive(files.size))
+        put("workspaceStageDeclared", JsonPrimitive(workspaceDeclared))
+        put("workspaceStageInstalled", JsonPrimitive(workspaceInstalled))
+        put(
+          "stageNames",
+          buildJsonArray {
+            stageNames.forEach { add(JsonPrimitive(it)) }
+          },
+        )
+        put(
+          "stageDestinations",
+          buildJsonArray {
+            stageDestinations.forEach { add(JsonPrimitive(it)) }
+          },
+        )
+        put(
+          "fileStageCounts",
+          buildJsonObject {
+            fileStageCounts.forEach { (stageName, count) ->
+              put(stageName, JsonPrimitive(count))
+            }
+          },
+        )
+        put("podManifest", selectedManifest)
+        selectedLayout?.let { put("podLayout", it) }
+      },
+  )
+}
+
 private fun embeddedRuntimePodInstallRoot(context: Context): File =
   context.filesDir.resolve("openclaw/embedded-runtime-pod")
 
@@ -342,6 +440,17 @@ private fun loadEmbeddedRuntimePodManifest(context: Context): EmbeddedRuntimePod
       .use { reader ->
         embeddedRuntimePodJson.decodeFromString(EmbeddedRuntimePodAssetManifest.serializer(), reader.readText())
       }
+  }.getOrNull()
+}
+
+private fun readAssetJsonObjectOrNull(
+  context: Context,
+  assetPath: String,
+): JsonObject? {
+  return runCatching {
+    context.assets.open(assetPath).bufferedReader().use { reader ->
+      embeddedRuntimePodJson.parseToJsonElement(reader.readText()) as? JsonObject
+    }
   }.getOrNull()
 }
 
@@ -452,12 +561,24 @@ private fun indexedWorkspaceDocument(
   contentIndex: JsonObject?,
   relativePath: String,
 ): JsonObject? {
-  val documents = contentIndex?.get("documents") as? JsonArray ?: return null
+  val documents = jsonObjectArray(contentIndex?.get("documents"))
   return documents
-    .mapNotNull { it as? JsonObject }
     .firstOrNull { doc ->
       doc["path"]?.let { value -> value as? JsonPrimitive }?.content == relativePath
     }
+}
+
+private fun jsonObjectArray(element: kotlinx.serialization.json.JsonElement?): List<JsonObject> {
+  val array = element as? JsonArray ?: return emptyList()
+  return array.mapNotNull { it as? JsonObject }
+}
+
+private fun primitiveContent(
+  jsonObject: JsonObject,
+  key: String,
+): String? {
+  val primitive = jsonObject[key] as? JsonPrimitive ?: return null
+  return primitive.content.takeUnless { it == "null" }
 }
 
 private fun sha256(file: File): String {

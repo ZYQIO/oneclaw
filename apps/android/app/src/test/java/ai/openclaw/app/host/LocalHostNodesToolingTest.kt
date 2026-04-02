@@ -39,6 +39,7 @@ class LocalHostNodesToolingTest {
     assertTrue("device_status" in actions)
     assertTrue("device_permissions" in actions)
     assertTrue("pod_health" in actions)
+    assertTrue("pod_manifest_describe" in actions)
     assertTrue("pod_workspace_scan" in actions)
     assertTrue("pod_workspace_read" in actions)
     assertTrue("ui_state" in actions)
@@ -164,6 +165,34 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("workspaceStagePresent"))
       assertTrue(result.outputText.contains("matchedFileCount"))
+    }
+
+  @Test
+  fun podManifestDescribe_mapsInvokeCommandForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.manifest.describe", command)
+            org.junit.Assert.assertEquals("{}", paramsJson)
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"manifestSource":"installed","fileCount":7}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_manifest_describe"}""",
+        )
+
+      assertTrue(result.outputText.contains("manifestSource"))
+      assertTrue(result.outputText.contains("fileCount"))
     }
 
   @Test

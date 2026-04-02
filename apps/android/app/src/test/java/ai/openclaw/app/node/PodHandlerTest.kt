@@ -55,6 +55,53 @@ class PodHandlerTest {
   }
 
   @Test
+  fun handlePodManifestDescribe_prefersInstalledMetadataAfterInstall() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodManifestDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("pod.manifest.describe", payload.getValue("command").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("localExecutionAvailable").jsonPrimitive.boolean)
+    assertEquals("installed", payload.getValue("manifestSource").jsonPrimitive.content)
+    assertEquals("installed", payload.getValue("layoutSource").jsonPrimitive.content)
+    assertEquals(3, payload.getValue("stageCount").jsonPrimitive.int)
+    assertEquals(7, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(true, payload.getValue("workspaceStageDeclared").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
+    val stageNames = payload.getValue("stageNames").jsonArray.map { it.jsonPrimitive.content }
+    assertTrue("workspace" in stageNames)
+    val fileStageCounts = payload.getValue("fileStageCounts").jsonObject
+    assertEquals(5, fileStageCounts.getValue("workspace").jsonPrimitive.int)
+    val podManifest = payload.getValue("podManifest").jsonObject
+    assertEquals("0.2.0", podManifest.getValue("version").jsonPrimitive.content)
+    val podLayout = payload.getValue("podLayout").jsonObject
+    assertEquals("0.2.0", podLayout.getValue("version").jsonPrimitive.content)
+  }
+
+  @Test
+  fun handlePodManifestDescribe_fallsBackToBundledMetadataBeforeInstall() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodManifestDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals(false, payload.getValue("localExecutionAvailable").jsonPrimitive.boolean)
+    assertEquals("bundled", payload.getValue("manifestSource").jsonPrimitive.content)
+    assertEquals("bundled", payload.getValue("layoutSource").jsonPrimitive.content)
+    assertEquals(false, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
+    assertEquals(3, payload.getValue("stageCount").jsonPrimitive.int)
+    assertEquals(7, payload.getValue("fileCount").jsonPrimitive.int)
+  }
+
+  @Test
   fun handlePodWorkspaceScan_reportsWorkspaceAssetsAfterInstall() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
