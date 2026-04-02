@@ -62,21 +62,22 @@ If we need a second command later, it should still be offline and deterministic.
 
 ## Directory And Build Shape / 目录与构建形态
 
-### Suggested source layout / 建议源码布局
+### Current landed layout / 当前已落地布局
 
-- `apps/android/embedded-runtime-pod/` for source manifests, helper metadata, and packaging inputs. / `apps/android/embedded-runtime-pod/` 存放 source manifest、helper 元数据和打包输入。
-- `apps/android/app/src/main/assets/embedded-runtime-pod/` for generated packaged assets. / `apps/android/app/src/main/assets/embedded-runtime-pod/` 存放生成后的打包资产。
-- `apps/android/app/src/main/java/.../embeddedpod/` for the Android-side extractor, verifier, and invoker adapter. / `apps/android/app/src/main/java/.../embeddedpod/` 存放 Android 侧的解包器、校验器和调用适配器。
+- `apps/android/runtime-pod/` holds the source manifest, helper metadata, and packaging inputs. / `apps/android/runtime-pod/` 存放 source manifest、helper 元数据和打包输入。
+- `apps/android/app/build/generated/embedded-runtime-pod-assets/<variant>/embedded-runtime-pod/` holds the generated packaged assets produced by `pnpm android:local-host:embedded-runtime-pod:sync-assets` during Android builds. / `apps/android/app/build/generated/embedded-runtime-pod-assets/<variant>/embedded-runtime-pod/` 存放 Android 构建时由 `pnpm android:local-host:embedded-runtime-pod:sync-assets` 生成的打包资产。
+- `apps/android/app/src/main/java/ai/openclaw/app/EmbeddedRuntimePodManager.kt` holds the Android-side extractor, verifier, and status adapter. / `apps/android/app/src/main/java/ai/openclaw/app/EmbeddedRuntimePodManager.kt` 存放 Android 侧的解包器、校验器和状态适配层。
 
 ### Suggested runtime location / 建议运行时位置
 
-- Extract to a versioned app-private directory such as `filesDir/embedded-runtime-pod/<version>/`. / 解压到带版本号的 app 私有目录，例如 `filesDir/embedded-runtime-pod/<version>/`。
+- Extract to a versioned app-private directory such as `filesDir/openclaw/embedded-runtime-pod/<version>/`. / 解压到带版本号的 app 私有目录，例如 `filesDir/openclaw/embedded-runtime-pod/<version>/`。
 - Keep the extracted payload read-only after verification. / 验证完成后保持解包产物只读。
 - Cache only what is needed for the current installed version. / 只缓存当前安装版本所需的内容。
 
 ### Suggested build rule / 建议构建规则
 
 - Package the pod at build time. / 在构建期完成打包。
+- Keep a sanitized APK-safe asset manifest/layout separate from the raw desktop-side staging metadata. / 让 APK-safe 的清洗后 asset manifest/layout 与原始桌面侧 staging 元数据保持分离。
 - Verify checksum before extraction and before every first use. / 在解压前以及首次使用前都做校验和验证。
 - Fail closed if the manifest or checksum does not match. / 如果 manifest 或校验和不匹配，则默认失败关闭。
 - Never auto-fetch executable pod updates from a server in this first slice. / 第一切片中绝不从服务器自动拉取可执行 pod 更新。
