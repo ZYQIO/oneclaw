@@ -241,6 +241,9 @@ Optional overrides:
 
 Each run writes `status.json`, `capabilities.json`, `pod-health.json`, `pod-workspace-scan.json`, and `summary.json` into the artifact directory so the phone-side pod state is easy to inspect after the fact.
 
+- If the smoke reports `capabilities_missing_pod_health` or `capabilities_missing_pod_workspace_scan`, the phone is usually still running an older debug build. Reinstall the current app with `cd apps/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:installDebug`, then rerun `pnpm android:local-host:token -- --json` and the pod smoke.
+- On April 2, 2026, that exact rerun path passed on the current OPPO / ColorOS device with `manifestVersion=0.2.0`, `verifiedFileCount=7`, `documentCount=2`, and `firstPath=templates/handoff-template.md`.
+
 ## Local Host Doctor
 
 Use this when you want one repo command to bootstrap the debug token, rerun smoke, and automatically fall through to the OpenAI network probe only when the failure really looks like upstream Codex connectivity.

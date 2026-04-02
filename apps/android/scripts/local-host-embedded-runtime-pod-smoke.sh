@@ -126,6 +126,8 @@ summary_json="$ARTIFACT_DIR/summary.json"
 
 smoke_failed=0
 failed_checks=()
+failure_hint=""
+skip_helper_invocations=0
 
 record_failure() {
   local check=$1
@@ -161,9 +163,6 @@ fi
 
 get_json "$BASE_URL/api/local-host/v1/status" | tee "$status_json" >/dev/null
 get_json "$BASE_URL/api/local-host/v1/invoke/capabilities" | tee "$capabilities_json" >/dev/null
-post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
-workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
-post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
 
 status_ok="$(jq -r '.ok // false' "$status_json")"
 status_mode="$(jq -r '.mode // ""' "$status_json")"
@@ -175,6 +174,20 @@ status_pod_verified_count="$(jq -r '.host.embeddedRuntimePod.verifiedFileCount /
 cap_has_health="$(jq -r --arg command 'pod.health' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_scan="$(jq -r --arg command 'pod.workspace.scan' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
+
+[[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
+[[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
+
+if [[ "$cap_has_health" != "true" || "$cap_has_workspace_scan" != "true" ]]; then
+  skip_helper_invocations=1
+  failure_hint="install the current debug app on the device, rerun pnpm android:local-host:token -- --json, then rerun pnpm android:local-host:embedded-runtime-pod:smoke"
+  printf '{}\n' >"$health_json"
+  printf '{}\n' >"$workspace_json"
+else
+  post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
+  workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
+  post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
+fi
 
 health_ok="$(jq -r '.ok // false' "$health_json")"
 health_command="$(jq -r '.payload.command // ""' "$health_json")"
@@ -205,28 +218,27 @@ fi
 [[ "$status_pod_version" == "$EXPECTED_VERSION" ]] || record_failure "status_version_mismatch"
 [[ "$status_pod_verified_count" == "$EXPECTED_FILE_COUNT" ]] || record_failure "status_verified_file_count_mismatch"
 
-[[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
-[[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
+if [[ "$skip_helper_invocations" == "0" ]]; then
+  [[ "$health_ok" == "true" ]] || record_failure "pod_health_not_ok"
+  [[ "$health_command" == "pod.health" ]] || record_failure "pod_health_command_mismatch"
+  [[ "$health_ready" == "true" ]] || record_failure "pod_health_not_ready"
+  [[ "$health_local_execution" == "true" ]] || record_failure "pod_health_local_execution_unavailable"
+  [[ "$health_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_health_version_mismatch"
+  [[ "$health_verified_count" == "$EXPECTED_FILE_COUNT" ]] || record_failure "pod_health_verified_file_count_mismatch"
 
-[[ "$health_ok" == "true" ]] || record_failure "pod_health_not_ok"
-[[ "$health_command" == "pod.health" ]] || record_failure "pod_health_command_mismatch"
-[[ "$health_ready" == "true" ]] || record_failure "pod_health_not_ready"
-[[ "$health_local_execution" == "true" ]] || record_failure "pod_health_local_execution_unavailable"
-[[ "$health_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_health_version_mismatch"
-[[ "$health_verified_count" == "$EXPECTED_FILE_COUNT" ]] || record_failure "pod_health_verified_file_count_mismatch"
-
-[[ "$workspace_ok" == "true" ]] || record_failure "pod_workspace_scan_not_ok"
-[[ "$workspace_command" == "pod.workspace.scan" ]] || record_failure "pod_workspace_scan_command_mismatch"
-[[ "$workspace_stage_present" == "true" ]] || record_failure "pod_workspace_stage_missing"
-[[ "$workspace_stage_manifest_present" == "true" ]] || record_failure "pod_workspace_stage_manifest_missing"
-[[ "$workspace_content_index_present" == "true" ]] || record_failure "pod_workspace_content_index_missing"
-[[ "$workspace_stage_name" == "workspace" ]] || record_failure "pod_workspace_stage_name_mismatch"
-[[ "$workspace_document_count" == "$EXPECTED_DOCUMENT_COUNT" ]] || record_failure "pod_workspace_document_count_mismatch"
-[[ "$workspace_matched_file_count" -ge 1 ]] || record_failure "pod_workspace_no_matched_files"
-[[ "$workspace_returned_file_count" -ge 1 ]] || record_failure "pod_workspace_no_returned_files"
-[[ -n "$workspace_first_preview" ]] || record_failure "pod_workspace_missing_text_preview"
-if [[ -n "$EXPECTED_PATH" ]]; then
-  [[ "$workspace_expected_path_found" == "true" ]] || record_failure "pod_workspace_expected_path_missing"
+  [[ "$workspace_ok" == "true" ]] || record_failure "pod_workspace_scan_not_ok"
+  [[ "$workspace_command" == "pod.workspace.scan" ]] || record_failure "pod_workspace_scan_command_mismatch"
+  [[ "$workspace_stage_present" == "true" ]] || record_failure "pod_workspace_stage_missing"
+  [[ "$workspace_stage_manifest_present" == "true" ]] || record_failure "pod_workspace_stage_manifest_missing"
+  [[ "$workspace_content_index_present" == "true" ]] || record_failure "pod_workspace_content_index_missing"
+  [[ "$workspace_stage_name" == "workspace" ]] || record_failure "pod_workspace_stage_name_mismatch"
+  [[ "$workspace_document_count" == "$EXPECTED_DOCUMENT_COUNT" ]] || record_failure "pod_workspace_document_count_mismatch"
+  [[ "$workspace_matched_file_count" -ge 1 ]] || record_failure "pod_workspace_no_matched_files"
+  [[ "$workspace_returned_file_count" -ge 1 ]] || record_failure "pod_workspace_no_returned_files"
+  [[ -n "$workspace_first_preview" ]] || record_failure "pod_workspace_missing_text_preview"
+  if [[ -n "$EXPECTED_PATH" ]]; then
+    [[ "$workspace_expected_path_found" == "true" ]] || record_failure "pod_workspace_expected_path_missing"
+  fi
 fi
 
 failed_checks_json='[]'
@@ -242,6 +254,8 @@ jq -n \
   --arg expectedPath "$EXPECTED_PATH" \
   --arg query "$QUERY" \
   --argjson limit "$LIMIT" \
+  --arg failureHint "$failure_hint" \
+  --arg skipHelperInvocations "$skip_helper_invocations" \
   --argjson failedChecks "$failed_checks_json" \
   --arg statusOk "$status_ok" \
   --arg statusMode "$status_mode" \
@@ -273,6 +287,7 @@ jq -n \
   '{
     ok: ($failedChecks | length == 0),
     baseUrl: $baseUrl,
+    hint: (if $failureHint == "" then null else $failureHint end),
     expected: {
       podVersion: $expectedVersion,
       assetFileCount: $expectedFileCount,
@@ -282,6 +297,9 @@ jq -n \
       limit: $limit
     },
     failedChecks: $failedChecks,
+    preflight: {
+      helperInvocationsSkipped: ($skipHelperInvocations == "1")
+    },
     status: {
       ok: ($statusOk == "true"),
       mode: (if $statusMode == "" then null else $statusMode end),
@@ -325,6 +343,9 @@ printf 'runtime_pod.health ok=%s ready=%s local=%s version=%s verified=%s\n' \
   "$health_ok" "$health_ready" "$health_local_execution" "$health_version" "$health_verified_count"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \
   "$workspace_ok" "$workspace_stage_present" "$workspace_document_count" "$workspace_matched_file_count" "$workspace_returned_file_count" "$workspace_first_path"
+if [[ -n "$failure_hint" ]]; then
+  echo "runtime_pod.hint=$failure_hint"
+fi
 
 if [[ "$smoke_failed" != "0" ]]; then
   echo "runtime_pod.smoke=failed" >&2
