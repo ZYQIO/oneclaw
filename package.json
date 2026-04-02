@@ -520,6 +520,7 @@
     "android:local-host:dedicated:testdpc-qr": "bash apps/android/scripts/local-host-dedicated-testdpc-qr.sh",
     "android:local-host:doctor": "bash apps/android/scripts/local-host-doctor.sh",
     "android:local-host:embedded-runtime-pod:prepare": "pnpm exec tsx apps/android/scripts/local-host-embedded-runtime-pod-prepare.ts",
+    "android:local-host:embedded-runtime-pod:sync-assets": "pnpm exec tsx apps/android/scripts/local-host-embedded-runtime-pod-sync-assets.ts",
     "android:local-host:openai-network": "bash apps/android/scripts/local-host-openai-network-probe.sh",
     "android:local-host:permissions": "bash apps/android/scripts/local-host-permission-smoke.sh",
     "android:local-host:smoke": "bash apps/android/scripts/local-host-remote-smoke.sh",

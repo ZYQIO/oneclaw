@@ -1,6 +1,74 @@
 import com.android.build.api.variant.impl.VariantOutputImpl
+import java.io.File
+import javax.inject.Inject
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecOperations
 
 val dnsjavaInetAddressResolverService = "META-INF/services/java.net.spi.InetAddressResolverProvider"
+val openclawRepoRootDir = rootProject.projectDir.resolve("../..").canonicalFile
+
+abstract class PrepareEmbeddedRuntimePodAssetsTask : DefaultTask() {
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    @get:Input
+    abstract val repoRootPath: Property<String>
+
+    @get:InputDirectory
+    abstract val sourceDir: DirectoryProperty
+
+    @get:InputFile
+    abstract val scriptFile: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val artifactDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Input
+    abstract val clean: Property<Boolean>
+
+    init {
+        clean.convention(true)
+    }
+
+    @TaskAction
+    fun generate() {
+        val repoRoot = File(repoRootPath.get())
+        val command =
+            mutableListOf(
+                "pnpm",
+                "exec",
+                "tsx",
+                scriptFile.get().asFile.absolutePath,
+                "--repo-root",
+                repoRoot.absolutePath,
+                "--source-dir",
+                sourceDir.get().asFile.absolutePath,
+                "--artifact-dir",
+                artifactDir.get().asFile.absolutePath,
+                "--target-dir",
+                outputDir.get().asFile.absolutePath,
+            )
+        if (!clean.get()) {
+            command += "--no-clean"
+        }
+
+        execOperations.exec {
+            workingDir = repoRoot
+            commandLine(command)
+        }
+    }
+}
 
 val androidStoreFile = providers.gradleProperty("OPENCLAW_ANDROID_STORE_FILE").orNull?.takeIf { it.isNotBlank() }
 val androidStorePassword = providers.gradleProperty("OPENCLAW_ANDROID_STORE_PASSWORD").orNull?.takeIf { it.isNotBlank() }
@@ -135,6 +203,26 @@ android {
 
 androidComponents {
     onVariants { variant ->
+        val variantName =
+            variant.name.replaceFirstChar { firstChar ->
+                if (firstChar.isLowerCase()) {
+                    firstChar.titlecase()
+                } else {
+                    firstChar.toString()
+                }
+            }
+        val prepareEmbeddedRuntimePodAssets =
+            tasks.register<PrepareEmbeddedRuntimePodAssetsTask>("prepare${variantName}EmbeddedRuntimePodAssets") {
+                repoRootPath.set(openclawRepoRootDir.absolutePath)
+                sourceDir.set(openclawRepoRootDir.resolve("apps/android/runtime-pod"))
+                scriptFile.set(openclawRepoRootDir.resolve("apps/android/scripts/local-host-embedded-runtime-pod-sync-assets.ts"))
+                artifactDir.set(layout.buildDirectory.dir("intermediates/embedded-runtime-pod/${variant.name}/prepared"))
+                outputDir.set(layout.buildDirectory.dir("generated/embedded-runtime-pod-assets/${variant.name}"))
+            }
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            prepareEmbeddedRuntimePodAssets,
+            PrepareEmbeddedRuntimePodAssetsTask::outputDir,
+        )
         variant.outputs
             .filterIsInstance<VariantOutputImpl>()
             .forEach { output ->

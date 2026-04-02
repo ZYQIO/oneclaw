@@ -3,6 +3,7 @@ package ai.openclaw.app
 import android.app.Application
 import android.content.BroadcastReceiver
 import android.os.StrictMode
+import android.util.Log
 import ai.openclaw.app.auth.OpenAICodexAuthManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,11 @@ class NodeApp : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    runCatching {
+      ensureEmbeddedRuntimePodInstalled(this)
+    }.onFailure { err ->
+      Log.w("OpenClawEmbeddedRuntimePod", "failed to prepare embedded runtime pod", err)
+    }
     if (BuildConfig.DEBUG) {
       StrictMode.setThreadPolicy(
         StrictMode.ThreadPolicy.Builder()
