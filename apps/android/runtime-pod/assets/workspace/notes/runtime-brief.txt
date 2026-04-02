@@ -1,0 +1,5 @@
+Embedded Runtime Pod v0.2.0
+
+This workspace is packaged at build time and extracted into app-private storage.
+It is meant for deterministic offline helper workflows, not a general shell.
+Use pod.workspace.scan to inspect the staged workspace from inside the app.

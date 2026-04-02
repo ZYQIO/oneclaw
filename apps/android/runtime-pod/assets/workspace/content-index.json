@@ -1,0 +1,17 @@
+{
+  "workspaceVersion": 1,
+  "documents": [
+    {
+      "path": "templates/handoff-template.md",
+      "kind": "template",
+      "title": "Embedded Runtime Handoff",
+      "description": "Capture the current pod helper result and the next bounded offline step."
+    },
+    {
+      "path": "templates/offline-task-brief.md",
+      "kind": "template",
+      "title": "Offline Task Brief",
+      "description": "Packaged offline brief that proves the embedded pod workspace can be scanned from inside the app."
+    }
+  ]
+}

@@ -48,6 +48,7 @@ internal object LocalHostCommandPolicy {
       OpenClawMotionCommand.Pedometer.rawValue,
       OpenClawNotificationsCommand.List.rawValue,
       OpenClawPodCommand.Health.rawValue,
+      OpenClawPodCommand.WorkspaceScan.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
       OpenClawUiCommand.State.rawValue,

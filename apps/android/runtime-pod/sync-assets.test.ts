@@ -30,11 +30,15 @@ describe("syncRuntimePodAssets", () => {
 
     expect(manifest.assetBasePath).toBe("embedded-runtime-pod/staged");
     expect(manifest.assetManifestPath).toBe("embedded-runtime-pod/manifest.json");
-    expect(manifest.fileCount).toBe(3);
+    expect(manifest.fileCount).toBe(7);
     expect(manifest.files.map((file) => file.relativePath)).toEqual([
       "bridge/manifest.json",
       "toolkit/manifest.json",
+      "workspace/content-index.json",
       "workspace/manifest.json",
+      "workspace/notes/runtime-brief.txt",
+      "workspace/templates/handoff-template.md",
+      "workspace/templates/offline-task-brief.md",
     ]);
     expect(manifest.files.every((file) => file.assetPath.startsWith("embedded-runtime-pod/staged/"))).toBe(true);
     expect((await stat(path.join(result.assetRoot, "staged", "bridge", "manifest.json"))).isFile()).toBe(true);

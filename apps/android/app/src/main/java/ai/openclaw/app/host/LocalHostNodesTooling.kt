@@ -88,6 +88,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "device_permissions", command = OpenClawDeviceCommand.Permissions.rawValue),
       NodesActionSpec(name = "device_health", command = OpenClawDeviceCommand.Health.rawValue),
       NodesActionSpec(name = "pod_health", command = OpenClawPodCommand.Health.rawValue),
+      NodesActionSpec(name = "pod_workspace_scan", command = OpenClawPodCommand.WorkspaceScan.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
       NodesActionSpec(name = "ui_wait_for_text", command = OpenClawUiCommand.WaitForText.rawValue),
       NodesActionSpec(name = "ui_launch_app", command = OpenClawUiCommand.LaunchApp.rawValue),
@@ -318,9 +319,15 @@ internal class LocalHostNodesToolBridge(
       "device_info",
       "device_permissions",
       "device_health",
+      "pod_health",
       "ui_state",
       "ui_back",
       "ui_home" -> buildJsonObject {}
+      "pod_workspace_scan" ->
+        buildJsonObject {
+          copyString(params, "query")
+          copyNumber(params, "limit")
+        }
       "ui_launch_app" ->
         buildJsonObject {
           copyString(params, "packageName")

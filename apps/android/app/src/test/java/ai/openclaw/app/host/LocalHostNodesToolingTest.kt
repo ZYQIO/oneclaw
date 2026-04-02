@@ -39,6 +39,7 @@ class LocalHostNodesToolingTest {
     assertTrue("device_status" in actions)
     assertTrue("device_permissions" in actions)
     assertTrue("pod_health" in actions)
+    assertTrue("pod_workspace_scan" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
     assertFalse("ui_launch_app" in actions)
@@ -133,6 +134,35 @@ class LocalHostNodesToolingTest {
         )
 
       assertTrue(result.outputText.contains("matched"))
+    }
+
+  @Test
+  fun podWorkspaceScan_mapsQueryAndLimitForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.workspace.scan", command)
+            assertTrue(paramsJson.orEmpty().contains("\"query\":\"template\""))
+            assertTrue(paramsJson.orEmpty().contains("\"limit\":2"))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"workspaceStagePresent":true,"matchedFileCount":1}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_workspace_scan","query":"template","limit":2}""",
+        )
+
+      assertTrue(result.outputText.contains("workspaceStagePresent"))
+      assertTrue(result.outputText.contains("matchedFileCount"))
     }
 
   @Test

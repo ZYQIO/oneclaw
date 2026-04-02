@@ -170,6 +170,56 @@ fun inspectEmbeddedRuntimePod(context: Context): EmbeddedRuntimePodInspection {
   )
 }
 
+fun scanEmbeddedRuntimePodWorkspace(
+  context: Context,
+  limit: Int = 20,
+  query: String? = null,
+): JsonObject {
+  val inspection = inspectEmbeddedRuntimePod(context)
+  val manifestVersion = inspection.manifestVersion
+  val normalizedLimit = limit.coerceIn(1, 50)
+  val normalizedQuery = query?.trim()?.takeIf { it.isNotEmpty() }
+  val workspaceRoot = manifestVersion?.let { embeddedRuntimePodInstallRoot(context).resolve(it).resolve("workspace") }
+  val workspacePresent = workspaceRoot?.isDirectory == true
+  val stageManifest = workspaceRoot?.resolve("manifest.json")?.takeIf { it.isFile }?.let(::readJsonObjectOrNull)
+  val contentIndex = workspaceRoot?.resolve("content-index.json")?.takeIf { it.isFile }?.let(::readJsonObjectOrNull)
+  val allFiles =
+    if (workspacePresent) {
+      walkFiles(workspaceRoot)
+        .filter { it.isFile }
+        .sortedBy { toPodRelativePath(workspaceRoot, it) }
+    } else {
+      emptyList()
+    }
+  val matchedFiles =
+    allFiles.filter { file ->
+      normalizedQuery == null || toPodRelativePath(workspaceRoot!!, file).contains(normalizedQuery, ignoreCase = true)
+    }
+  val selectedFiles = matchedFiles.take(normalizedLimit)
+
+  return buildJsonObject {
+    put("workspaceStagePath", JsonPrimitive("workspace"))
+    put("workspaceStagePresent", JsonPrimitive(workspacePresent))
+    put("stageManifestPresent", JsonPrimitive(stageManifest != null))
+    put("contentIndexPresent", JsonPrimitive(contentIndex != null))
+    put("limit", JsonPrimitive(normalizedLimit))
+    normalizedQuery?.let { put("query", JsonPrimitive(it)) }
+    put("matchedFileCount", JsonPrimitive(matchedFiles.size))
+    put("returnedFileCount", JsonPrimitive(selectedFiles.size))
+    put("truncated", JsonPrimitive(matchedFiles.size > selectedFiles.size))
+    stageManifest?.let { put("stageManifest", it) }
+    contentIndex?.let { put("contentIndex", it) }
+    put(
+      "files",
+      buildJsonArray {
+        selectedFiles.forEach { file ->
+          add(describeWorkspaceFile(workspaceRoot!!, file))
+        }
+      },
+    )
+  }
+}
+
 private fun embeddedRuntimePodInstallRoot(context: Context): File =
   context.filesDir.resolve("openclaw/embedded-runtime-pod")
 
@@ -198,6 +248,69 @@ private fun resolvePodRelativePath(versionDir: File, relativePath: String): File
   if (normalized.isBlank()) return null
   if (normalized.startsWith("/") || normalized.contains("../")) return null
   return versionDir.resolve(normalized)
+}
+
+private fun walkFiles(rootDir: File): List<File> {
+  val entries = rootDir.listFiles().orEmpty().sortedBy { it.name.lowercase() }
+  val files = mutableListOf<File>()
+  entries.forEach { entry ->
+    if (entry.isDirectory) {
+      files.addAll(walkFiles(entry))
+    } else if (entry.isFile) {
+      files.add(entry)
+    }
+  }
+  return files
+}
+
+private fun toPodRelativePath(rootDir: File, file: File): String =
+  file.relativeTo(rootDir).invariantSeparatorsPath
+
+private fun readJsonObjectOrNull(file: File): JsonObject? {
+  return runCatching {
+    embeddedRuntimePodJson.parseToJsonElement(file.readText(Charsets.UTF_8)) as? JsonObject
+  }.getOrNull()
+}
+
+private fun describeWorkspaceFile(
+  workspaceRoot: File,
+  file: File,
+): JsonObject {
+  val relativePath = toPodRelativePath(workspaceRoot, file)
+  val previewText = readWorkspaceTextPreview(file)
+  return buildJsonObject {
+    put("relativePath", JsonPrimitive(relativePath))
+    put("sizeBytes", JsonPrimitive(file.length()))
+    put("sha256", JsonPrimitive(sha256(file)))
+    put("isManifest", JsonPrimitive(relativePath == "manifest.json"))
+    put("isContentIndex", JsonPrimitive(relativePath == "content-index.json"))
+    if (previewText != null) {
+      put("textPreview", JsonPrimitive(previewText.text))
+      put("textPreviewTruncated", JsonPrimitive(previewText.truncated))
+    }
+  }
+}
+
+private data class WorkspaceTextPreview(
+  val text: String,
+  val truncated: Boolean,
+)
+
+private fun readWorkspaceTextPreview(
+  file: File,
+): WorkspaceTextPreview? {
+  val extension = file.extension.lowercase()
+  val previewable = extension in setOf("json", "md", "txt", "yaml", "yml")
+  if (!previewable) return null
+  val text = runCatching { file.readText(Charsets.UTF_8) }.getOrNull() ?: return null
+  val trimmed = text.trim()
+  if (trimmed.isEmpty()) return WorkspaceTextPreview(text = "", truncated = false)
+  val maxChars = 240
+  val truncated = trimmed.length > maxChars
+  return WorkspaceTextPreview(
+    text = trimmed.take(maxChars),
+    truncated = truncated,
+  )
 }
 
 private fun sha256(file: File): String {

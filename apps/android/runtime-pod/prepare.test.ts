@@ -36,7 +36,7 @@ describe("prepareRuntimePod", () => {
 
     expect(result.podId).toBe("ai.openclaw.android.embedded-runtime-pod");
     expect(result.stages).toHaveLength(3);
-    expect(result.files).toHaveLength(3);
+    expect(result.files).toHaveLength(7);
 
     const manifestText = await readFile(result.manifestPath, "utf8");
     const layoutText = await readFile(result.layoutPath, "utf8");
@@ -44,15 +44,19 @@ describe("prepareRuntimePod", () => {
     const layout = JSON.parse(layoutText) as { files: Array<{ relativePath: string }> };
 
     expect(manifest.stageCount).toBe(3);
-    expect(manifest.fileCount).toBe(3);
+    expect(manifest.fileCount).toBe(7);
     expect(layout.files.map((file) => file.relativePath)).toEqual([
       "bridge/manifest.json",
       "toolkit/manifest.json",
+      "workspace/content-index.json",
       "workspace/manifest.json",
+      "workspace/notes/runtime-brief.txt",
+      "workspace/templates/handoff-template.md",
+      "workspace/templates/offline-task-brief.md",
     ]);
 
     const stagedFiles = await listFiles(result.stagedRoot);
-    expect(stagedFiles).toHaveLength(3);
+    expect(stagedFiles).toHaveLength(7);
     for (const entry of stagedFiles) {
       expect((await stat(entry)).isFile()).toBe(true);
     }

@@ -213,6 +213,7 @@ class LocalHostRemoteAccessServerTest {
       assertEquals(200, response.statusCode)
       assertTrue(response.body.contains("\"device.status\""))
       assertTrue(response.body.contains("\"pod.health\""))
+      assertTrue(response.body.contains("\"pod.workspace.scan\""))
       assertTrue(response.body.contains("\"notifications.list\""))
       assertTrue(response.body.contains("\"location.get\""))
       assertTrue(response.body.contains("\"writeEnabled\":false"))

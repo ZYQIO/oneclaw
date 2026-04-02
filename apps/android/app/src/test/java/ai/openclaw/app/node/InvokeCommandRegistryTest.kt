@@ -47,6 +47,7 @@ class InvokeCommandRegistryTest {
       OpenClawDeviceCommand.Permissions.rawValue,
       OpenClawDeviceCommand.Health.rawValue,
       OpenClawPodCommand.Health.rawValue,
+      OpenClawPodCommand.WorkspaceScan.rawValue,
       OpenClawNotificationsCommand.List.rawValue,
       OpenClawNotificationsCommand.Actions.rawValue,
       OpenClawSystemCommand.Notify.rawValue,
