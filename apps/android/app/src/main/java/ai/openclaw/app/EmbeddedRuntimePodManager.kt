@@ -456,6 +456,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   val engineIntegrated =
     carrier.runtimeStageInstalled && carrier.runtimeStageManifestPresent && carrier.runtimeEngineManifestPresent && carrier.runtimeTaskCount > 0
   val environmentIntegrated = carrier.runtimeStageInstalled
+  val toolsIntegrated =
+    carrier.toolkitStageInstalled &&
+      carrier.toolkitStageManifestPresent &&
+      carrier.toolkitCommandPolicyPresent &&
+      carrier.toolDescriptorCount > 0 &&
+      carrier.runtimeToolTaskIds.isNotEmpty()
   val engineStatus =
     when {
       engineIntegrated -> "partial_bootstrap"
@@ -467,15 +473,24 @@ fun describeEmbeddedRuntimeDesktopRuntime(
       environmentIntegrated -> "partial_bootstrap"
       else -> "missing"
     }
+  val toolsStatus =
+    when {
+      carrier.runtimeToolExecutionStateCount > 0 -> "landed_bootstrap"
+      toolsIntegrated -> "partial_bootstrap"
+      carrier.toolkitStageInstalled || carrier.toolDescriptorCount > 0 -> "bootstrap_present"
+      else -> "missing"
+    }
   val missingDomains = buildList {
     if (!engineIntegrated) add("engine")
     if (!environmentIntegrated) add("environment")
     add("browser")
-    add("tools")
+    if (!toolsIntegrated) add("tools")
     add("plugins")
   }
   val mainlineStatus =
     when {
+      inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && carrier.runtimeToolExecutionStateCount > 0 -> "tool_lane_replayed"
+      inspection.ready && carrier.runtimeHomeReady && toolsIntegrated -> "tool_lane_ready"
       inspection.ready && carrier.runtimeHomeReady && engineIntegrated -> "runtime_execute_ready"
       inspection.ready && engineIntegrated -> "carrier_ready"
       inspection.ready -> "bootstrap_ready"
@@ -501,6 +516,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("runtimeHomeReady", JsonPrimitive(carrier.runtimeHomeReady))
         put("runtimeHomeExists", JsonPrimitive(carrier.runtimeHomeExists))
         put("runtimeExecutionStateCount", JsonPrimitive(carrier.runtimeExecutionStateCount))
+        put("toolkitStageInstalled", JsonPrimitive(carrier.toolkitStageInstalled))
+        put("toolkitStageManifestPresent", JsonPrimitive(carrier.toolkitStageManifestPresent))
+        put("toolkitCommandPolicyPresent", JsonPrimitive(carrier.toolkitCommandPolicyPresent))
+        put("toolDescriptorCount", JsonPrimitive(carrier.toolDescriptorCount))
+        put("runtimeToolTaskCount", JsonPrimitive(carrier.runtimeToolTaskIds.size))
+        put("runtimeToolExecutionStateCount", JsonPrimitive(carrier.runtimeToolExecutionStateCount))
         carrier.engineId?.let { put("engineId", JsonPrimitive(it)) }
         carrier.engineVersion?.let { put("engineVersion", JsonPrimitive(it)) }
         carrier.runtimeHomeVersion?.let { put("runtimeHomeVersion", JsonPrimitive(it)) }
@@ -527,6 +548,22 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           buildJsonArray {
             carrier.runtimeTaskIds.forEach { taskId ->
               add(JsonPrimitive(taskId))
+            }
+          },
+        )
+        put(
+          "runtimeToolTaskIds",
+          buildJsonArray {
+            carrier.runtimeToolTaskIds.forEach { taskId ->
+              add(JsonPrimitive(taskId))
+            }
+          },
+        )
+        put(
+          "toolIds",
+          buildJsonArray {
+            carrier.toolIds.forEach { toolId ->
+              add(JsonPrimitive(toolId))
             }
           },
         )
@@ -592,9 +629,18 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             add(
               buildDesktopRuntimeDomain(
                 id = "tools",
-                status = "missing",
-                integrated = false,
-                summary = "No curated desktop tool execution lane is packaged yet.",
+                status = toolsStatus,
+                integrated = toolsIntegrated,
+                summary =
+                  when {
+                    carrier.runtimeToolExecutionStateCount > 0 ->
+                      "A curated packaged desktop tool lane now executes through pod.runtime.execute and leaves replayable state on disk."
+                    toolsIntegrated ->
+                      "A curated packaged desktop tool lane is now bundled behind toolkit descriptors and command policy."
+                    carrier.toolkitStageInstalled || carrier.toolDescriptorCount > 0 ->
+                      "Toolkit assets have started to land, but the packaged desktop tool lane is not callable yet."
+                    else -> "No curated desktop tool execution lane is packaged yet."
+                  },
               ),
             )
             add(
@@ -609,15 +655,27 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         )
         put(
           "recommendedNextSlice",
-          JsonPrimitive(if (carrier.runtimeHomeReady) "browser_or_tool_lane" else "runtime_execute_replay"),
+          JsonPrimitive(
+            when {
+              !carrier.runtimeHomeReady -> "runtime_execute_replay"
+              !toolsIntegrated -> "tool_lane_bootstrap"
+              carrier.runtimeToolExecutionStateCount < 1 -> "tool_lane_replay"
+              else -> "browser_or_plugin_lane"
+            },
+          ),
         )
         put(
           "recommendedNextStep",
           JsonPrimitive(
-            if (carrier.runtimeHomeReady) {
-              "Use the packaged runtime carrier as the base for the first bounded browser or desktop tool lane."
-            } else {
-              "Run pod.runtime.execute with the runtime-smoke task on-device to verify the packaged carrier end to end before widening browser, tools, or plugins."
+            when {
+              !carrier.runtimeHomeReady ->
+                "Run pod.runtime.execute with the runtime-smoke task on-device to verify the packaged carrier end to end before widening browser, tools, or plugins."
+              !toolsIntegrated ->
+                "Use the packaged runtime carrier as the base for the first bounded desktop tool lane before widening into browser or plugins."
+              carrier.runtimeToolExecutionStateCount < 1 ->
+                "Run pod.runtime.execute with the packaged desktop tool task on-device to prove the new tool lane is replayable."
+              else ->
+                "Keep the packaged tool lane stable, then attach only the next bounded browser or plugin slice that the mainline truly needs."
             },
           ),
         )

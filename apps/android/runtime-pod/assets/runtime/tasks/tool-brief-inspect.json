@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "taskId": "tool-brief-inspect",
+  "displayName": "Tool Brief Inspect",
+  "kind": "desktop-tool",
+  "toolId": "packaged-brief-inspector-v1",
+  "summary": "Run the packaged brief-inspector desktop tool against the offline task brief template and persist the structured result.",
+  "packagedConfigPath": "config/runtime-env.json",
+  "packagedWorkspacePath": "workspace/templates/offline-task-brief.md",
+  "packagedToolDescriptorPath": "toolkit/tools/packaged-brief-inspector.json",
+  "stateFile": "state/tool-brief-inspect.json",
+  "logFile": "logs/runtime-engine.log",
+  "resultFile": "work/tool-brief-inspect-result.json"
+}

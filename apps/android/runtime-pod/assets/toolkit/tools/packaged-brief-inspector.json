@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "toolId": "packaged-brief-inspector-v1",
+  "displayName": "Packaged Brief Inspector",
+  "kind": "document-inspector",
+  "summary": "Inspect one packaged offline brief and emit a deterministic structured summary without using browser, shell, or network access.",
+  "runtimeTaskIds": [
+    "tool-brief-inspect"
+  ],
+  "inputKind": "text-markdown",
+  "supportedFileExtensions": [
+    "md",
+    "txt"
+  ],
+  "capabilities": [
+    "heading-scan",
+    "keyword-count",
+    "line-stats",
+    "preview-extract"
+  ],
+  "limitations": [
+    "Packaged workspace inputs only",
+    "No browser lane",
+    "No network access",
+    "No unrestricted shell"
+  ]
+}

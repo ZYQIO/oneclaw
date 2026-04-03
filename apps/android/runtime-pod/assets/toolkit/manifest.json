@@ -1,6 +1,13 @@
 {
   "stage": "toolkit",
   "purpose": "Tool surface metadata for the Android embedded pod spike.",
+  "commandPolicyPath": "command-policy.json",
+  "toolDescriptorPaths": [
+    "tools/packaged-brief-inspector.json"
+  ],
+  "toolIds": [
+    "packaged-brief-inspector-v1"
+  ],
   "exposes": [
     "toolDescriptors",
     "commandPolicy"

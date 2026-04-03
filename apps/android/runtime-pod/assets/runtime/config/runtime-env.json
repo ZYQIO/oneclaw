@@ -3,6 +3,6 @@
   "distributionLane": "internal_or_sideload_first",
   "workspaceBridgeEnabled": true,
   "browserLaneEnabled": false,
-  "toolLaneEnabled": false,
+  "toolLaneEnabled": true,
   "pluginLaneEnabled": false
 }

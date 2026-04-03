@@ -179,7 +179,7 @@ class LocalHostNodesToolingTest {
             org.junit.Assert.assertEquals("pod.manifest.describe", command)
             org.junit.Assert.assertEquals("{}", paramsJson)
             GatewaySession.InvokeResult.ok(
-              """{"ok":true,"manifestSource":"installed","fileCount":11}""",
+              """{"ok":true,"manifestSource":"installed","fileCount":14}""",
             )
           },
           allowAdvancedRemoteCommands = { false },
@@ -251,6 +251,34 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("runtime-smoke"))
       assertTrue(result.outputText.contains("runtimeHomeReady"))
+    }
+
+  @Test
+  fun podRuntimeExecute_supportsPackagedDesktopToolTaskForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.runtime.execute", command)
+            assertTrue(paramsJson.orEmpty().contains("\"taskId\":\"tool-brief-inspect\""))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"taskId":"tool-brief-inspect","toolId":"packaged-brief-inspector-v1","runtimeHomeReady":true}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_runtime_execute","taskId":"tool-brief-inspect"}""",
+        )
+
+      assertTrue(result.outputText.contains("tool-brief-inspect"))
+      assertTrue(result.outputText.contains("packaged-brief-inspector-v1"))
     }
 
   @Test

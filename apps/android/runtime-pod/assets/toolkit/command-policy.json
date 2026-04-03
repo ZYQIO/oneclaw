@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "allowedTaskKinds": [
+    "desktop-tool"
+  ],
+  "allowedToolIds": [
+    "packaged-brief-inspector-v1"
+  ],
+  "blockedCapabilities": [
+    "browser",
+    "network",
+    "plugin-runtime",
+    "shell"
+  ]
+}

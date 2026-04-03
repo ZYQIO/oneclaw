@@ -12,8 +12,8 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 
 ## Current Baseline / 当前基线
 
-- The packaged pod payload is now `0.3.0` and includes a new `runtime/` stage with engine metadata, packaged runtime config, and the bounded `runtime-smoke` task. / 当前打包 pod payload 已更新到 `0.3.0`，并新增 `runtime/` stage，包含 engine metadata、packaged runtime config 和有边界的 `runtime-smoke` task。
-- `pod.runtime.execute` can now materialize an app-private runtime home with config, logs, state, and work directories, but the browser, desktop tool, and plugin lanes are still intentionally missing. / `pod.runtime.execute` 现在已经能把 app-private runtime home 实体化成带有 config、logs、state 和 work 目录的运行环境，但 browser、desktop tool 和 plugin lane 仍然故意保留为空。
+- The packaged pod payload is now `0.4.0` and includes a packaged `toolkit/` stage plus a second bounded task `tool-brief-inspect` on top of the earlier `runtime/` stage. / 当前打包 pod payload 已更新到 `0.4.0`，并在原有 `runtime/` stage 之上新增了打包 `toolkit/` stage 和第二条有边界任务 `tool-brief-inspect`。
+- `pod.runtime.execute` can now materialize an app-private runtime home with config, logs, state, and work directories, and it already replays the first packaged desktop tool lane, while the browser and plugin lanes remain intentionally missing. / `pod.runtime.execute` 现在已经能把 app-private runtime home 实体化成带有 config、logs、state 和 work 目录的运行环境，并且已经能复跑第一条打包 desktop tool lane；但 browser 和 plugin lane 仍然故意保留为空。
 
 - Build-time packaging, app-private extraction, checksum verification, and read-only pod invocation are already landed. / 构建期打包、app 私有目录解包、checksum 校验和只读 pod 调用已经落地。
 - `pod.runtime.describe` is now the machine-readable status surface for this mainline and reports which desktop-runtime domains are landed, bootstrap-only, or still missing. / `pod.runtime.describe` 现在是这条主线的机器可读状态面，会直接报告哪些桌面 runtime 域已落地、仅是 bootstrap，或仍然缺失。
@@ -41,7 +41,7 @@ Target capability domains / 目标能力域:
 - `engine`: missing. No real embedded desktop execution engine is wired into Android yet. / `engine`：缺失。Android 里还没有接入真正的嵌入桌面执行引擎。
 - `environment`: missing. No runtime env supervisor, process model, config bundle, or restart contract exists yet. / `environment`：缺失。还没有 runtime env supervisor、进程模型、配置 bundle 或重启契约。
 - `browser`: missing. No packaged browser runtime or bounded browser automation bridge exists yet. / `browser`：缺失。还没有打包浏览器 runtime 或有边界浏览器自动化桥。
-- `tools`: missing. No selected desktop tool surface is packaged and callable yet. / `tools`：缺失。还没有精选桌面工具面被打包并可调用。
+- `tools`: partial bootstrap. One packaged desktop tool lane now exists behind toolkit descriptors and command policy, but it still needs repetitive on-device replay proof. / `tools`：部分 bootstrap。现在已经有一条通过 toolkit descriptor 和 command policy 封装的打包桌面工具通道，但仍需持续补足真机复跑证据。
 - `plugins`: missing. No packaged plugin/runtime lane exists yet. / `plugins`：缺失。还没有打包插件或 runtime lane。
 
 ## Definition Of Done / 完成定义
@@ -65,7 +65,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 
 ### Phase 1. Engine Carrier / 引擎载体
 
-- Status on this branch: the packaged `runtime/` stage plus `pod.runtime.execute(taskId=runtime-smoke)` now provide the first bounded execution carrier, but they are still intentionally narrower than a full desktop JS/browser engine. / 这条分支的现状：打包好的 `runtime/` stage 和 `pod.runtime.execute(taskId=runtime-smoke)` 已经提供了第一条有边界的执行载体，但它仍然故意比完整桌面 JS/browser engine 更窄。
+- Status on this branch: the packaged `runtime/` stage plus `pod.runtime.execute(taskId=runtime-smoke)` still provide the first bounded execution carrier, and `pod.runtime.execute(taskId=tool-brief-inspect)` now proves the first packaged desktop tool contract on top of it. / 这条分支的现状：打包好的 `runtime/` stage 和 `pod.runtime.execute(taskId=runtime-smoke)` 仍然提供第一条有边界执行载体，而 `pod.runtime.execute(taskId=tool-brief-inspect)` 现在已经在其上证明了第一条打包桌面工具契约。
 
 - Choose and package the smallest viable embedded execution engine. / 选出并打包最小可行的嵌入执行引擎。
 - Prove it can run one bounded desktop-side task from app-private storage. / 证明它能从 app 私有目录执行一条有边界的桌面侧任务。
@@ -73,7 +73,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 
 ### Phase 2. Runtime Environment / 运行环境
 
-- Status on this branch: `pod.runtime.execute` now hydrates `filesDir/openclaw/embedded-runtime-home/<version>/` with config, logs, state, and work directories, so the next gap is not basic runtime-home creation but replaying that carrier on-device and then attaching the first browser or tool lane. / 这条分支的现状：`pod.runtime.execute` 已经会把 `filesDir/openclaw/embedded-runtime-home/<version>/` 水合成带有 config、logs、state 和 work 目录的 runtime home，因此下一步真正的缺口不再是创建 runtime home，而是在真机上把这条载体复跑成基线，然后接上第一条 browser 或 tool lane。
+- Status on this branch: `pod.runtime.execute` now hydrates `filesDir/openclaw/embedded-runtime-home/<version>/` with config, logs, state, and work directories, and the first packaged tool lane already writes replayable results under `work/`, so the next gap is sustained on-device replay plus the first bounded browser lane. / 这条分支的现状：`pod.runtime.execute` 已经会把 `filesDir/openclaw/embedded-runtime-home/<version>/` 水合成带有 config、logs、state 和 work 目录的 runtime home，第一条打包工具通道也已经会把可复跑结果写入 `work/`，因此下一步真正的缺口是持续真机复跑，以及第一条有边界浏览器通道。
 
 - Add an app-private runtime environment layout, config bundle, lifecycle supervision, and health/log surfaces. / 加入 app 私有 runtime 环境目录、配置 bundle、生命周期监督和 health/log 面。
 - Make restart and stale-build diagnostics explicit. / 让重启和 stale-build 诊断显式化。

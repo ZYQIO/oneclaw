@@ -23,6 +23,7 @@ describe("syncRuntimePodAssets", () => {
     const manifest = JSON.parse(await readFile(result.assetManifestPath, "utf8")) as {
       assetBasePath: string;
       assetManifestPath: string;
+      version: string;
       fileCount: number;
       files: Array<{ relativePath: string; assetPath: string }>;
     };
@@ -30,14 +31,18 @@ describe("syncRuntimePodAssets", () => {
 
     expect(manifest.assetBasePath).toBe("embedded-runtime-pod/staged");
     expect(manifest.assetManifestPath).toBe("embedded-runtime-pod/manifest.json");
-    expect(manifest.fileCount).toBe(11);
+    expect(manifest.version).toBe("0.4.0");
+    expect(manifest.fileCount).toBe(14);
     expect(manifest.files.map((file) => file.relativePath)).toEqual([
       "bridge/manifest.json",
       "runtime/config/runtime-env.json",
       "runtime/engine/manifest.json",
       "runtime/manifest.json",
       "runtime/tasks/runtime-smoke.json",
+      "runtime/tasks/tool-brief-inspect.json",
+      "toolkit/command-policy.json",
       "toolkit/manifest.json",
+      "toolkit/tools/packaged-brief-inspector.json",
       "workspace/content-index.json",
       "workspace/manifest.json",
       "workspace/notes/runtime-brief.txt",

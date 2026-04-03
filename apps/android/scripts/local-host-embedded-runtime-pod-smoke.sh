@@ -36,6 +36,7 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT=5] \
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH=<relative-path>] \
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_RUNTIME_TASK_ID=runtime-smoke] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_POD_TOOL_TASK_ID=tool-brief-inspect] \
   ./apps/android/scripts/local-host-embedded-runtime-pod-smoke.sh
 
 What it does:
@@ -46,9 +47,10 @@ What it does:
   5. Calls /invoke pod.manifest.describe
   6. Calls /invoke pod.runtime.describe
   7. Calls /invoke pod.runtime.execute
-  8. Calls /invoke pod.workspace.scan
-  9. Calls /invoke pod.workspace.read
-  10. Verifies the phone-side results against repo pod-spec.json and content-index.json
+  8. Calls /invoke pod.runtime.execute for the packaged desktop tool lane
+  9. Calls /invoke pod.workspace.scan
+  10. Calls /invoke pod.workspace.read
+  11. Verifies the phone-side results against repo pod-spec.json and content-index.json
 
 Requirements:
   - curl
@@ -109,6 +111,7 @@ QUERY="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_QUERY:-$DEFAULT_QUERY}"
 LIMIT="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT:-5}"
 EXPECTED_PATH="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH:-$DEFAULT_EXPECTED_PATH}"
 RUNTIME_TASK_ID="${OPENCLAW_ANDROID_LOCAL_HOST_POD_RUNTIME_TASK_ID:-runtime-smoke}"
+TOOL_TASK_ID="${OPENCLAW_ANDROID_LOCAL_HOST_POD_TOOL_TASK_ID:-tool-brief-inspect}"
 EXPECTED_WORKSPACE_FILE=""
 EXPECTED_WORKSPACE_FILE_SIZE=""
 if [[ -n "$EXPECTED_PATH" && -f "$RUNTIME_POD_DIR/assets/workspace/$EXPECTED_PATH" ]]; then
@@ -149,6 +152,7 @@ health_json="$ARTIFACT_DIR/pod-health.json"
 manifest_json="$ARTIFACT_DIR/pod-manifest-describe.json"
 runtime_describe_json="$ARTIFACT_DIR/pod-runtime-describe.json"
 runtime_execute_json="$ARTIFACT_DIR/pod-runtime-execute.json"
+tool_execute_json="$ARTIFACT_DIR/pod-tool-execute.json"
 workspace_json="$ARTIFACT_DIR/pod-workspace-scan.json"
 workspace_read_json="$ARTIFACT_DIR/pod-workspace-read.json"
 summary_json="$ARTIFACT_DIR/summary.json"
@@ -224,6 +228,7 @@ if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "
   printf '{}\n' >"$manifest_json"
   printf '{}\n' >"$runtime_describe_json"
   printf '{}\n' >"$runtime_execute_json"
+  printf '{}\n' >"$tool_execute_json"
   printf '{}\n' >"$workspace_json"
   printf '{}\n' >"$workspace_read_json"
 else
@@ -232,6 +237,8 @@ else
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.runtime.describe"}' | tee "$runtime_describe_json" >/dev/null
   runtime_execute_body="$(jq -cn --arg taskId "$RUNTIME_TASK_ID" '{command:"pod.runtime.execute", params:{taskId:$taskId}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$runtime_execute_body" | tee "$runtime_execute_json" >/dev/null
+  tool_execute_body="$(jq -cn --arg taskId "$TOOL_TASK_ID" '{command:"pod.runtime.execute", params:{taskId:$taskId}}')"
+  post_json "$BASE_URL/api/local-host/v1/invoke" "$tool_execute_body" | tee "$tool_execute_json" >/dev/null
   workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
   workspace_read_body="$(jq -cn --arg path "$EXPECTED_PATH" '{command:"pod.workspace.read", params:{path:$path, maxChars:4096}}')"
@@ -267,6 +274,8 @@ runtime_describe_environment_domain="$(jq -r '(.payload.domains // []) | map(.id
 runtime_describe_browser_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("browser") != null' "$runtime_describe_json")"
 runtime_describe_tools_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("tools") != null' "$runtime_describe_json")"
 runtime_describe_plugins_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("plugins") != null' "$runtime_describe_json")"
+runtime_describe_tool_count="$(jq -r '.payload.toolDescriptorCount // -1' "$runtime_describe_json")"
+runtime_describe_tool_task_count="$(jq -r '.payload.runtimeToolTaskCount // -1' "$runtime_describe_json")"
 
 runtime_execute_ok="$(jq -r '.ok // false' "$runtime_execute_json")"
 runtime_execute_command="$(jq -r '.payload.command // ""' "$runtime_execute_json")"
@@ -276,6 +285,16 @@ runtime_execute_engine_id="$(jq -r '.payload.engineId // ""' "$runtime_execute_j
 runtime_execute_execution_count="$(jq -r '.payload.executionCount // -1' "$runtime_execute_json")"
 runtime_execute_state_path="$(jq -r '.payload.stateFilePath // ""' "$runtime_execute_json")"
 runtime_execute_log_path="$(jq -r '.payload.logFilePath // ""' "$runtime_execute_json")"
+
+tool_execute_ok="$(jq -r '.ok // false' "$tool_execute_json")"
+tool_execute_command="$(jq -r '.payload.command // ""' "$tool_execute_json")"
+tool_execute_task_id="$(jq -r '.payload.taskId // ""' "$tool_execute_json")"
+tool_execute_runtime_home_ready="$(jq -r '.payload.runtimeHomeReady // false' "$tool_execute_json")"
+tool_execute_tool_id="$(jq -r '.payload.toolId // ""' "$tool_execute_json")"
+tool_execute_execution_count="$(jq -r '.payload.executionCount // -1' "$tool_execute_json")"
+tool_execute_result_path="$(jq -r '.payload.toolResultFilePath // ""' "$tool_execute_json")"
+tool_execute_heading_count="$(jq -r '.payload.toolResult.headingCount // -1' "$tool_execute_json")"
+tool_execute_preview="$(jq -r '.payload.toolResult.preview // ""' "$tool_execute_json")"
 
 workspace_ok="$(jq -r '.ok // false' "$workspace_json")"
 workspace_command="$(jq -r '.payload.command // ""' "$workspace_json")"
@@ -337,6 +356,8 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$runtime_describe_browser_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_browser_domain"
   [[ "$runtime_describe_tools_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_tools_domain"
   [[ "$runtime_describe_plugins_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_plugins_domain"
+  [[ "$runtime_describe_tool_count" -ge 1 ]] || record_failure "pod_runtime_describe_missing_tool_descriptor"
+  [[ "$runtime_describe_tool_task_count" -ge 1 ]] || record_failure "pod_runtime_describe_missing_tool_task"
 
   [[ "$runtime_execute_ok" == "true" ]] || record_failure "pod_runtime_execute_not_ok"
   [[ "$runtime_execute_command" == "pod.runtime.execute" ]] || record_failure "pod_runtime_execute_command_mismatch"
@@ -346,6 +367,16 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$runtime_execute_execution_count" -ge 1 ]] || record_failure "pod_runtime_execute_execution_count_invalid"
   [[ "$runtime_execute_state_path" == *"/state/"* ]] || record_failure "pod_runtime_execute_missing_state_path"
   [[ "$runtime_execute_log_path" == *"/logs/"* ]] || record_failure "pod_runtime_execute_missing_log_path"
+
+  [[ "$tool_execute_ok" == "true" ]] || record_failure "pod_tool_execute_not_ok"
+  [[ "$tool_execute_command" == "pod.runtime.execute" ]] || record_failure "pod_tool_execute_command_mismatch"
+  [[ "$tool_execute_task_id" == "$TOOL_TASK_ID" ]] || record_failure "pod_tool_execute_task_mismatch"
+  [[ "$tool_execute_runtime_home_ready" == "true" ]] || record_failure "pod_tool_execute_runtime_home_not_ready"
+  [[ "$tool_execute_tool_id" == "packaged-brief-inspector-v1" ]] || record_failure "pod_tool_execute_tool_id_mismatch"
+  [[ "$tool_execute_execution_count" -ge 1 ]] || record_failure "pod_tool_execute_execution_count_invalid"
+  [[ "$tool_execute_result_path" == *"/work/"* ]] || record_failure "pod_tool_execute_missing_result_path"
+  [[ "$tool_execute_heading_count" -ge 1 ]] || record_failure "pod_tool_execute_heading_count_invalid"
+  [[ -n "$tool_execute_preview" ]] || record_failure "pod_tool_execute_missing_preview"
 
   [[ "$workspace_ok" == "true" ]] || record_failure "pod_workspace_scan_not_ok"
   [[ "$workspace_command" == "pod.workspace.scan" ]] || record_failure "pod_workspace_scan_command_mismatch"
@@ -428,6 +459,8 @@ jq -n \
   --arg runtimeDescribeBrowserDomain "$runtime_describe_browser_domain" \
   --arg runtimeDescribeToolsDomain "$runtime_describe_tools_domain" \
   --arg runtimeDescribePluginsDomain "$runtime_describe_plugins_domain" \
+  --arg runtimeDescribeToolCount "$runtime_describe_tool_count" \
+  --arg runtimeDescribeToolTaskCount "$runtime_describe_tool_task_count" \
   --arg runtimeExecuteOk "$runtime_execute_ok" \
   --arg runtimeExecuteCommand "$runtime_execute_command" \
   --arg runtimeExecuteTaskId "$runtime_execute_task_id" \
@@ -436,6 +469,15 @@ jq -n \
   --arg runtimeExecuteExecutionCount "$runtime_execute_execution_count" \
   --arg runtimeExecuteStatePath "$runtime_execute_state_path" \
   --arg runtimeExecuteLogPath "$runtime_execute_log_path" \
+  --arg toolExecuteOk "$tool_execute_ok" \
+  --arg toolExecuteCommand "$tool_execute_command" \
+  --arg toolExecuteTaskId "$tool_execute_task_id" \
+  --arg toolExecuteRuntimeHomeReady "$tool_execute_runtime_home_ready" \
+  --arg toolExecuteToolId "$tool_execute_tool_id" \
+  --arg toolExecuteExecutionCount "$tool_execute_execution_count" \
+  --arg toolExecuteResultPath "$tool_execute_result_path" \
+  --arg toolExecuteHeadingCount "$tool_execute_heading_count" \
+  --arg toolExecutePreview "$tool_execute_preview" \
   --arg workspaceOk "$workspace_ok" \
   --arg workspaceCommand "$workspace_command" \
   --arg workspaceStagePresent "$workspace_stage_present" \
@@ -521,7 +563,9 @@ jq -n \
       hasEnvironmentDomain: ($runtimeDescribeEnvironmentDomain == "true"),
       hasBrowserDomain: ($runtimeDescribeBrowserDomain == "true"),
       hasToolsDomain: ($runtimeDescribeToolsDomain == "true"),
-      hasPluginsDomain: ($runtimeDescribePluginsDomain == "true")
+      hasPluginsDomain: ($runtimeDescribePluginsDomain == "true"),
+      toolDescriptorCount: ($runtimeDescribeToolCount | tonumber),
+      runtimeToolTaskCount: ($runtimeDescribeToolTaskCount | tonumber)
     },
     podRuntimeExecute: {
       ok: ($runtimeExecuteOk == "true"),
@@ -532,6 +576,17 @@ jq -n \
       executionCount: ($runtimeExecuteExecutionCount | tonumber),
       stateFilePath: (if $runtimeExecuteStatePath == "" then null else $runtimeExecuteStatePath end),
       logFilePath: (if $runtimeExecuteLogPath == "" then null else $runtimeExecuteLogPath end)
+    },
+    podToolExecute: {
+      ok: ($toolExecuteOk == "true"),
+      command: (if $toolExecuteCommand == "" then null else $toolExecuteCommand end),
+      taskId: (if $toolExecuteTaskId == "" then null else $toolExecuteTaskId end),
+      runtimeHomeReady: ($toolExecuteRuntimeHomeReady == "true"),
+      toolId: (if $toolExecuteToolId == "" then null else $toolExecuteToolId end),
+      executionCount: ($toolExecuteExecutionCount | tonumber),
+      resultFilePath: (if $toolExecuteResultPath == "" then null else $toolExecuteResultPath end),
+      headingCount: ($toolExecuteHeadingCount | tonumber),
+      preview: (if $toolExecutePreview == "" then null else $toolExecutePreview end)
     },
     podWorkspaceScan: {
       ok: ($workspaceOk == "true"),
@@ -568,6 +623,8 @@ printf 'runtime_pod.runtime_describe ok=%s branch=%s status=%s engine=%s browser
   "$runtime_describe_ok" "$runtime_describe_branch" "$runtime_describe_status" "$runtime_describe_engine_domain" "$runtime_describe_browser_domain" "$runtime_describe_tools_domain" "$runtime_describe_plugins_domain"
 printf 'runtime_pod.runtime_execute ok=%s task=%s home=%s engine=%s count=%s\n' \
   "$runtime_execute_ok" "$runtime_execute_task_id" "$runtime_execute_runtime_home_ready" "$runtime_execute_engine_id" "$runtime_execute_execution_count"
+printf 'runtime_pod.tool_execute ok=%s task=%s tool=%s home=%s count=%s\n' \
+  "$tool_execute_ok" "$tool_execute_task_id" "$tool_execute_tool_id" "$tool_execute_runtime_home_ready" "$tool_execute_execution_count"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \
   "$workspace_ok" "$workspace_stage_present" "$workspace_document_count" "$workspace_matched_file_count" "$workspace_returned_file_count" "$workspace_first_path"
 printf 'runtime_pod.workspace_read ok=%s path=%s size=%s truncated=%s kind=%s\n' \
@@ -590,6 +647,7 @@ echo "artifacts.health=$health_json"
 echo "artifacts.manifest=$manifest_json"
 echo "artifacts.runtime_describe=$runtime_describe_json"
 echo "artifacts.runtime_execute=$runtime_execute_json"
+echo "artifacts.tool_execute=$tool_execute_json"
 echo "artifacts.workspace_scan=$workspace_json"
 echo "artifacts.workspace_read=$workspace_read_json"
 echo "artifacts.summary=$summary_json"
