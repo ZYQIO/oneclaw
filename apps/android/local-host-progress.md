@@ -4,7 +4,7 @@ Scope / 范围: track the Android effort to run OpenClaw locally on the phone, a
 
 ## Branch Pivot / 主线切换
 
-As of April 3, 2026, branch `android-desktop-runtime-mainline-20260403` changes the active Android mainline from “ship the Android-native local-host MVP first” to “integrate a selected desktop-runtime slice into Android.” / 截至 2026 年 4 月 3 日，分支 `android-desktop-runtime-mainline-20260403` 已将 Android 的活动主线从“先交付 Android-native local-host MVP”切换为“把一段精选桌面 runtime 切片整合进 Android”。
+As of April 3, 2026, branch `android-desktop-runtime-mainline-20260403` changes the active Android mainline from “ship the Android-native local-host MVP first” to “integrate the full packaged desktop environment into Android.” / 截至 2026 年 4 月 3 日，分支 `android-desktop-runtime-mainline-20260403` 已将 Android 的活动主线从“先交付 Android-native local-host MVP”切换为“把完整打包的桌面环境整合进 Android”。
 
 - The new objective lives in `apps/android/local-host-desktop-runtime-mainline.md`. / 新主线目标写在 `apps/android/local-host-desktop-runtime-mainline.md`。
 - The milestone table below still matters, but it now describes validated baseline capabilities and bootstrap plumbing. / 下面的 milestone 表仍然重要，但它现在描述的是已验证的基线能力和 bootstrap 管线。
@@ -79,7 +79,7 @@ The current MVP does not aim to deliver all desktop Gateway features. / 当前 M
 
 Completed implementation highlights / 已完成实现要点:
 
-- As of April 3, 2026 on branch `android-desktop-runtime-mainline-20260403`, the embedded pod is now `0.5.0`: on top of the runtime carrier and packaged desktop-tool lane, it now also includes a packaged `browser/` stage with the first bounded `openai-codex` auth flow behind `pod.browser.describe` and `pod.browser.auth.start`. / 截至 2026 年 4 月 3 日，在分支 `android-desktop-runtime-mainline-20260403` 上，embedded pod 已升级到 `0.5.0`：在 runtime carrier 和 packaged desktop-tool lane 之外，现在还新增了打包 `browser/` stage，并通过 `pod.browser.describe` 与 `pod.browser.auth.start` 暴露第一条有边界的 `openai-codex` auth flow。
+- As of April 3, 2026 on branch `android-desktop-runtime-mainline-20260403`, the embedded pod is now `0.6.0`: on top of the runtime carrier, packaged desktop-tool lane, and bounded browser-auth lane, it now also includes a packaged `desktop/` stage and `pod.desktop.materialize`, which can materialize `filesDir/openclaw/embedded-desktop-home/<version>/` with engine, environment, browser, tools, plugins, supervisor manifests, and an active desktop profile. / 截至 2026 年 4 月 3 日，在分支 `android-desktop-runtime-mainline-20260403` 上，embedded pod 已升级到 `0.6.0`：在 runtime carrier、packaged desktop-tool lane 和有边界的 browser-auth lane 之外，现在还新增了打包 `desktop/` stage 以及 `pod.desktop.materialize`，可把包含 engine、environment、browser、tools、plugins、supervisor manifests 和 active desktop profile 的 `filesDir/openclaw/embedded-desktop-home/<version>/` materialize 出来。
 - `pod.runtime.describe` therefore no longer treats `browser` as a fully missing domain on this branch either: it now reports a partial-bootstrap browser-auth lane separately from the still-missing generic browser/plugin runtime surfaces, and the pod smoke has been extended to verify the new read-only browser describe surface alongside the carrier and tool lanes. / 因此这条分支上的 `pod.runtime.describe` 也不再把 `browser` 视为完全缺失：它现在会把部分 bootstrap 的 browser-auth lane 与仍然缺失的通用 browser/plugin runtime 面分开报告，而 pod smoke 也已经扩展成在 carrier 和 tool lane 之外，一并校验新的只读 browser describe 面。
 
 - `Local Host` 模式已经出现在 Connect tab，并作为一等运行模式暴露。`Local Host` mode exists in the Connect tab and is exposed as a first-class runtime option.

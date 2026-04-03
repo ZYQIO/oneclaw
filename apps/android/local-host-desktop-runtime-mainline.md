@@ -1,6 +1,6 @@
 # Android Desktop Runtime Mainline / Android 桌面 Runtime 主线
 
-Purpose / 用途: redefine the Android mainline around integrating selected desktop-runtime capabilities into the app, instead of stopping at the current helper-pod boundary. / 把 Android 主线重新定义为将精选桌面 runtime 能力整合进 app，而不是停在当前 helper pod 边界。
+Purpose / 用途: redefine the Android mainline around integrating the full packaged desktop environment into the app, instead of stopping at the current helper-pod boundary. / 把 Android 主线重新定义为将完整打包的桌面环境整合进 app，而不是停在当前 helper pod 边界。
 Branch / 分支: `android-desktop-runtime-mainline-20260403`
 Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 
@@ -21,7 +21,7 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 
 ## Mainline Objective / 主线目标
 
-Bring a selected desktop-runtime slice onto Android so the phone can host not only local chat and Android-native commands, but also a curated subset of the desktop execution environment. / 把一段精选桌面 runtime 能力带到 Android，让手机不只承载本地聊天和 Android 原生命令，还能承载一段经过裁剪的桌面执行环境。
+Bring the full packaged desktop environment onto Android so the phone can host not only local chat and Android-native commands, but also a cohesive desktop-environment bundle that can be materialized inside app-private storage. / 把完整打包的桌面环境带到 Android，让手机不只承载本地聊天和 Android 原生命令，还能承载一套可 materialize 到 app 私有目录里的完整桌面环境 bundle。
 
 Target capability domains / 目标能力域:
 
