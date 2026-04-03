@@ -519,6 +519,7 @@
     "android:local-host:dedicated:testdpc-kiosk": "bash apps/android/scripts/local-host-dedicated-testdpc-kiosk.sh",
     "android:local-host:dedicated:testdpc-qr": "bash apps/android/scripts/local-host-dedicated-testdpc-qr.sh",
     "android:local-host:doctor": "bash apps/android/scripts/local-host-doctor.sh",
+    "android:local-host:embedded-runtime-pod:doctor": "bash apps/android/scripts/local-host-embedded-runtime-pod-doctor.sh",
     "android:local-host:embedded-runtime-pod:browser-lane:smoke": "bash apps/android/scripts/local-host-embedded-runtime-browser-lane-smoke.sh",
     "android:local-host:embedded-runtime-pod:prepare": "pnpm exec tsx apps/android/scripts/local-host-embedded-runtime-pod-prepare.ts",
     "android:local-host:embedded-runtime-pod:smoke": "bash apps/android/scripts/local-host-embedded-runtime-pod-smoke.sh",

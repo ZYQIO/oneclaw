@@ -293,6 +293,29 @@ Artifact output includes `pod-browser-describe-before.json`, `pod-browser-auth-s
 - Use the default `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1` pass to prove that the packaged browser lane leaves replayable state/log evidence on disk.
 - After you finish the external browser auth flow on the device, rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0` to confirm that the stored credential path has converged from `browser_lane_replayed` to `browser_lane_configured`.
 
+## Embedded Runtime Pod Doctor
+
+Use this when you want one command that bootstraps the token if needed, reruns the pod baseline smoke, and then runs the browser-lane smoke only when the packaged pod baseline is already healthy.
+
+```bash
+pnpm android:local-host:embedded-runtime-pod:doctor
+pnpm android:local-host:embedded-runtime-pod:doctor -- --json
+```
+
+The desktop-runtime doctor:
+
+- reuses `OPENCLAW_ANDROID_LOCAL_HOST_TOKEN` when you already provided one
+- otherwise bootstraps the debug token over trusted adb
+- runs `pnpm android:local-host:embedded-runtime-pod:smoke`
+- runs `pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke` only when the packaged pod baseline is already healthy
+- writes one combined `summary.json` that includes token bootstrap info, the pod smoke summary, the browser-lane smoke summary, and a single top-level classification
+
+Common outcomes:
+
+- `classification=embedded_pod_unhealthy`: fix the packaged pod baseline first
+- `classification=browser_lane_replayed`: the packaged browser lane left replayable state on disk, and the next step is to complete auth then rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0`
+- `classification=browser_lane_configured`: the packaged browser lane is replayed and now also backed by a stored credential
+
 ## Local Host Doctor
 
 Use this when you want one repo command to bootstrap the debug token, rerun smoke, and automatically fall through to the OpenAI network probe only when the failure really looks like upstream Codex connectivity.

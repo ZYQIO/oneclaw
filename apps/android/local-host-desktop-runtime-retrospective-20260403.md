@@ -29,6 +29,10 @@ This checkpoint records the first three desktop-runtime slices after the Android
 - `pod.browser.describe` now reports whether the bounded browser lane has replayable state/log evidence on disk, plus the last persisted launch status. / `pod.browser.describe` 现在会显式报告 bounded browser lane 是否已经在磁盘上留下可复跑的 state/log 证据，以及最后一次持久化的 launch 状态。
 - `pod.runtime.describe` no longer treats a pre-existing credential as replay proof by itself. The browser lane now becomes `browser_lane_replayed` only after persisted launch evidence exists, and `browser_lane_configured` only after replay evidence and a stored credential both exist. / `pod.runtime.describe` 不再把“已有 credential”本身当成 replay 证据；现在 browser lane 只有在持久化 launch 证据存在时才会进入 `browser_lane_replayed`，而 `browser_lane_configured` 则要求 replay 证据和存储中的 credential 同时存在。
 
+## Iteration 5 / 第五个小切片
+
+- A dedicated desktop-runtime doctor command now combines token bootstrap, the packaged-pod baseline smoke, and the browser-lane smoke into one top-level summary so device verification later can start from one stable entrypoint. / 现在又补了一条专门的 desktop-runtime doctor 命令，把 token bootstrap、packaged-pod baseline smoke 和 browser-lane smoke 收成了一个顶层 summary，方便后续真机验证从一个稳定入口开始。
+
 ## Do Not Reopen / 不要重开
 
 - Do not reopen the old assumption that helper metadata alone answers the desktop-runtime question. / 不要重新回到“helper metadata 本身就回答了 desktop-runtime 问题”的旧假设。

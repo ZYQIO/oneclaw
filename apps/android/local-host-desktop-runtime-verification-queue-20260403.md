@@ -9,6 +9,12 @@ Record the exact real-device verification steps that are still blocked during th
 
 ## Tonight's Commands / 今晚要跑的命令
 
+0. Fastest one-command path when you just want the combined desktop-runtime verdict first.
+
+```bash
+pnpm android:local-host:embedded-runtime-pod:doctor
+```
+
 1. Reinstall the current debug app if the device might still be on an older build.
 
 ```bash
@@ -49,6 +55,7 @@ pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke
 
 ## Expected Results / 预期结果
 
+- Step 0 should collapse the current state into one top-level classification and leave one combined `summary.json`.
 - Step 3 should still report the packaged pod baseline as healthy.
 - Step 4 should leave `browserDescribeAfter.replayReady=true` in `summary.json`.
 - Step 4 should move `runtimeDescribeAfter.mainlineStatus` to `browser_lane_replayed` or `browser_lane_configured`.
