@@ -1,13 +1,18 @@
 {
   "podId": "ai.openclaw.android.embedded-runtime-pod",
   "podName": "Embedded Runtime Pod",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Build-time packaged asset slice for Android host integration.",
   "stages": [
     {
       "name": "bridge",
       "source": "assets/bridge",
       "destination": "bridge"
+    },
+    {
+      "name": "browser",
+      "source": "assets/browser",
+      "destination": "browser"
     },
     {
       "name": "toolkit",

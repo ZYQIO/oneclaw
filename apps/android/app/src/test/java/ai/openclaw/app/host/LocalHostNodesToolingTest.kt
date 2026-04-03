@@ -40,10 +40,12 @@ class LocalHostNodesToolingTest {
     assertTrue("device_permissions" in actions)
     assertTrue("pod_health" in actions)
     assertTrue("pod_manifest_describe" in actions)
+    assertTrue("pod_browser_describe" in actions)
     assertTrue("pod_runtime_describe" in actions)
     assertTrue("pod_runtime_execute" in actions)
     assertTrue("pod_workspace_scan" in actions)
     assertTrue("pod_workspace_read" in actions)
+    assertFalse("pod_browser_auth_start" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
     assertFalse("ui_launch_app" in actions)
@@ -179,7 +181,7 @@ class LocalHostNodesToolingTest {
             org.junit.Assert.assertEquals("pod.manifest.describe", command)
             org.junit.Assert.assertEquals("{}", paramsJson)
             GatewaySession.InvokeResult.ok(
-              """{"ok":true,"manifestSource":"installed","fileCount":14}""",
+              """{"ok":true,"manifestSource":"installed","fileCount":16}""",
             )
           },
           allowAdvancedRemoteCommands = { false },
@@ -195,6 +197,62 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("manifestSource"))
       assertTrue(result.outputText.contains("fileCount"))
+    }
+
+  @Test
+  fun podBrowserDescribe_mapsInvokeCommandForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.browser.describe", command)
+            org.junit.Assert.assertEquals("{}", paramsJson)
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"browserStatus":"bounded_lane_ready","browserAuthFlowCount":1}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_browser_describe"}""",
+        )
+
+      assertTrue(result.outputText.contains("bounded_lane_ready"))
+      assertTrue(result.outputText.contains("browserAuthFlowCount"))
+    }
+
+  @Test
+  fun podBrowserAuthStart_mapsFlowIdForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.browser.auth.start", command)
+            assertTrue(paramsJson.orEmpty().contains("\"flowId\":\"openai-codex-oauth\""))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"flowId":"openai-codex-oauth","launchStatus":"launch_requested","authInProgress":true}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_browser_auth_start","flowId":"openai-codex-oauth"}""",
+        )
+
+      assertTrue(result.outputText.contains("openai-codex-oauth"))
+      assertTrue(result.outputText.contains("launch_requested"))
     }
 
   @Test

@@ -1,12 +1,16 @@
 package ai.openclaw.app.node
 
 import android.content.Context
+import ai.openclaw.app.EmbeddedRuntimePodBrowserDescribeResult
+import ai.openclaw.app.EmbeddedRuntimePodBrowserStartResult
+import ai.openclaw.app.describeEmbeddedRuntimePodBrowser
 import ai.openclaw.app.describeEmbeddedRuntimeDesktopRuntime
 import ai.openclaw.app.describeEmbeddedRuntimePodManifest
 import ai.openclaw.app.executeEmbeddedRuntimePodTask
 import ai.openclaw.app.readEmbeddedRuntimePodWorkspaceFile
 import ai.openclaw.app.inspectEmbeddedRuntimePod
 import ai.openclaw.app.scanEmbeddedRuntimePodWorkspace
+import ai.openclaw.app.startEmbeddedRuntimePodBrowserAuth
 import ai.openclaw.app.gateway.GatewaySession
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -16,6 +20,8 @@ import kotlinx.serialization.json.put
 
 class PodHandler(
   private val appContext: Context,
+  private val browserDescribe: (Context) -> EmbeddedRuntimePodBrowserDescribeResult = ::describeEmbeddedRuntimePodBrowser,
+  private val browserAuthStart: (Context, String?) -> EmbeddedRuntimePodBrowserStartResult = ::startEmbeddedRuntimePodBrowserAuth,
 ) {
   private val json = Json { ignoreUnknownKeys = true }
 
@@ -45,6 +51,45 @@ class PodHandler(
         inspection = inspection.toJson(),
         localExecutionAvailable = inspection.ready,
         extra = describeResult.payload ?: buildJsonObject {},
+      ).toString(),
+    )
+  }
+
+  fun handlePodBrowserDescribe(_paramsJson: String?): GatewaySession.InvokeResult {
+    val inspection = inspectEmbeddedRuntimePod(appContext)
+    val describeResult = browserDescribe(appContext)
+    if (!describeResult.ok) {
+      return GatewaySession.InvokeResult.error(
+        code = describeResult.code ?: "UNAVAILABLE",
+        message = describeResult.message ?: "UNAVAILABLE: browser metadata unavailable",
+      )
+    }
+    return GatewaySession.InvokeResult.ok(
+      buildPayload(
+        command = "pod.browser.describe",
+        inspection = inspection.toJson(),
+        localExecutionAvailable = inspection.ready,
+        extra = describeResult.payload ?: buildJsonObject {},
+      ).toString(),
+    )
+  }
+
+  fun handlePodBrowserAuthStart(paramsJson: String?): GatewaySession.InvokeResult {
+    val inspection = inspectEmbeddedRuntimePod(appContext)
+    val params = parseBrowserAuthParams(paramsJson)
+    val startResult = browserAuthStart(appContext, params.flowId)
+    if (!startResult.ok) {
+      return GatewaySession.InvokeResult.error(
+        code = startResult.code ?: "UNAVAILABLE",
+        message = startResult.message ?: "UNAVAILABLE: browser auth start failed",
+      )
+    }
+    return GatewaySession.InvokeResult.ok(
+      buildPayload(
+        command = "pod.browser.auth.start",
+        inspection = inspection.toJson(),
+        localExecutionAvailable = inspection.ready,
+        extra = startResult.payload ?: buildJsonObject {},
       ).toString(),
     )
   }
@@ -219,6 +264,24 @@ class PodHandler(
     return PodRuntimeExecuteParams(taskId = taskId)
   }
 
+  private fun parseBrowserAuthParams(paramsJson: String?): PodBrowserAuthParams {
+    val params =
+      try {
+        paramsJson
+          ?.trim()
+          ?.takeIf { it.isNotEmpty() }
+          ?.let { json.parseToJsonElement(it) as? JsonObject }
+      } catch (_: Throwable) {
+        null
+      } ?: return PodBrowserAuthParams()
+
+    val flowId =
+      primitiveContent(params, "flowId")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    return PodBrowserAuthParams(flowId = flowId)
+  }
+
   private fun primitiveContent(
     params: JsonObject,
     key: String,
@@ -239,5 +302,9 @@ class PodHandler(
 
   private data class PodRuntimeExecuteParams(
     val taskId: String? = null,
+  )
+
+  private data class PodBrowserAuthParams(
+    val flowId: String? = null,
   )
 }

@@ -48,6 +48,8 @@ class InvokeCommandRegistryTest {
       OpenClawDeviceCommand.Health.rawValue,
       OpenClawPodCommand.Health.rawValue,
       OpenClawPodCommand.ManifestDescribe.rawValue,
+      OpenClawPodCommand.BrowserDescribe.rawValue,
+      OpenClawPodCommand.BrowserAuthStart.rawValue,
       OpenClawPodCommand.RuntimeDescribe.rawValue,
       OpenClawPodCommand.RuntimeExecute.rawValue,
       OpenClawPodCommand.WorkspaceScan.rawValue,

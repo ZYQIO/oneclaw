@@ -24,12 +24,17 @@ private val embeddedRuntimeBootstrapHelperCommands =
   listOf(
     "pod.health",
     "pod.manifest.describe",
+    "pod.browser.describe",
     "pod.workspace.scan",
     "pod.workspace.read",
   )
 private val embeddedRuntimeExecutionCommands =
   listOf(
     "pod.runtime.execute",
+  )
+private val embeddedRuntimeBrowserLaunchCommands =
+  listOf(
+    "pod.browser.auth.start",
   )
 
 @Serializable
@@ -453,9 +458,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
 ): EmbeddedRuntimePodRuntimeDescribeResult {
   val inspection = inspectEmbeddedRuntimePod(context)
   val carrier = inspectEmbeddedRuntimeCarrier(context = context, manifestVersion = inspection.manifestVersion)
+  val browser = inspectEmbeddedRuntimeBrowserLane(context = context, manifestVersion = inspection.manifestVersion)
   val engineIntegrated =
     carrier.runtimeStageInstalled && carrier.runtimeStageManifestPresent && carrier.runtimeEngineManifestPresent && carrier.runtimeTaskCount > 0
   val environmentIntegrated = carrier.runtimeStageInstalled
+  val browserIntegrated =
+    browser.browserStageInstalled && browser.browserStageManifestPresent && browser.browserAuthFlowCount > 0
   val toolsIntegrated =
     carrier.toolkitStageInstalled &&
       carrier.toolkitStageManifestPresent &&
@@ -480,15 +488,25 @@ fun describeEmbeddedRuntimeDesktopRuntime(
       carrier.toolkitStageInstalled || carrier.toolDescriptorCount > 0 -> "bootstrap_present"
       else -> "missing"
     }
+  val browserStatus =
+    when {
+      browserIntegrated && browser.authInProgress -> "auth_in_progress"
+      browserIntegrated && browser.authCredentialPresent -> "landed_bootstrap"
+      browserIntegrated -> "partial_bootstrap"
+      browser.browserStageInstalled || browser.browserAuthFlowCount > 0 -> "bootstrap_present"
+      else -> "missing"
+    }
   val missingDomains = buildList {
     if (!engineIntegrated) add("engine")
     if (!environmentIntegrated) add("environment")
-    add("browser")
+    if (!browserIntegrated) add("browser")
     if (!toolsIntegrated) add("tools")
     add("plugins")
   }
   val mainlineStatus =
     when {
+      inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && browserIntegrated && browser.authCredentialPresent -> "browser_lane_configured"
+      inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && browserIntegrated -> "browser_lane_ready"
       inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && carrier.runtimeToolExecutionStateCount > 0 -> "tool_lane_replayed"
       inspection.ready && carrier.runtimeHomeReady && toolsIntegrated -> "tool_lane_ready"
       inspection.ready && carrier.runtimeHomeReady && engineIntegrated -> "runtime_execute_ready"
@@ -522,6 +540,13 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("toolDescriptorCount", JsonPrimitive(carrier.toolDescriptorCount))
         put("runtimeToolTaskCount", JsonPrimitive(carrier.runtimeToolTaskIds.size))
         put("runtimeToolExecutionStateCount", JsonPrimitive(carrier.runtimeToolExecutionStateCount))
+        put("browserStageInstalled", JsonPrimitive(browser.browserStageInstalled))
+        put("browserStageManifestPresent", JsonPrimitive(browser.browserStageManifestPresent))
+        put("browserAuthFlowCount", JsonPrimitive(browser.browserAuthFlowCount))
+        put("browserLaunchStateCount", JsonPrimitive(browser.browserLaunchStateCount))
+        put("authCredentialPresent", JsonPrimitive(browser.authCredentialPresent))
+        put("authInProgress", JsonPrimitive(browser.authInProgress))
+        browser.authSignedInEmail?.let { put("authSignedInEmail", JsonPrimitive(it)) }
         carrier.engineId?.let { put("engineId", JsonPrimitive(it)) }
         carrier.engineVersion?.let { put("engineVersion", JsonPrimitive(it)) }
         carrier.runtimeHomeVersion?.let { put("runtimeHomeVersion", JsonPrimitive(it)) }
@@ -539,6 +564,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           "runtimeExecutionCommands",
           buildJsonArray {
             embeddedRuntimeExecutionCommands.forEach { command ->
+              add(JsonPrimitive(command))
+            }
+          },
+        )
+        put("browserLaunchCommandCount", JsonPrimitive(embeddedRuntimeBrowserLaunchCommands.size))
+        put(
+          "browserLaunchCommands",
+          buildJsonArray {
+            embeddedRuntimeBrowserLaunchCommands.forEach { command ->
               add(JsonPrimitive(command))
             }
           },
@@ -591,7 +625,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 id = "helperSurface",
                 status = "landed_bootstrap",
                 integrated = true,
-                summary = "Read-only helper entrypoints exist for pod health, manifest metadata, workspace inventory, and workspace reads.",
+                summary = "Read-only helper entrypoints exist for pod health, manifest metadata, bounded browser metadata, workspace inventory, and workspace reads.",
               ),
             )
             add(
@@ -621,9 +655,20 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             add(
               buildDesktopRuntimeDomain(
                 id = "browser",
-                status = "missing",
-                integrated = false,
-                summary = "No bounded desktop browser runtime or browser automation bridge exists yet.",
+                status = browserStatus,
+                integrated = browserIntegrated,
+                summary =
+                  when {
+                    browser.authInProgress ->
+                      "The bounded browser-auth lane is active and waiting for the external OpenAI Codex login flow to complete."
+                    browser.authCredentialPresent ->
+                      "A bounded browser-auth lane is packaged and currently backed by a stored OpenAI Codex credential."
+                    browserIntegrated ->
+                      "A bounded external-browser auth lane is now packaged, but it still needs replayable on-device proof."
+                    browser.browserStageInstalled || browser.browserAuthFlowCount > 0 ->
+                      "Browser stage assets have started to land, but the bounded auth lane is not fully wired yet."
+                    else -> "No bounded desktop browser lane is packaged yet."
+                  },
               ),
             )
             add(
@@ -660,7 +705,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !carrier.runtimeHomeReady -> "runtime_execute_replay"
               !toolsIntegrated -> "tool_lane_bootstrap"
               carrier.runtimeToolExecutionStateCount < 1 -> "tool_lane_replay"
-              else -> "browser_or_plugin_lane"
+              !browserIntegrated -> "browser_lane_bootstrap"
+              !browser.authCredentialPresent -> "browser_lane_replay"
+              else -> "plugin_lane"
             },
           ),
         )
@@ -674,8 +721,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Use the packaged runtime carrier as the base for the first bounded desktop tool lane before widening into browser or plugins."
               carrier.runtimeToolExecutionStateCount < 1 ->
                 "Run pod.runtime.execute with the packaged desktop tool task on-device to prove the new tool lane is replayable."
+              !browserIntegrated ->
+                "Package the first bounded browser lane around an explicit auth flow instead of widening into generic browser tools."
+              !browser.authCredentialPresent ->
+                "Run pod.browser.describe, then replay pod.browser.auth.start on-device to prove the bounded browser-auth lane before widening into plugins."
               else ->
-                "Keep the packaged tool lane stable, then attach only the next bounded browser or plugin slice that the mainline truly needs."
+                "Keep the packaged browser and tool lanes stable, then attach only the next allowlisted plugin slice that the mainline truly needs."
             },
           ),
         )

@@ -2,7 +2,9 @@ package ai.openclaw.app.node
 
 import ai.openclaw.app.ensureEmbeddedRuntimePodInstalled
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -52,8 +54,8 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("localExecutionAvailable").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("ready").jsonPrimitive.boolean)
     assertEquals("ready", payload.getValue("reason").jsonPrimitive.content)
-    assertEquals(14, payload.getValue("verifiedFileCount").jsonPrimitive.int)
-    assertEquals("0.4.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
+    assertEquals(16, payload.getValue("verifiedFileCount").jsonPrimitive.int)
+    assertEquals("0.5.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
   }
 
   @Test
@@ -72,21 +74,23 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("localExecutionAvailable").jsonPrimitive.boolean)
     assertEquals("installed", payload.getValue("manifestSource").jsonPrimitive.content)
     assertEquals("installed", payload.getValue("layoutSource").jsonPrimitive.content)
-    assertEquals(4, payload.getValue("stageCount").jsonPrimitive.int)
-    assertEquals(14, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(5, payload.getValue("stageCount").jsonPrimitive.int)
+    assertEquals(16, payload.getValue("fileCount").jsonPrimitive.int)
     assertEquals(true, payload.getValue("workspaceStageDeclared").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
     val stageNames = payload.getValue("stageNames").jsonArray.map { it.jsonPrimitive.content }
+    assertTrue("browser" in stageNames)
     assertTrue("workspace" in stageNames)
     assertTrue("runtime" in stageNames)
     val fileStageCounts = payload.getValue("fileStageCounts").jsonObject
+    assertEquals(2, fileStageCounts.getValue("browser").jsonPrimitive.int)
     assertEquals(5, fileStageCounts.getValue("workspace").jsonPrimitive.int)
     assertEquals(5, fileStageCounts.getValue("runtime").jsonPrimitive.int)
     assertEquals(3, fileStageCounts.getValue("toolkit").jsonPrimitive.int)
     val podManifest = payload.getValue("podManifest").jsonObject
-    assertEquals("0.4.0", podManifest.getValue("version").jsonPrimitive.content)
+    assertEquals("0.5.0", podManifest.getValue("version").jsonPrimitive.content)
     val podLayout = payload.getValue("podLayout").jsonObject
-    assertEquals("0.4.0", podLayout.getValue("version").jsonPrimitive.content)
+    assertEquals("0.5.0", podLayout.getValue("version").jsonPrimitive.content)
   }
 
   @Test
@@ -104,8 +108,8 @@ class PodHandlerTest {
     assertEquals("bundled", payload.getValue("manifestSource").jsonPrimitive.content)
     assertEquals("bundled", payload.getValue("layoutSource").jsonPrimitive.content)
     assertEquals(false, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
-    assertEquals(4, payload.getValue("stageCount").jsonPrimitive.int)
-    assertEquals(14, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(5, payload.getValue("stageCount").jsonPrimitive.int)
+    assertEquals(16, payload.getValue("fileCount").jsonPrimitive.int)
   }
 
   @Test
@@ -144,7 +148,59 @@ class PodHandlerTest {
     assertFalse("engine" in missingDomains)
     assertFalse("environment" in missingDomains)
     assertFalse("tools" in missingDomains)
-    assertTrue("browser" in missingDomains)
+    assertFalse("browser" in missingDomains)
+  }
+
+  @Test
+  fun handlePodBrowserDescribe_reportsBoundedBrowserLane() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodBrowserDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("pod.browser.describe", payload.getValue("command").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("browserStageInstalled").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("browserStageManifestPresent").jsonPrimitive.boolean)
+    assertEquals(1, payload.getValue("browserAuthFlowCount").jsonPrimitive.int)
+    assertEquals("openai-codex-oauth", payload.getValue("recommendedFlowId").jsonPrimitive.content)
+    assertEquals(
+      "pod.browser.auth.start",
+      payload.getValue("launchCommands").jsonArray.single().jsonPrimitive.content,
+    )
+  }
+
+  @Test
+  fun handlePodBrowserAuthStart_returnsStructuredLaunchPayload() {
+    val context = RuntimeEnvironment.getApplication()
+    val handler =
+      PodHandler(
+        appContext = context,
+        browserAuthStart = { _, flowId ->
+          ai.openclaw.app.EmbeddedRuntimePodBrowserStartResult(
+            ok = true,
+            payload =
+              buildJsonObject {
+                put("flowId", JsonPrimitive(flowId ?: "openai-codex-oauth"))
+                put("launchStatus", JsonPrimitive("launch_requested"))
+                put("authInProgress", JsonPrimitive(true))
+              },
+          )
+        },
+      )
+
+    val result = handler.handlePodBrowserAuthStart("""{"flowId":"openai-codex-oauth"}""")
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("pod.browser.auth.start", payload.getValue("command").jsonPrimitive.content)
+    assertEquals("openai-codex-oauth", payload.getValue("flowId").jsonPrimitive.content)
+    assertEquals("launch_requested", payload.getValue("launchStatus").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("authInProgress").jsonPrimitive.boolean)
   }
 
   @Test
@@ -168,9 +224,9 @@ class PodHandlerTest {
     val state = payload.getValue("state").jsonObject
     assertEquals("ok", state.getValue("status").jsonPrimitive.content)
     assertEquals(1, state.getValue("executionCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.4.0/config/runtime-env.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.4.0/state/runtime-smoke.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.4.0/logs/runtime-engine.log").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0/config/runtime-env.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0/state/runtime-smoke.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0/logs/runtime-engine.log").isFile)
   }
 
   @Test
@@ -192,7 +248,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("packagedToolDescriptorPresent").jsonPrimitive.boolean)
     assertTrue(payload.getValue("toolResultFilePath").jsonPrimitive.content.endsWith("/work/tool-brief-inspect-result.json"))
     assertEquals(1, payload.getValue("toolResult").jsonObject.getValue("headingCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.4.0/work/tool-brief-inspect-result.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0/work/tool-brief-inspect-result.json").isFile)
   }
 
   @Test

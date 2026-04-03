@@ -17,14 +17,15 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - `Local Host` currently provides on-device Codex-backed chat, a curated Android command surface, an app-private on-device workspace for text files with search/edit/copy/move support, and a dedicated idle-phone deployment mode that can keep the host service alive across app relaunches, package upgrades, and reboots.
 - When the phone is connected to a trusted desktop, the desktop can now inspect its own `openai-codex` OAuth state and push that credential into the phone's guarded local-host API so the phone can recover from missing / stale auth without another browser login.
 - The app now supports a settings-driven English / Simplified Chinese toggle across the tab bar, Connect tab, Settings tab, onboarding flow, Chat / Voice primary surfaces, Voice runtime/microphone status copy, Voice reply / TTS detail status copy, common gateway auth/pairing edge states, the browser-based Codex auth success/failure page, and several runtime/auth status strings. Some deeper secondary copy still remains to be localized.
-- It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
+- It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, generic browser tools, or plugin runtime.
 - On branch `android-desktop-runtime-mainline-20260403`, the Android mainline now explicitly targets selected desktop-runtime integration; the current helper pod remains the bootstrap carrier, and `pod.runtime.describe` reports the live gap map for engine, environment, browser, tools, and plugins.
 - Local-host `/status` now also reports `embeddedRuntimePodAvailable` plus an `embeddedRuntimePod` object, and app startup now attempts to extract the shipped pod into `filesDir/openclaw/embedded-runtime-pod/<version>/`, verify checksums, and report `verifiedFileCount` plus extracted-version readiness instead of only manifest presence.
 - The repo now has both `pnpm android:local-host:embedded-runtime-pod:prepare` and `pnpm android:local-host:embedded-runtime-pod:sync-assets`: `prepare` emits the raw `.tmp/android-runtime-pod/manifest.json`, `layout.json`, and staged tree, while `sync-assets` rewrites that payload into APK-safe asset metadata and staged files that the Android build now wires into generated assets automatically.
-- The read-only pod surface now includes `pod.health`, `pod.manifest.describe`, `pod.runtime.describe`, `pod.workspace.scan`, and `pod.workspace.read`: remote callers can verify pod readiness, inspect packaged manifest/layout metadata, inspect the desktop-runtime mainline gap map, inspect the packaged workspace inventory, and read one packaged workspace document without touching any shell/browser path.
+- The read-only pod surface now includes `pod.health`, `pod.manifest.describe`, `pod.browser.describe`, `pod.runtime.describe`, `pod.workspace.scan`, and `pod.workspace.read`: remote callers can verify pod readiness, inspect packaged manifest/layout metadata, inspect the bounded browser lane, inspect the desktop-runtime mainline gap map, inspect the packaged workspace inventory, and read one packaged workspace document without touching any generic shell/browser path.
 - The bounded runtime-carrier surface now also includes `pod.runtime.execute`, which runs both the packaged `runtime-smoke` carrier task and the first packaged desktop-tool task `tool-brief-inspect`, materializes an app-private runtime home, hydrates packaged config, and persists structured state plus logs without opening an unrestricted shell lane.
-- The current embedded pod payload is versioned as `0.4.0`, which adds a packaged toolkit policy + tool descriptor lane on top of the earlier `runtime/` stage and still extracts into a fresh app-private version directory instead of silently reusing the previous payload.
-- This is now a real packaging-plus-extraction-plus-runtime-carrier path with the first bounded packaged desktop tool lane, but it is still not a full embedded desktop runtime yet: browser and plugin lanes remain explicitly out of scope until this bounded carrier has boring replay proof on-device.
+- The bounded browser surface now also includes `pod.browser.auth.start`, which only reuses the app's existing OpenAI Codex OAuth browser flow and persists structured launch state instead of opening a generic browser runtime lane.
+- The current embedded pod payload is versioned as `0.5.0`, which adds a packaged `browser/` auth stage on top of the earlier runtime + toolkit carrier and still extracts into a fresh app-private version directory instead of silently reusing the previous payload.
+- This is now a real packaging-plus-extraction-plus-runtime-carrier path with the first bounded packaged desktop tool lane plus the first bounded browser-auth lane, but it is still not a full embedded desktop runtime yet: generic browser tooling and plugin lanes remain explicitly out of scope until these bounded lanes have boring replay proof on-device.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
 
 ### Dedicated Host Deployment / 专用 Host 部署
@@ -232,9 +233,11 @@ pnpm android:local-host:embedded-runtime-pod:smoke
 The pod smoke validates:
 
 - `/status` reports `embeddedRuntimePod` as ready
-- `/invoke/capabilities` advertises `pod.health`, `pod.manifest.describe`, `pod.runtime.describe`, `pod.runtime.execute`, `pod.workspace.scan`, and `pod.workspace.read`
+- `/invoke/capabilities` advertises `pod.health`, `pod.manifest.describe`, `pod.browser.describe`, `pod.runtime.describe`, `pod.runtime.execute`, `pod.workspace.scan`, and `pod.workspace.read`
 - `pod.health` matches the repo's current `pod-spec.json` version and asset file count
 - `pod.manifest.describe` matches the repo's current stage count, asset file count, and installed manifest/layout metadata
+- `pod.browser.describe` reports the first bounded browser-auth lane and its allowlisted `openai-codex` flow descriptor
+- `pod.browser.auth.start` is the side-effectful companion for that lane and intentionally stays outside the read-only smoke
 - `pod.runtime.execute` runs both `taskId=runtime-smoke` and the packaged desktop-tool task `taskId=tool-brief-inspect`, materializes the packaged runtime home, and returns structured state/log metadata
 - the packaged desktop-tool task returns `toolId=packaged-brief-inspector-v1`, a structured brief summary, and a replayable result file under the runtime home `work/` directory
 - `pod.workspace.scan` matches the repo's current `content-index.json` document count and can read the packaged handoff template out of the extracted app-private workspace
@@ -248,14 +251,14 @@ Optional overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT=5`
 - `OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH=templates/handoff-template.md`
 
-Each run writes `status.json`, `capabilities.json`, `pod-health.json`, `pod-manifest-describe.json`, `pod-runtime-describe.json`, `pod-runtime-execute.json`, `pod-tool-execute.json`, `pod-workspace-scan.json`, `pod-workspace-read.json`, and `summary.json` into the artifact directory so the phone-side pod state is easy to inspect after the fact.
+Each run writes `status.json`, `capabilities.json`, `pod-health.json`, `pod-manifest-describe.json`, `pod-browser-describe.json`, `pod-runtime-describe.json`, `pod-runtime-execute.json`, `pod-tool-execute.json`, `pod-workspace-scan.json`, `pod-workspace-read.json`, and `summary.json` into the artifact directory so the phone-side pod state is easy to inspect after the fact.
 
 Optional runtime override:
 
 - `OPENCLAW_ANDROID_LOCAL_HOST_POD_RUNTIME_TASK_ID=runtime-smoke`
 - `OPENCLAW_ANDROID_LOCAL_HOST_POD_TOOL_TASK_ID=tool-brief-inspect`
 
-- If the smoke reports `capabilities_missing_pod_health`, `capabilities_missing_pod_manifest_describe`, `capabilities_missing_pod_workspace_scan`, or `capabilities_missing_pod_workspace_read`, the phone is usually still running an older debug build. Reinstall the current app with `cd apps/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:installDebug`, then rerun `pnpm android:local-host:token -- --json` and the pod smoke.
+- If the smoke reports `capabilities_missing_pod_health`, `capabilities_missing_pod_manifest_describe`, `capabilities_missing_pod_browser_describe`, `capabilities_missing_pod_runtime_describe`, `capabilities_missing_pod_runtime_execute`, `capabilities_missing_pod_workspace_scan`, or `capabilities_missing_pod_workspace_read`, the phone is usually still running an older debug build. Reinstall the current app with `cd apps/android && ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:installDebug`, then rerun `pnpm android:local-host:token -- --json` and the pod smoke.
 - On April 2, 2026, that exact rerun path passed on the current OPPO / ColorOS device with `manifestVersion=0.2.0`, `verifiedFileCount=7`, `documentCount=2`, and `firstPath=templates/handoff-template.md`.
 - Later that same night, after landing `pod.workspace.read`, the same rerun path also verified `hasPodWorkspaceRead=true`, `relativePath=templates/handoff-template.md`, `sizeBytes=238`, `textPresent=true`, and `documentKind=template` on the device.
 - After landing `pod.manifest.describe`, the same rerun path also verified `hasPodManifestDescribe=true`, `manifestSource=installed`, `layoutSource=installed`, `stageCount=3`, `fileCount=7`, and `workspaceStageFileCount=5` on the device.

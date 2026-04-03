@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "flowId": "openai-codex-oauth",
+  "displayName": "OpenAI Codex Browser Auth",
+  "kind": "browser-auth",
+  "provider": "openai-codex",
+  "summary": "Starts the bounded external-browser OAuth flow already used by the Android app for OpenAI Codex sign-in.",
+  "startCommand": "pod.browser.auth.start",
+  "authorizeUrl": "https://auth.openai.com/oauth/authorize",
+  "redirectUri": "http://localhost:1455/auth/callback",
+  "returnUri": "openclaw://auth/callback",
+  "browserMode": "external-browser-with-loopback-callback",
+  "runtimeDependencies": [
+    "browser",
+    "loopback-callback",
+    "app-return-link"
+  ]
+}

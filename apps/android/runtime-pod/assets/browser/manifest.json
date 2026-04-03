@@ -1,0 +1,10 @@
+{
+  "stage": "browser",
+  "purpose": "Bounded external-browser auth lane for selected desktop-runtime flows.",
+  "authFlowDescriptorPaths": [
+    "auth/openai-codex-auth.json"
+  ],
+  "authFlowIds": [
+    "openai-codex-oauth"
+  ]
+}

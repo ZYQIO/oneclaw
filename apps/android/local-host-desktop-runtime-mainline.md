@@ -12,12 +12,12 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 
 ## Current Baseline / 当前基线
 
-- The packaged pod payload is now `0.4.0` and includes a packaged `toolkit/` stage plus a second bounded task `tool-brief-inspect` on top of the earlier `runtime/` stage. / 当前打包 pod payload 已更新到 `0.4.0`，并在原有 `runtime/` stage 之上新增了打包 `toolkit/` stage 和第二条有边界任务 `tool-brief-inspect`。
-- `pod.runtime.execute` can now materialize an app-private runtime home with config, logs, state, and work directories, and it already replays the first packaged desktop tool lane, while the browser and plugin lanes remain intentionally missing. / `pod.runtime.execute` 现在已经能把 app-private runtime home 实体化成带有 config、logs、state 和 work 目录的运行环境，并且已经能复跑第一条打包 desktop tool lane；但 browser 和 plugin lane 仍然故意保留为空。
+- The packaged pod payload is now `0.5.0` and includes a packaged `browser/` stage on top of the earlier `runtime/` plus `toolkit/` carrier. / 当前打包 pod payload 已更新到 `0.5.0`，并在原有 `runtime/` 加 `toolkit/` carrier 之上新增了打包 `browser/` stage。
+- `pod.runtime.execute` still carries the first bounded execution lane, `pod.browser.describe` now reports the first bounded browser-auth lane, and `pod.browser.auth.start` reuses the app's existing OpenAI Codex OAuth browser flow instead of pretending Android already has a generic browser runtime. / `pod.runtime.execute` 仍然承载第一条有边界执行通道，`pod.browser.describe` 现在开始报告第一条有边界 browser-auth lane，而 `pod.browser.auth.start` 只是复用 app 现有的 OpenAI Codex OAuth 浏览器流程，并不假装 Android 已经拥有通用浏览器 runtime。
 
 - Build-time packaging, app-private extraction, checksum verification, and read-only pod invocation are already landed. / 构建期打包、app 私有目录解包、checksum 校验和只读 pod 调用已经落地。
 - `pod.runtime.describe` is now the machine-readable status surface for this mainline and reports which desktop-runtime domains are landed, bootstrap-only, or still missing. / `pod.runtime.describe` 现在是这条主线的机器可读状态面，会直接报告哪些桌面 runtime 域已落地、仅是 bootstrap，或仍然缺失。
-- The current pod payload still does not include a real embedded execution engine, an app-private runtime environment supervisor, a bounded browser lane, packaged desktop tools, or packaged plugin execution. / 当前 pod payload 仍然没有真正的嵌入执行引擎、app 私有 runtime 环境监督器、有边界的浏览器通道、打包桌面工具或打包插件执行面。
+- The current pod payload still does not include a generic browser runtime, a full embedded execution engine, an app-private runtime supervisor, or packaged plugin execution. / 当前 pod payload 仍然没有通用浏览器 runtime、完整嵌入执行引擎、app 私有 runtime supervisor，或打包插件执行面。
 
 ## Mainline Objective / 主线目标
 
@@ -40,7 +40,7 @@ Target capability domains / 目标能力域:
 - `workspace-bridge`: landed bootstrap. Packaged workspace metadata and document reads already work. / `workspace-bridge`：已落地 bootstrap。打包 workspace 元数据和文档读取已经可用。
 - `engine`: missing. No real embedded desktop execution engine is wired into Android yet. / `engine`：缺失。Android 里还没有接入真正的嵌入桌面执行引擎。
 - `environment`: missing. No runtime env supervisor, process model, config bundle, or restart contract exists yet. / `environment`：缺失。还没有 runtime env supervisor、进程模型、配置 bundle 或重启契约。
-- `browser`: missing. No packaged browser runtime or bounded browser automation bridge exists yet. / `browser`：缺失。还没有打包浏览器 runtime 或有边界浏览器自动化桥。
+- `browser`: partial bootstrap. A single allowlisted external-browser auth lane is now packaged, but it still needs replayable on-device proof. / `browser`：部分 bootstrap。现在已经打包了一条单一白名单 external-browser auth lane，但仍需可复跑的真机证据。
 - `tools`: partial bootstrap. One packaged desktop tool lane now exists behind toolkit descriptors and command policy, but it still needs repetitive on-device replay proof. / `tools`：部分 bootstrap。现在已经有一条通过 toolkit descriptor 和 command policy 封装的打包桌面工具通道，但仍需持续补足真机复跑证据。
 - `plugins`: missing. No packaged plugin/runtime lane exists yet. / `plugins`：缺失。还没有打包插件或 runtime lane。
 
@@ -73,7 +73,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 
 ### Phase 2. Runtime Environment / 运行环境
 
-- Status on this branch: `pod.runtime.execute` now hydrates `filesDir/openclaw/embedded-runtime-home/<version>/` with config, logs, state, and work directories, and the first packaged tool lane already writes replayable results under `work/`, so the next gap is sustained on-device replay plus the first bounded browser lane. / 这条分支的现状：`pod.runtime.execute` 已经会把 `filesDir/openclaw/embedded-runtime-home/<version>/` 水合成带有 config、logs、state 和 work 目录的 runtime home，第一条打包工具通道也已经会把可复跑结果写入 `work/`，因此下一步真正的缺口是持续真机复跑，以及第一条有边界浏览器通道。
+- Status on this branch: `pod.runtime.execute` now hydrates `filesDir/openclaw/embedded-runtime-home/<version>/` with config, logs, state, and work directories, the first packaged tool lane already writes replayable results under `work/`, and the next gap is sustained on-device replay for the new bounded browser-auth lane. / 这条分支的现状：`pod.runtime.execute` 已经会把 `filesDir/openclaw/embedded-runtime-home/<version>/` 水合成带有 config、logs、state 和 work 目录的 runtime home，第一条打包工具通道也已经会把可复跑结果写入 `work/`，而下一步缺口则变成了给新的 bounded browser-auth lane 补上持续真机复跑。
 
 - Add an app-private runtime environment layout, config bundle, lifecycle supervision, and health/log surfaces. / 加入 app 私有 runtime 环境目录、配置 bundle、生命周期监督和 health/log 面。
 - Make restart and stale-build diagnostics explicit. / 让重启和 stale-build 诊断显式化。

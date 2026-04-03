@@ -45,12 +45,13 @@ What it does:
   3. Calls /invoke/capabilities and checks pod helper allowlisting
   4. Calls /invoke pod.health
   5. Calls /invoke pod.manifest.describe
-  6. Calls /invoke pod.runtime.describe
-  7. Calls /invoke pod.runtime.execute
-  8. Calls /invoke pod.runtime.execute for the packaged desktop tool lane
-  9. Calls /invoke pod.workspace.scan
-  10. Calls /invoke pod.workspace.read
-  11. Verifies the phone-side results against repo pod-spec.json and content-index.json
+  6. Calls /invoke pod.browser.describe
+  7. Calls /invoke pod.runtime.describe
+  8. Calls /invoke pod.runtime.execute
+  9. Calls /invoke pod.runtime.execute for the packaged desktop tool lane
+  10. Calls /invoke pod.workspace.scan
+  11. Calls /invoke pod.workspace.read
+  12. Verifies the phone-side results against repo pod-spec.json and content-index.json
 
 Requirements:
   - curl
@@ -151,6 +152,7 @@ capabilities_json="$ARTIFACT_DIR/capabilities.json"
 health_json="$ARTIFACT_DIR/pod-health.json"
 manifest_json="$ARTIFACT_DIR/pod-manifest-describe.json"
 runtime_describe_json="$ARTIFACT_DIR/pod-runtime-describe.json"
+browser_describe_json="$ARTIFACT_DIR/pod-browser-describe.json"
 runtime_execute_json="$ARTIFACT_DIR/pod-runtime-execute.json"
 tool_execute_json="$ARTIFACT_DIR/pod-tool-execute.json"
 workspace_json="$ARTIFACT_DIR/pod-workspace-scan.json"
@@ -208,6 +210,7 @@ status_pod_verified_count="$(jq -r '.host.embeddedRuntimePod.verifiedFileCount /
 
 cap_has_health="$(jq -r --arg command 'pod.health' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_manifest_describe="$(jq -r --arg command 'pod.manifest.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
+cap_has_browser_describe="$(jq -r --arg command 'pod.browser.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_runtime_describe="$(jq -r --arg command 'pod.runtime.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_runtime_execute="$(jq -r --arg command 'pod.runtime.execute' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_scan="$(jq -r --arg command 'pod.workspace.scan' '(.commands // []) | index($command) != null' "$capabilities_json")"
@@ -216,16 +219,18 @@ cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
 
 [[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
 [[ "$cap_has_manifest_describe" == "true" ]] || record_failure "capabilities_missing_pod_manifest_describe"
+[[ "$cap_has_browser_describe" == "true" ]] || record_failure "capabilities_missing_pod_browser_describe"
 [[ "$cap_has_runtime_describe" == "true" ]] || record_failure "capabilities_missing_pod_runtime_describe"
 [[ "$cap_has_runtime_execute" == "true" ]] || record_failure "capabilities_missing_pod_runtime_execute"
 [[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
 [[ "$cap_has_workspace_read" == "true" ]] || record_failure "capabilities_missing_pod_workspace_read"
 
-if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_runtime_describe" != "true" || "$cap_has_runtime_execute" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
+if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_browser_describe" != "true" || "$cap_has_runtime_describe" != "true" || "$cap_has_runtime_execute" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
   skip_helper_invocations=1
   failure_hint="install the current debug app on the device, rerun pnpm android:local-host:token -- --json, then rerun pnpm android:local-host:embedded-runtime-pod:smoke"
   printf '{}\n' >"$health_json"
   printf '{}\n' >"$manifest_json"
+  printf '{}\n' >"$browser_describe_json"
   printf '{}\n' >"$runtime_describe_json"
   printf '{}\n' >"$runtime_execute_json"
   printf '{}\n' >"$tool_execute_json"
@@ -234,6 +239,7 @@ if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "
 else
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.manifest.describe"}' | tee "$manifest_json" >/dev/null
+  post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.browser.describe"}' | tee "$browser_describe_json" >/dev/null
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.runtime.describe"}' | tee "$runtime_describe_json" >/dev/null
   runtime_execute_body="$(jq -cn --arg taskId "$RUNTIME_TASK_ID" '{command:"pod.runtime.execute", params:{taskId:$taskId}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$runtime_execute_body" | tee "$runtime_execute_json" >/dev/null
@@ -264,6 +270,15 @@ manifest_workspace_installed="$(jq -r '.payload.workspaceStageInstalled // false
 manifest_version="$(jq -r '.payload.podManifest.version // ""' "$manifest_json")"
 manifest_layout_version="$(jq -r '.payload.podLayout.version // ""' "$manifest_json")"
 manifest_workspace_stage_file_count="$(jq -r '.payload.fileStageCounts.workspace // -1' "$manifest_json")"
+
+browser_describe_ok="$(jq -r '.ok // false' "$browser_describe_json")"
+browser_describe_command="$(jq -r '.payload.command // ""' "$browser_describe_json")"
+browser_describe_status="$(jq -r '.payload.browserStatus // ""' "$browser_describe_json")"
+browser_describe_stage_installed="$(jq -r '.payload.browserStageInstalled // false' "$browser_describe_json")"
+browser_describe_manifest_present="$(jq -r '.payload.browserStageManifestPresent // false' "$browser_describe_json")"
+browser_describe_auth_flow_count="$(jq -r '.payload.browserAuthFlowCount // -1' "$browser_describe_json")"
+browser_describe_launch_command_count="$(jq -r '.payload.launchCommandCount // -1' "$browser_describe_json")"
+browser_describe_recommended_flow_id="$(jq -r '.payload.recommendedFlowId // ""' "$browser_describe_json")"
 
 runtime_describe_ok="$(jq -r '.ok // false' "$runtime_describe_json")"
 runtime_describe_command="$(jq -r '.payload.command // ""' "$runtime_describe_json")"
@@ -347,6 +362,15 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$manifest_layout_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_manifest_describe_layout_version_mismatch"
   [[ "$manifest_workspace_stage_file_count" == "$EXPECTED_WORKSPACE_STAGE_FILE_COUNT" ]] || record_failure "pod_manifest_describe_workspace_file_count_mismatch"
 
+  [[ "$browser_describe_ok" == "true" ]] || record_failure "pod_browser_describe_not_ok"
+  [[ "$browser_describe_command" == "pod.browser.describe" ]] || record_failure "pod_browser_describe_command_mismatch"
+  [[ "$browser_describe_status" != "" ]] || record_failure "pod_browser_describe_missing_status"
+  [[ "$browser_describe_stage_installed" == "true" ]] || record_failure "pod_browser_describe_stage_missing"
+  [[ "$browser_describe_manifest_present" == "true" ]] || record_failure "pod_browser_describe_manifest_missing"
+  [[ "$browser_describe_auth_flow_count" -ge 1 ]] || record_failure "pod_browser_describe_missing_auth_flow"
+  [[ "$browser_describe_launch_command_count" -ge 1 ]] || record_failure "pod_browser_describe_missing_launch_command"
+  [[ "$browser_describe_recommended_flow_id" == "openai-codex-oauth" ]] || record_failure "pod_browser_describe_flow_id_mismatch"
+
   [[ "$runtime_describe_ok" == "true" ]] || record_failure "pod_runtime_describe_not_ok"
   [[ "$runtime_describe_command" == "pod.runtime.describe" ]] || record_failure "pod_runtime_describe_command_mismatch"
   [[ "$runtime_describe_branch" == "android-desktop-runtime-mainline-20260403" ]] || record_failure "pod_runtime_describe_branch_mismatch"
@@ -427,6 +451,7 @@ jq -n \
   --arg statusPodVerifiedCount "$status_pod_verified_count" \
   --arg capHasHealth "$cap_has_health" \
   --arg capHasManifestDescribe "$cap_has_manifest_describe" \
+  --arg capHasBrowserDescribe "$cap_has_browser_describe" \
   --arg capHasRuntimeDescribe "$cap_has_runtime_describe" \
   --arg capHasRuntimeExecute "$cap_has_runtime_execute" \
   --arg capHasWorkspaceScan "$cap_has_workspace_scan" \
@@ -450,6 +475,14 @@ jq -n \
   --arg manifestVersion "$manifest_version" \
   --arg manifestLayoutVersion "$manifest_layout_version" \
   --arg manifestWorkspaceStageFileCount "$manifest_workspace_stage_file_count" \
+  --arg browserDescribeOk "$browser_describe_ok" \
+  --arg browserDescribeCommand "$browser_describe_command" \
+  --arg browserDescribeStatus "$browser_describe_status" \
+  --arg browserDescribeStageInstalled "$browser_describe_stage_installed" \
+  --arg browserDescribeManifestPresent "$browser_describe_manifest_present" \
+  --arg browserDescribeAuthFlowCount "$browser_describe_auth_flow_count" \
+  --arg browserDescribeLaunchCommandCount "$browser_describe_launch_command_count" \
+  --arg browserDescribeRecommendedFlowId "$browser_describe_recommended_flow_id" \
   --arg runtimeDescribeOk "$runtime_describe_ok" \
   --arg runtimeDescribeCommand "$runtime_describe_command" \
   --arg runtimeDescribeBranch "$runtime_describe_branch" \
@@ -526,6 +559,7 @@ jq -n \
     capabilities: {
       hasPodHealth: ($capHasHealth == "true"),
       hasPodManifestDescribe: ($capHasManifestDescribe == "true"),
+      hasPodBrowserDescribe: ($capHasBrowserDescribe == "true"),
       hasPodRuntimeDescribe: ($capHasRuntimeDescribe == "true"),
       hasPodRuntimeExecute: ($capHasRuntimeExecute == "true"),
       hasPodWorkspaceScan: ($capHasWorkspaceScan == "true"),
@@ -553,6 +587,16 @@ jq -n \
       manifestVersion: (if $manifestVersion == "" then null else $manifestVersion end),
       layoutVersion: (if $manifestLayoutVersion == "" then null else $manifestLayoutVersion end),
       workspaceStageFileCount: ($manifestWorkspaceStageFileCount | tonumber)
+    },
+    podBrowserDescribe: {
+      ok: ($browserDescribeOk == "true"),
+      command: (if $browserDescribeCommand == "" then null else $browserDescribeCommand end),
+      browserStatus: (if $browserDescribeStatus == "" then null else $browserDescribeStatus end),
+      browserStageInstalled: ($browserDescribeStageInstalled == "true"),
+      browserStageManifestPresent: ($browserDescribeManifestPresent == "true"),
+      browserAuthFlowCount: ($browserDescribeAuthFlowCount | tonumber),
+      launchCommandCount: ($browserDescribeLaunchCommandCount | tonumber),
+      recommendedFlowId: (if $browserDescribeRecommendedFlowId == "" then null else $browserDescribeRecommendedFlowId end)
     },
     podRuntimeDescribe: {
       ok: ($runtimeDescribeOk == "true"),
@@ -619,6 +663,8 @@ printf 'runtime_pod.health ok=%s ready=%s local=%s version=%s verified=%s\n' \
   "$health_ok" "$health_ready" "$health_local_execution" "$health_version" "$health_verified_count"
 printf 'runtime_pod.manifest ok=%s source=%s layout=%s stages=%s files=%s workspace_files=%s\n' \
   "$manifest_ok" "$manifest_source" "$manifest_layout_source" "$manifest_stage_count" "$manifest_file_count" "$manifest_workspace_stage_file_count"
+printf 'runtime_pod.browser_describe ok=%s status=%s stage=%s flows=%s recommended=%s\n' \
+  "$browser_describe_ok" "$browser_describe_status" "$browser_describe_stage_installed" "$browser_describe_auth_flow_count" "$browser_describe_recommended_flow_id"
 printf 'runtime_pod.runtime_describe ok=%s branch=%s status=%s engine=%s browser=%s tools=%s plugins=%s\n' \
   "$runtime_describe_ok" "$runtime_describe_branch" "$runtime_describe_status" "$runtime_describe_engine_domain" "$runtime_describe_browser_domain" "$runtime_describe_tools_domain" "$runtime_describe_plugins_domain"
 printf 'runtime_pod.runtime_execute ok=%s task=%s home=%s engine=%s count=%s\n' \
@@ -645,6 +691,7 @@ echo "artifacts.status=$status_json"
 echo "artifacts.capabilities=$capabilities_json"
 echo "artifacts.health=$health_json"
 echo "artifacts.manifest=$manifest_json"
+echo "artifacts.browser_describe=$browser_describe_json"
 echo "artifacts.runtime_describe=$runtime_describe_json"
 echo "artifacts.runtime_execute=$runtime_execute_json"
 echo "artifacts.tool_execute=$tool_execute_json"
