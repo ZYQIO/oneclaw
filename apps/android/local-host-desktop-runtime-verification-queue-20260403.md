@@ -5,7 +5,16 @@ Branch / 分支: `android-desktop-runtime-mainline-20260403`
 
 ## Goal / 目标
 
-Record the exact real-device verification steps that are still blocked during the current daytime session. / 记录当前白天会话里因为没法连设备而暂时挂起的真机验证步骤。
+Record the exact real-device verification steps that were blocked during the earlier daytime session, plus the actual evening results once a phone became available. / 记录早先白天会话里因缺设备而挂起的真机验证步骤，以及晚间接上手机后的实际结果。
+
+## Completion Snapshot / 完成快照
+
+- On April 3, 2026 evening, the connected OPPO / ColorOS `PFEM10` phone completed this queue end to end. / 2026 年 4 月 3 日晚，接入的 OPPO / ColorOS `PFEM10` 真机已把这条验证队列完整跑通。
+- The first doctor run correctly caught a stale device build: `classification=embedded_pod_unhealthy`, `manifestVersion=0.2.0`, and missing `pod.browser.describe` / `pod.runtime.describe` / `pod.runtime.execute`. / 第一轮 doctor 正确抓到了设备上还是旧包：`classification=embedded_pod_unhealthy`，`manifestVersion=0.2.0`，并且缺少 `pod.browser.describe` / `pod.runtime.describe` / `pod.runtime.execute`。
+- After `:app:installDebug`, the pod baseline converged to `manifestVersion=0.6.0`, `verifiedFileCount=24`, and a healthy packaged pod surface. / 重新执行 `:app:installDebug` 后，pod 基线已收敛成 `manifestVersion=0.6.0`、`verifiedFileCount=24`，且 packaged pod 面整体健康。
+- The browser-lane smoke then proved `browserDescribeAfter.replayReady=true` and `authCredentialPresent=true`. / 随后的 browser-lane smoke 已证明 `browserDescribeAfter.replayReady=true` 且 `authCredentialPresent=true`。
+- The first direct `pod.desktop.materialize` attempt exposed a real repo bug: `/invoke/capabilities` listed the command, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` had not registered `OpenClawPodCommand.DesktopMaterialize`. / 第一轮直接调用 `pod.desktop.materialize` 还暴露出一个真实仓库缺口：`/invoke/capabilities` 已列出该命令，但 `/invoke` 返回 `INVALID_REQUEST: unknown command`，原因是 `InvokeCommandRegistry` 漏注册了 `OpenClawPodCommand.DesktopMaterialize`。
+- After fixing that registry gap and reinstalling the debug app, `pod.desktop.materialize` succeeded on-device with `desktopHomeReady=true`, and the follow-up doctor converged to `classification=desktop_home_configured` with `runtimeDescribeAfter.mainlineStatus=desktop_home_configured`. / 修掉这个注册表缺口并重装 debug app 后，`pod.desktop.materialize` 已在真机成功返回 `desktopHomeReady=true`，随后 doctor 也收敛到 `classification=desktop_home_configured`，且 `runtimeDescribeAfter.mainlineStatus=desktop_home_configured`。
 
 ## Tonight's Commands / 今晚要跑的命令
 
@@ -58,14 +67,15 @@ pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke
 - Step 0 should collapse the current state into one top-level classification and leave one combined `summary.json`.
 - Step 3 should still report the packaged pod baseline as healthy.
 - Step 4 should leave `browserDescribeAfter.replayReady=true` in `summary.json`.
-- Step 4 should move `runtimeDescribeAfter.mainlineStatus` to `browser_lane_replayed` or `browser_lane_configured`.
-- Step 5 should keep `browserDescribeAfter.replayReady=true` and ideally converge to `runtimeDescribeAfter.mainlineStatus=browser_lane_configured`.
+- Step 4 should move `runtimeDescribeAfter.mainlineStatus` at least to `browser_lane_replayed` or `browser_lane_configured`.
+- After `pod.desktop.materialize`, the branch now ideally converges one step further to `runtimeDescribeAfter.mainlineStatus=desktop_home_configured`.
 
 ## Artifacts To Keep / 建议保留的产物
 
 - The `summary.json` from `pnpm android:local-host:embedded-runtime-pod:smoke`.
 - The `summary.json` from the browser-lane smoke start pass.
 - The `summary.json` from the browser-lane smoke confirm pass.
+- The direct `pod.desktop.materialize` artifact set that includes `active-profile.json` and `desktop-materialize.json`.
 
 ## Do Not Reopen / 不要重开
 

@@ -43,13 +43,15 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 
 1. Stop widening helper/status-only surfaces.
 2. Make the desktop-home side run a more real embedded engine task instead of only materializing manifests.
-3. Move browser, tools, and plugins from manifest-only bundle state toward executable bundle state.
-4. When a device is available again, capture on-device replay evidence for the desktop-home path and update the verification queue.
+3. Keep the packaged browser lane, desktop-home materialization, and tool/runtime replay boringly stable on-device.
+4. Decide whether the next slice should deepen engine/environment execution or attach one narrowly allowlisted plugin lane now that real-device desktop-home proof exists.
 
 ## Verification Status / 验证状态
 
 - Offline repo checks for the desktop bundle landed in this branch are already done.
-- The device-side replay for `pod.desktop.materialize` is still pending because no device was available at the time of this checkpoint.
+- Later on April 3, 2026, the connected OPPO / ColorOS `PFEM10` phone completed the full replay path: after reinstalling the current debug app, `pnpm android:local-host:embedded-runtime-pod:doctor` converged from the stale `0.2.0` build to `classification=desktop_home_configured`, with `manifestVersion=0.6.0`, `verifiedFileCount=24`, `browserReplayReady=true`, and `runtimeDescribeAfter.mainlineStatus=desktop_home_configured`.
+- The same device session also provided direct `pod.desktop.materialize` proof: the command created `filesDir/openclaw/embedded-desktop-home/0.6.0`, returned `desktopHomeReady=true`, and wrote both `profiles/active-profile.json` and `state/desktop-materialize.json` in app-private storage.
+- That first materialize rerun also surfaced a real repo bug: remote `/invoke/capabilities` advertised `pod.desktop.materialize`, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` was missing `OpenClawPodCommand.DesktopMaterialize`. The branch now fixes that mismatch.
 - The existing device-facing verification entrypoints remain:
   - `pnpm android:local-host:embedded-runtime-pod:doctor`
   - `pnpm android:local-host:embedded-runtime-pod:smoke`
