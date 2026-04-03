@@ -263,6 +263,36 @@ Optional runtime override:
 - Later that same night, after landing `pod.workspace.read`, the same rerun path also verified `hasPodWorkspaceRead=true`, `relativePath=templates/handoff-template.md`, `sizeBytes=238`, `textPresent=true`, and `documentKind=template` on the device.
 - After landing `pod.manifest.describe`, the same rerun path also verified `hasPodManifestDescribe=true`, `manifestSource=installed`, `layoutSource=installed`, `stageCount=3`, `fileCount=7`, and `workspaceStageFileCount=5` on the device.
 
+## Embedded Runtime Browser Lane Smoke
+
+Use this when you want one focused command for the bounded browser-auth lane instead of manually chaining runtime replay, browser metadata reads, and `pod.browser.auth.start`.
+
+```bash
+OPENCLAW_ANDROID_LOCAL_HOST_TOKEN='<token-from-connect-tab>' \
+OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1 \
+pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke
+```
+
+The browser-lane smoke:
+
+- replays `pod.runtime.execute(taskId=runtime-smoke)` and `pod.runtime.execute(taskId=tool-brief-inspect)` first so the runtime carrier is already materialized
+- reads `pod.browser.describe` before launch
+- calls `pod.browser.auth.start` for the allowlisted `openai-codex-oauth` flow when `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1`
+- polls `pod.browser.describe` until the browser lane has replayable state on disk
+- re-reads `pod.runtime.describe` and checks that the mainline has advanced to `browser_lane_replayed` or `browser_lane_configured`
+
+Useful overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_FLOW_ID=openai-codex-oauth`
+- `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0`
+- `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_POLL_ATTEMPTS=8`
+- `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_POLL_INTERVAL_SEC=2`
+
+Artifact output includes `pod-browser-describe-before.json`, `pod-browser-auth-start.json`, `pod-browser-describe-after.json`, `pod-runtime-describe-after.json`, and `summary.json`.
+
+- Use the default `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1` pass to prove that the packaged browser lane leaves replayable state/log evidence on disk.
+- After you finish the external browser auth flow on the device, rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0` to confirm that the stored credential path has converged from `browser_lane_replayed` to `browser_lane_configured`.
+
 ## Local Host Doctor
 
 Use this when you want one repo command to bootstrap the debug token, rerun smoke, and automatically fall through to the OpenAI network probe only when the failure really looks like upstream Codex connectivity.
