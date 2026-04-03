@@ -21,8 +21,8 @@ This checkpoint records the first three desktop-runtime slices after the Android
 
 ## Forced Next Gate / 强制下一门槛
 
-- Real-device replay for `pod.browser.describe` plus `pod.browser.auth.start`. / 必须补上 `pod.browser.describe` 与 `pod.browser.auth.start` 的真机复跑证据。
-- Plugin work remains blocked until that browser-lane proof exists. / 在这份 browser lane 真机证据到位之前，不展开 plugin lane。
+- That earlier browser-lane proof is now complete on the connected OPPO / ColorOS `PFEM10` phone. / 前面那道 browser lane 真机门槛现在已经在接入的 OPPO / ColorOS `PFEM10` 真机上完成了。
+- The new gate is no longer "prove the browser lane exists," but "keep the desktop-home replay boringly stable and decide whether the next slice is deeper engine/environment execution or one narrowly allowlisted plugin lane." / 新门槛已经不再是“证明 browser lane 存在”，而是“把 desktop-home replay 维持成无聊地稳定，并明确下一刀到底是更深的 engine/environment 执行，还是一条狭义白名单 plugin lane”。
 
 ## Iteration 4 / 第四个小切片
 
@@ -43,3 +43,10 @@ This checkpoint records the first three desktop-runtime slices after the Android
 - Payload `0.6.0` now carries a packaged `desktop/` environment stage with engine, environment, browser, tools, plugins, supervisor manifests, and one desktop profile descriptor.
 - `pod.desktop.materialize` now materializes `filesDir/openclaw/embedded-desktop-home/<version>/`, so the branch has a real app-private desktop home layout instead of only a gap-map description.
 - This iteration is the explicit correction back toward the branch's full-desktop objective after the earlier drift into "selected slice" framing.
+
+## Iteration 7 / 第七个小切片
+
+- Real-device replay now reaches `desktop_home_configured` on the connected OPPO / ColorOS `PFEM10` phone after reinstalling the current debug app and rerunning `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`.
+- The first direct `pod.desktop.materialize` replay exposed a real repo mismatch: `/invoke/capabilities` already advertised the command, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` had not registered `OpenClawPodCommand.DesktopMaterialize`.
+- That registry gap is now fixed, and direct `pod.desktop.materialize` replay writes `profiles/active-profile.json` plus `state/desktop-materialize.json` under `filesDir/openclaw/embedded-desktop-home/0.6.0/`.
+- The doctor summary is also corrected now so a `desktop_home_configured` branch state is reported as `classification=desktop_home_configured` instead of being collapsed back into `browser_lane_configured`.

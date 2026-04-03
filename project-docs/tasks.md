@@ -2,44 +2,39 @@
 
 ## Immediate Tasks
 
-1. Decide repository strategy.
-   - Option A: keep `ZYQIO/oneclaw` as a separate Android product repo.
-   - Option B: use the repo as an OpenClaw fork.
-   - Exit criteria: one clear decision for what `origin/main` is supposed to represent.
+1. Decide the next desktop-runtime slice after `desktop_home_configured`.
+   - Option A: deepen the engine/environment lane so the materialized desktop home runs a more meaningful packaged workflow.
+   - Option B: add one narrowly allowlisted plugin/runtime slice now that desktop-home materialization is proven on-device.
+   - Exit criteria: one explicit branch-level decision, recorded in docs, for what comes after `desktop_home_configured`.
 
-2. Preserve the current OpenClaw work on your fork without damaging the old branch.
-   - Create a new branch from local `main`.
-   - Push that branch to `origin`.
-   - Exit criteria: the rebased OpenClaw branch exists remotely on your fork.
+2. Turn the direct `pod.desktop.materialize` replay into a stable repo command.
+   - Today the proof exists, but the clearest verification still used an ad hoc curl + adb sequence to capture `active-profile.json` and `desktop-materialize.json`.
+   - Exit criteria: one repeatable repo entrypoint that invokes `pod.desktop.materialize`, verifies desktop-home state, and writes artifacts in one place.
 
-3. Finish verification for the Codex CLI auth fallback change.
-   - Investigate why `oauth.fallback-to-main-agent.test.ts` hangs on Vitest exit.
-   - Exit criteria: the test exits cleanly or is split/refactored so the regression is reliably covered.
+3. Stabilize the broader pod validation lane.
+   - `InvokeCommandRegistryTest` and the real-device replay are green, but the wider `PodHandlerTest` lane still fails with `KeyStoreException` / `NoSuchAlgorithmException` in this environment.
+   - Exit criteria: either the broader test lane exits cleanly or the unstable portion is isolated and documented so the default validation path is reliable.
 
 ## Short-Term Tasks
 
-1. Decide what to do with the old fork history.
-   - If it is still needed, keep it on a dedicated branch such as `android-main` or archive it into a separate repository.
-   - If it is not needed, stop treating it as the default `main` branch for OpenClaw work.
+1. Keep the current real-device replay boringly repeatable.
+   - Re-run `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` after the next desktop-runtime slice.
+   - Exit criteria: the branch still converges to the expected top-level classification after reinstall and token bootstrap.
 
-2. Run broader project checks after the hanging test issue is resolved.
-   - Suggested order:
-     - `corepack pnpm exec vitest run src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts`
-     - `corepack pnpm check`
-     - `corepack pnpm build`
-   - Exit criteria: the branch is ready for push/PR with known-good local validation.
+2. Review whether the current `recommendedNextSlice=plugin_lane` should be followed literally.
+   - The status surface now points at `plugin_lane`, but the branch objective may still benefit more from deeper engine/environment execution first.
+   - Exit criteria: one short keep/override rationale in the Android docs.
 
-3. Review whether any content from your fork is worth porting manually.
-   - Current evidence suggests the fork contains a different product line, not a clean feature branch.
-   - Exit criteria: a short keep/drop list of fork-only artifacts worth preserving.
+3. Keep doc/task surfaces aligned with the Android mainline rather than old fork-management work.
+   - `project-docs/` is now repointed at the Android desktop-runtime branch and should stay that way until the workstream changes.
+   - Exit criteria: no stale fork/auth-fallback task lists remain as the default project-management entrypoint.
 
 ## Deferred Tasks
 
-1. If you want to contribute this auth-profile fix upstream:
-   - Push the branch to your fork.
-   - Open a PR against `openclaw/openclaw`.
-   - Include the test-hang note if it is not fully resolved by then.
+1. If the direct desktop-home verification command proves stable:
+   - Fold it into the broader Android README and preferred replay order.
+   - Promote it alongside `doctor`, `smoke`, and `browser-lane:smoke`.
 
-2. If you want unified project management artifacts inside this repo:
-   - Keep `project-docs/` updated at the end of each session.
-   - Promote only stable, user-facing docs into `docs/`.
+2. If the next slice materially changes user-visible Android behavior:
+   - Refresh the Android handoff/checkpoint docs again.
+   - Capture one new real-device evidence block before widening further.
