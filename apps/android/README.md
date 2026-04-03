@@ -236,7 +236,7 @@ The pod smoke validates:
 - `/invoke/capabilities` advertises `pod.health`, `pod.manifest.describe`, `pod.browser.describe`, `pod.runtime.describe`, `pod.runtime.execute`, `pod.workspace.scan`, and `pod.workspace.read`
 - `pod.health` matches the repo's current `pod-spec.json` version and asset file count
 - `pod.manifest.describe` matches the repo's current stage count, asset file count, and installed manifest/layout metadata
-- `pod.browser.describe` reports the first bounded browser-auth lane and its allowlisted `openai-codex` flow descriptor
+- `pod.browser.describe` reports the first bounded browser-auth lane, its allowlisted `openai-codex` flow descriptor, and any replayable state/log evidence already persisted under the runtime home
 - `pod.browser.auth.start` is the side-effectful companion for that lane and intentionally stays outside the read-only smoke
 - `pod.runtime.execute` runs both `taskId=runtime-smoke` and the packaged desktop-tool task `taskId=tool-brief-inspect`, materializes the packaged runtime home, and returns structured state/log metadata
 - the packaged desktop-tool task returns `toolId=packaged-brief-inspector-v1`, a structured brief summary, and a replayable result file under the runtime home `work/` directory

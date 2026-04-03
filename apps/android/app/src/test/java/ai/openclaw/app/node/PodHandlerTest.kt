@@ -1,6 +1,7 @@
 package ai.openclaw.app.node
 
 import ai.openclaw.app.ensureEmbeddedRuntimePodInstalled
+import ai.openclaw.app.executeEmbeddedRuntimePodTask
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
@@ -167,11 +168,46 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("browserStageInstalled").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("browserStageManifestPresent").jsonPrimitive.boolean)
     assertEquals(1, payload.getValue("browserAuthFlowCount").jsonPrimitive.int)
+    assertEquals(false, payload.getValue("browserReplayReady").jsonPrimitive.boolean)
     assertEquals("openai-codex-oauth", payload.getValue("recommendedFlowId").jsonPrimitive.content)
     assertEquals(
       "pod.browser.auth.start",
       payload.getValue("launchCommands").jsonArray.single().jsonPrimitive.content,
     )
+    assertTrue(payload.getValue("stateFilePath").jsonPrimitive.content.endsWith("/state/browser-openai-codex-auth.json"))
+    assertTrue(payload.getValue("logFilePath").jsonPrimitive.content.endsWith("/logs/browser-lane.log"))
+  }
+
+  @Test
+  fun handlePodBrowserDescribe_reportsReplayStateAfterPersistedLaunch() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0")
+    runtimeHome.resolve("state").mkdirs()
+    runtimeHome.resolve("logs").mkdirs()
+    runtimeHome
+      .resolve("state/browser-openai-codex-auth.json")
+      .writeText(
+        """{"flowId":"openai-codex-oauth","status":"launch_requested","launchRequested":true,"executedAt":"2026-04-03T12:00:00Z","statusText":"Browser opened"}""",
+      )
+    runtimeHome.resolve("logs/browser-lane.log").writeText("2026-04-03T12:00:00Z launch_requested\n")
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodBrowserDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("replayed", payload.getValue("browserStatus").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("browserReplayReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("browserStateFilePresent").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("browserLogFilePresent").jsonPrimitive.boolean)
+    assertEquals("openai-codex-oauth", payload.getValue("lastLaunchFlowId").jsonPrimitive.content)
+    assertEquals("launch_requested", payload.getValue("lastLaunchStatus").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("lastLaunchRequested").jsonPrimitive.boolean)
+    assertEquals("2026-04-03T12:00:00Z", payload.getValue("lastLaunchExecutedAt").jsonPrimitive.content)
+    assertEquals("Browser opened", payload.getValue("lastLaunchStatusText").jsonPrimitive.content)
   }
 
   @Test
@@ -249,6 +285,39 @@ class PodHandlerTest {
     assertTrue(payload.getValue("toolResultFilePath").jsonPrimitive.content.endsWith("/work/tool-brief-inspect-result.json"))
     assertEquals(1, payload.getValue("toolResult").jsonObject.getValue("headingCount").jsonPrimitive.int)
     assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0/work/tool-brief-inspect-result.json").isFile)
+  }
+
+  @Test
+  fun handlePodRuntimeDescribe_requiresReplayEvidenceBeforeConfiguredBrowserLane() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+    executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.5.0")
+    runtimeHome.resolve("state").mkdirs()
+    runtimeHome.resolve("logs").mkdirs()
+    runtimeHome
+      .resolve("state/browser-openai-codex-auth.json")
+      .writeText(
+        """{"flowId":"openai-codex-oauth","status":"launch_requested","launchRequested":true,"executedAt":"2026-04-03T12:00:00Z"}""",
+      )
+    runtimeHome.resolve("logs/browser-lane.log").writeText("2026-04-03T12:00:00Z launch_requested\n")
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodRuntimeDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("browser_lane_replayed", payload.getValue("mainlineStatus").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("browserReplayReady").jsonPrimitive.boolean)
+    assertEquals("browser_lane_complete", payload.getValue("recommendedNextSlice").jsonPrimitive.content)
+    val browserDomain =
+      payload.getValue("domains").jsonArray.first { item ->
+        item.jsonObject.getValue("id").jsonPrimitive.content == "browser"
+      }.jsonObject
+    assertEquals("landed_bootstrap", browserDomain.getValue("status").jsonPrimitive.content)
   }
 
   @Test

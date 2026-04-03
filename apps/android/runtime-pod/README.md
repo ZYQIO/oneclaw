@@ -8,4 +8,4 @@ The staged pod metadata plus `browser/`, `workspace/`, `toolkit/`, and `runtime/
 
 `pod.runtime.execute` currently runs both the packaged `runtime-smoke` task and the first packaged desktop-tool task `tool-brief-inspect` through the bounded Android runtime carrier: it materializes `filesDir/openclaw/embedded-runtime-home/<version>/`, hydrates packaged config into the app-private runtime home, and persists structured state plus logs without exposing an unrestricted shell.
 
-`pod.browser.describe` and `pod.browser.auth.start` now expose the first bounded browser lane as well: they package a single allowlisted OpenAI Codex external-browser auth flow instead of a generic browser runtime.
+`pod.browser.describe` and `pod.browser.auth.start` now expose the first bounded browser lane as well: they package a single allowlisted OpenAI Codex external-browser auth flow instead of a generic browser runtime, and the describe surface now reports whether that packaged lane has replayable state/log evidence under `filesDir/openclaw/embedded-runtime-home/<version>/`.

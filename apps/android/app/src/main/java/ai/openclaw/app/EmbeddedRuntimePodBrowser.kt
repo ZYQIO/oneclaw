@@ -50,9 +50,20 @@ data class EmbeddedRuntimeBrowserInspection(
   val browserAuthFlowCount: Int,
   val browserAuthFlowIds: List<String>,
   val browserLaunchStateCount: Int,
+  val browserReplayReady: Boolean = false,
+  val browserStateFilePresent: Boolean = false,
+  val browserLogFilePresent: Boolean = false,
   val authCredentialPresent: Boolean,
   val authSignedInEmail: String? = null,
   val authInProgress: Boolean = false,
+  val lastLaunchFlowId: String? = null,
+  val lastLaunchStatus: String? = null,
+  val lastLaunchRequested: Boolean? = null,
+  val lastLaunchExecutedAt: String? = null,
+  val lastLaunchStatusText: String? = null,
+  val lastLaunchErrorText: String? = null,
+  val stateFilePath: String? = null,
+  val logFilePath: String? = null,
 )
 
 data class EmbeddedRuntimePodBrowserDescribeResult(
@@ -83,9 +94,14 @@ fun inspectEmbeddedRuntimeBrowserLane(
       browserAuthFlowCount = 0,
       browserAuthFlowIds = emptyList(),
       browserLaunchStateCount = 0,
+      browserReplayReady = false,
+      browserStateFilePresent = false,
+      browserLogFilePresent = false,
       authCredentialPresent = credential != null,
       authSignedInEmail = credential?.email,
       authInProgress = currentUiState?.inProgress == true,
+      stateFilePath = null,
+      logFilePath = null,
     )
   }
 
@@ -107,10 +123,14 @@ fun inspectEmbeddedRuntimeBrowserLane(
 
   val runtimeHome = embeddedRuntimeHomeRootForBrowser(context).resolve(manifestVersion)
   val stateDir = runtimeHome.resolve("state")
+  val stateFile = stateDir.resolve(embeddedBrowserStateFileName)
+  val logFile = runtimeHome.resolve("logs/$embeddedBrowserLogFileName")
+  val launchState = stateFile.takeIf { it.isFile }?.let(::readBrowserJsonObjectOrNull)
   val browserLaunchStateCount =
     stateDir.takeIf { it.isDirectory }?.listFiles()?.count {
       it.isFile && it.name.startsWith("browser-") && it.extension.lowercase() == "json"
     } ?: 0
+  val browserReplayReady = launchState != null
 
   return EmbeddedRuntimeBrowserInspection(
     browserStageInstalled = browserStageInstalled,
@@ -118,9 +138,20 @@ fun inspectEmbeddedRuntimeBrowserLane(
     browserAuthFlowCount = authFlowIds.size,
     browserAuthFlowIds = authFlowIds,
     browserLaunchStateCount = browserLaunchStateCount,
+    browserReplayReady = browserReplayReady,
+    browserStateFilePresent = stateFile.isFile,
+    browserLogFilePresent = logFile.isFile,
     authCredentialPresent = credential != null,
     authSignedInEmail = credential?.email,
     authInProgress = currentUiState?.inProgress == true,
+    lastLaunchFlowId = browserPrimitiveContent(launchState, "flowId"),
+    lastLaunchStatus = browserPrimitiveContent(launchState, "status"),
+    lastLaunchRequested = browserPrimitiveBoolean(launchState, "launchRequested"),
+    lastLaunchExecutedAt = browserPrimitiveContent(launchState, "executedAt"),
+    lastLaunchStatusText = browserPrimitiveContent(launchState, "statusText"),
+    lastLaunchErrorText = browserPrimitiveContent(launchState, "errorText"),
+    stateFilePath = runtimeHomeDisplayPathForBrowser(manifestVersion, "state/$embeddedBrowserStateFileName"),
+    logFilePath = runtimeHomeDisplayPathForBrowser(manifestVersion, "logs/$embeddedBrowserLogFileName"),
   )
 }
 
@@ -136,7 +167,8 @@ fun describeEmbeddedRuntimePodBrowser(
   val browserStatus =
     when {
       browserIntegrated && browser.authInProgress -> "auth_in_progress"
-      browserIntegrated && browser.authCredentialPresent -> "configured"
+      browserIntegrated && browser.browserReplayReady && browser.authCredentialPresent -> "configured"
+      browserIntegrated && browser.browserReplayReady -> "replayed"
       browserIntegrated -> "bounded_lane_ready"
       browser.browserStageInstalled || browser.browserAuthFlowCount > 0 -> "bootstrap_present"
       else -> "missing"
@@ -152,9 +184,20 @@ fun describeEmbeddedRuntimePodBrowser(
         put("browserStageManifestPresent", JsonPrimitive(browser.browserStageManifestPresent))
         put("browserAuthFlowCount", JsonPrimitive(browser.browserAuthFlowCount))
         put("browserLaunchStateCount", JsonPrimitive(browser.browserLaunchStateCount))
+        put("browserReplayReady", JsonPrimitive(browser.browserReplayReady))
+        put("browserStateFilePresent", JsonPrimitive(browser.browserStateFilePresent))
+        put("browserLogFilePresent", JsonPrimitive(browser.browserLogFilePresent))
         put("authCredentialPresent", JsonPrimitive(browser.authCredentialPresent))
         put("authInProgress", JsonPrimitive(browser.authInProgress))
         browser.authSignedInEmail?.let { put("authSignedInEmail", JsonPrimitive(it)) }
+        browser.lastLaunchFlowId?.let { put("lastLaunchFlowId", JsonPrimitive(it)) }
+        browser.lastLaunchStatus?.let { put("lastLaunchStatus", JsonPrimitive(it)) }
+        browser.lastLaunchRequested?.let { put("lastLaunchRequested", JsonPrimitive(it)) }
+        browser.lastLaunchExecutedAt?.let { put("lastLaunchExecutedAt", JsonPrimitive(it)) }
+        browser.lastLaunchStatusText?.let { put("lastLaunchStatusText", JsonPrimitive(it)) }
+        browser.lastLaunchErrorText?.let { put("lastLaunchErrorText", JsonPrimitive(it)) }
+        browser.stateFilePath?.let { put("stateFilePath", JsonPrimitive(it)) }
+        browser.logFilePath?.let { put("logFilePath", JsonPrimitive(it)) }
         put("launchCommandCount", JsonPrimitive(1))
         put(
           "launchCommands",
@@ -384,6 +427,21 @@ private fun readBrowserJsonObjectOrNull(file: File): JsonObject? =
   runCatching {
     embeddedRuntimeBrowserJson.parseToJsonElement(file.readText(Charsets.UTF_8)) as? JsonObject
   }.getOrNull()
+
+private fun browserPrimitiveContent(
+  payload: JsonObject?,
+  key: String,
+): String? = (payload?.get(key) as? JsonPrimitive)?.content?.takeUnless { it == "null" }
+
+private fun browserPrimitiveBoolean(
+  payload: JsonObject?,
+  key: String,
+): Boolean? =
+  when (browserPrimitiveContent(payload, key)?.lowercase()) {
+    "true" -> true
+    "false" -> false
+    else -> null
+  }
 
 private fun embeddedRuntimePodInstallRootForBrowser(context: Context): File =
   context.filesDir.resolve("openclaw/embedded-runtime-pod")

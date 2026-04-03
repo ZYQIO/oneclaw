@@ -491,7 +491,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   val browserStatus =
     when {
       browserIntegrated && browser.authInProgress -> "auth_in_progress"
-      browserIntegrated && browser.authCredentialPresent -> "landed_bootstrap"
+      browserIntegrated && browser.browserReplayReady -> "landed_bootstrap"
       browserIntegrated -> "partial_bootstrap"
       browser.browserStageInstalled || browser.browserAuthFlowCount > 0 -> "bootstrap_present"
       else -> "missing"
@@ -505,7 +505,17 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   }
   val mainlineStatus =
     when {
-      inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && browserIntegrated && browser.authCredentialPresent -> "browser_lane_configured"
+      inspection.ready &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent -> "browser_lane_configured"
+      inspection.ready &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady -> "browser_lane_replayed"
       inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && browserIntegrated -> "browser_lane_ready"
       inspection.ready && carrier.runtimeHomeReady && toolsIntegrated && carrier.runtimeToolExecutionStateCount > 0 -> "tool_lane_replayed"
       inspection.ready && carrier.runtimeHomeReady && toolsIntegrated -> "tool_lane_ready"
@@ -544,9 +554,20 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("browserStageManifestPresent", JsonPrimitive(browser.browserStageManifestPresent))
         put("browserAuthFlowCount", JsonPrimitive(browser.browserAuthFlowCount))
         put("browserLaunchStateCount", JsonPrimitive(browser.browserLaunchStateCount))
+        put("browserReplayReady", JsonPrimitive(browser.browserReplayReady))
+        put("browserStateFilePresent", JsonPrimitive(browser.browserStateFilePresent))
+        put("browserLogFilePresent", JsonPrimitive(browser.browserLogFilePresent))
         put("authCredentialPresent", JsonPrimitive(browser.authCredentialPresent))
         put("authInProgress", JsonPrimitive(browser.authInProgress))
         browser.authSignedInEmail?.let { put("authSignedInEmail", JsonPrimitive(it)) }
+        browser.lastLaunchFlowId?.let { put("lastLaunchFlowId", JsonPrimitive(it)) }
+        browser.lastLaunchStatus?.let { put("lastLaunchStatus", JsonPrimitive(it)) }
+        browser.lastLaunchRequested?.let { put("lastLaunchRequested", JsonPrimitive(it)) }
+        browser.lastLaunchExecutedAt?.let { put("lastLaunchExecutedAt", JsonPrimitive(it)) }
+        browser.lastLaunchStatusText?.let { put("lastLaunchStatusText", JsonPrimitive(it)) }
+        browser.lastLaunchErrorText?.let { put("lastLaunchErrorText", JsonPrimitive(it)) }
+        browser.stateFilePath?.let { put("stateFilePath", JsonPrimitive(it)) }
+        browser.logFilePath?.let { put("logFilePath", JsonPrimitive(it)) }
         carrier.engineId?.let { put("engineId", JsonPrimitive(it)) }
         carrier.engineVersion?.let { put("engineVersion", JsonPrimitive(it)) }
         carrier.runtimeHomeVersion?.let { put("runtimeHomeVersion", JsonPrimitive(it)) }
@@ -661,8 +682,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                   when {
                     browser.authInProgress ->
                       "The bounded browser-auth lane is active and waiting for the external OpenAI Codex login flow to complete."
+                    browser.browserReplayReady && browser.authCredentialPresent ->
+                      "A bounded browser-auth lane now has replayable launch evidence on disk and is currently backed by a stored OpenAI Codex credential."
+                    browser.browserReplayReady ->
+                      "A bounded browser-auth lane now has replayable launch evidence on disk, but the auth flow still needs to finish and persist a credential."
                     browser.authCredentialPresent ->
-                      "A bounded browser-auth lane is packaged and currently backed by a stored OpenAI Codex credential."
+                      "A bounded browser-auth lane is packaged and a stored OpenAI Codex credential exists, but the packaged lane itself still lacks replay evidence."
                     browserIntegrated ->
                       "A bounded external-browser auth lane is now packaged, but it still needs replayable on-device proof."
                     browser.browserStageInstalled || browser.browserAuthFlowCount > 0 ->
@@ -706,7 +731,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !toolsIntegrated -> "tool_lane_bootstrap"
               carrier.runtimeToolExecutionStateCount < 1 -> "tool_lane_replay"
               !browserIntegrated -> "browser_lane_bootstrap"
-              !browser.authCredentialPresent -> "browser_lane_replay"
+              !browser.browserReplayReady -> "browser_lane_replay"
+              !browser.authCredentialPresent -> "browser_lane_complete"
               else -> "plugin_lane"
             },
           ),
@@ -723,8 +749,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Run pod.runtime.execute with the packaged desktop tool task on-device to prove the new tool lane is replayable."
               !browserIntegrated ->
                 "Package the first bounded browser lane around an explicit auth flow instead of widening into generic browser tools."
-              !browser.authCredentialPresent ->
+              !browser.browserReplayReady ->
                 "Run pod.browser.describe, then replay pod.browser.auth.start on-device to prove the bounded browser-auth lane before widening into plugins."
+              !browser.authCredentialPresent ->
+                "Complete the bounded browser-auth flow on-device and re-read pod.browser.describe until the replayed lane is also backed by a stored credential."
               else ->
                 "Keep the packaged browser and tool lanes stable, then attach only the next allowlisted plugin slice that the mainline truly needs."
             },

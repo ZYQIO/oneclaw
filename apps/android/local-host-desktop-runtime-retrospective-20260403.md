@@ -24,6 +24,11 @@ This checkpoint records the first three desktop-runtime slices after the Android
 - Real-device replay for `pod.browser.describe` plus `pod.browser.auth.start`. / 必须补上 `pod.browser.describe` 与 `pod.browser.auth.start` 的真机复跑证据。
 - Plugin work remains blocked until that browser-lane proof exists. / 在这份 browser lane 真机证据到位之前，不展开 plugin lane。
 
+## Iteration 4 / 第四个小切片
+
+- `pod.browser.describe` now reports whether the bounded browser lane has replayable state/log evidence on disk, plus the last persisted launch status. / `pod.browser.describe` 现在会显式报告 bounded browser lane 是否已经在磁盘上留下可复跑的 state/log 证据，以及最后一次持久化的 launch 状态。
+- `pod.runtime.describe` no longer treats a pre-existing credential as replay proof by itself. The browser lane now becomes `browser_lane_replayed` only after persisted launch evidence exists, and `browser_lane_configured` only after replay evidence and a stored credential both exist. / `pod.runtime.describe` 不再把“已有 credential”本身当成 replay 证据；现在 browser lane 只有在持久化 launch 证据存在时才会进入 `browser_lane_replayed`，而 `browser_lane_configured` 则要求 replay 证据和存储中的 credential 同时存在。
+
 ## Do Not Reopen / 不要重开
 
 - Do not reopen the old assumption that helper metadata alone answers the desktop-runtime question. / 不要重新回到“helper metadata 本身就回答了 desktop-runtime 问题”的旧假设。

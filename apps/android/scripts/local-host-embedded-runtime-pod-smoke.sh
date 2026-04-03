@@ -279,6 +279,10 @@ browser_describe_manifest_present="$(jq -r '.payload.browserStageManifestPresent
 browser_describe_auth_flow_count="$(jq -r '.payload.browserAuthFlowCount // -1' "$browser_describe_json")"
 browser_describe_launch_command_count="$(jq -r '.payload.launchCommandCount // -1' "$browser_describe_json")"
 browser_describe_recommended_flow_id="$(jq -r '.payload.recommendedFlowId // ""' "$browser_describe_json")"
+browser_describe_replay_ready="$(jq -r '.payload.browserReplayReady // false' "$browser_describe_json")"
+browser_describe_last_launch_status="$(jq -r '.payload.lastLaunchStatus // ""' "$browser_describe_json")"
+browser_describe_state_file_path="$(jq -r '.payload.stateFilePath // ""' "$browser_describe_json")"
+browser_describe_log_file_path="$(jq -r '.payload.logFilePath // ""' "$browser_describe_json")"
 
 runtime_describe_ok="$(jq -r '.ok // false' "$runtime_describe_json")"
 runtime_describe_command="$(jq -r '.payload.command // ""' "$runtime_describe_json")"
@@ -370,6 +374,8 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$browser_describe_auth_flow_count" -ge 1 ]] || record_failure "pod_browser_describe_missing_auth_flow"
   [[ "$browser_describe_launch_command_count" -ge 1 ]] || record_failure "pod_browser_describe_missing_launch_command"
   [[ "$browser_describe_recommended_flow_id" == "openai-codex-oauth" ]] || record_failure "pod_browser_describe_flow_id_mismatch"
+  [[ "$browser_describe_state_file_path" != "" ]] || record_failure "pod_browser_describe_missing_state_file_path"
+  [[ "$browser_describe_log_file_path" != "" ]] || record_failure "pod_browser_describe_missing_log_file_path"
 
   [[ "$runtime_describe_ok" == "true" ]] || record_failure "pod_runtime_describe_not_ok"
   [[ "$runtime_describe_command" == "pod.runtime.describe" ]] || record_failure "pod_runtime_describe_command_mismatch"
@@ -483,6 +489,10 @@ jq -n \
   --arg browserDescribeAuthFlowCount "$browser_describe_auth_flow_count" \
   --arg browserDescribeLaunchCommandCount "$browser_describe_launch_command_count" \
   --arg browserDescribeRecommendedFlowId "$browser_describe_recommended_flow_id" \
+  --arg browserDescribeReplayReady "$browser_describe_replay_ready" \
+  --arg browserDescribeLastLaunchStatus "$browser_describe_last_launch_status" \
+  --arg browserDescribeStateFilePath "$browser_describe_state_file_path" \
+  --arg browserDescribeLogFilePath "$browser_describe_log_file_path" \
   --arg runtimeDescribeOk "$runtime_describe_ok" \
   --arg runtimeDescribeCommand "$runtime_describe_command" \
   --arg runtimeDescribeBranch "$runtime_describe_branch" \
@@ -596,7 +606,11 @@ jq -n \
       browserStageManifestPresent: ($browserDescribeManifestPresent == "true"),
       browserAuthFlowCount: ($browserDescribeAuthFlowCount | tonumber),
       launchCommandCount: ($browserDescribeLaunchCommandCount | tonumber),
-      recommendedFlowId: (if $browserDescribeRecommendedFlowId == "" then null else $browserDescribeRecommendedFlowId end)
+      recommendedFlowId: (if $browserDescribeRecommendedFlowId == "" then null else $browserDescribeRecommendedFlowId end),
+      replayReady: ($browserDescribeReplayReady == "true"),
+      lastLaunchStatus: (if $browserDescribeLastLaunchStatus == "" then null else $browserDescribeLastLaunchStatus end),
+      stateFilePath: (if $browserDescribeStateFilePath == "" then null else $browserDescribeStateFilePath end),
+      logFilePath: (if $browserDescribeLogFilePath == "" then null else $browserDescribeLogFilePath end)
     },
     podRuntimeDescribe: {
       ok: ($runtimeDescribeOk == "true"),
@@ -663,8 +677,8 @@ printf 'runtime_pod.health ok=%s ready=%s local=%s version=%s verified=%s\n' \
   "$health_ok" "$health_ready" "$health_local_execution" "$health_version" "$health_verified_count"
 printf 'runtime_pod.manifest ok=%s source=%s layout=%s stages=%s files=%s workspace_files=%s\n' \
   "$manifest_ok" "$manifest_source" "$manifest_layout_source" "$manifest_stage_count" "$manifest_file_count" "$manifest_workspace_stage_file_count"
-printf 'runtime_pod.browser_describe ok=%s status=%s stage=%s flows=%s recommended=%s\n' \
-  "$browser_describe_ok" "$browser_describe_status" "$browser_describe_stage_installed" "$browser_describe_auth_flow_count" "$browser_describe_recommended_flow_id"
+printf 'runtime_pod.browser_describe ok=%s status=%s stage=%s flows=%s replay=%s recommended=%s last_launch=%s\n' \
+  "$browser_describe_ok" "$browser_describe_status" "$browser_describe_stage_installed" "$browser_describe_auth_flow_count" "$browser_describe_replay_ready" "$browser_describe_recommended_flow_id" "$browser_describe_last_launch_status"
 printf 'runtime_pod.runtime_describe ok=%s branch=%s status=%s engine=%s browser=%s tools=%s plugins=%s\n' \
   "$runtime_describe_ok" "$runtime_describe_branch" "$runtime_describe_status" "$runtime_describe_engine_domain" "$runtime_describe_browser_domain" "$runtime_describe_tools_domain" "$runtime_describe_plugins_domain"
 printf 'runtime_pod.runtime_execute ok=%s task=%s home=%s engine=%s count=%s\n' \
