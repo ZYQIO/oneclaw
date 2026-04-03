@@ -197,7 +197,11 @@ elif [[ "$browser_smoke_ok" != "true" ]]; then
   if [[ -n "$browser_smoke_hint" ]]; then
     recommended_command="$browser_smoke_hint"
   fi
-elif [[ "$browser_mainline_status" == "browser_lane_configured" || "$browser_mainline_status" == "desktop_home_configured" ]]; then
+elif [[ "$browser_mainline_status" == "desktop_home_configured" ]]; then
+  classification="desktop_home_configured"
+  recommended_action="none"
+  recommended_command=""
+elif [[ "$browser_mainline_status" == "browser_lane_configured" ]]; then
   classification="browser_lane_configured"
   recommended_action="none"
   recommended_command=""

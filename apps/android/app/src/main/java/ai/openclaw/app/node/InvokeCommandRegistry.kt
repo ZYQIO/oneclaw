@@ -195,6 +195,9 @@ object InvokeCommandRegistry {
         name = OpenClawPodCommand.BrowserAuthStart.rawValue,
       ),
       InvokeCommandSpec(
+        name = OpenClawPodCommand.DesktopMaterialize.rawValue,
+      ),
+      InvokeCommandSpec(
         name = OpenClawPodCommand.RuntimeDescribe.rawValue,
       ),
       InvokeCommandSpec(

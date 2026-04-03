@@ -50,6 +50,7 @@ class InvokeCommandRegistryTest {
       OpenClawPodCommand.ManifestDescribe.rawValue,
       OpenClawPodCommand.BrowserDescribe.rawValue,
       OpenClawPodCommand.BrowserAuthStart.rawValue,
+      OpenClawPodCommand.DesktopMaterialize.rawValue,
       OpenClawPodCommand.RuntimeDescribe.rawValue,
       OpenClawPodCommand.RuntimeExecute.rawValue,
       OpenClawPodCommand.WorkspaceScan.rawValue,
@@ -153,6 +154,13 @@ class InvokeCommandRegistryTest {
 
     assertTrue(commands.contains(OpenClawMotionCommand.Activity.rawValue))
     assertFalse(commands.contains(OpenClawMotionCommand.Pedometer.rawValue))
+  }
+
+  @Test
+  fun find_returnsDesktopMaterializeCommand() {
+    val command = InvokeCommandRegistry.find(OpenClawPodCommand.DesktopMaterialize.rawValue)
+
+    assertTrue(command != null)
   }
 
   private fun defaultFlags(
