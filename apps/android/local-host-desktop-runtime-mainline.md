@@ -98,6 +98,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 ## Working Rule / 工作规则
 
 - `apps/android/local-host-desktop-runtime-feasibility.md` stays as the feasibility input. / `apps/android/local-host-desktop-runtime-feasibility.md` 继续作为可行性输入文档。
+- `apps/android/local-host-desktop-runtime-checkpoint-20260403.md` is the fastest fresh-session entrypoint and should be read before replaying the longer Android history. / `apps/android/local-host-desktop-runtime-checkpoint-20260403.md` 是给新会话看的最快入口，应该先读它，再回放更长的 Android 历史。
 - `apps/android/local-host-embedded-runtime-pod-plan.md` now describes the bootstrap carrier, not the end-state mainline. / `apps/android/local-host-embedded-runtime-pod-plan.md` 现在描述的是 bootstrap 载体，不再是终态主线。
 - `apps/android/local-host-progress.md` and `apps/android/local-host-handoff.md` should treat the old Android-native MVP as validated baseline context, not the new finish line. / `apps/android/local-host-progress.md` 和 `apps/android/local-host-handoff.md` 应把旧的 Android-native MVP 当作已验证基线，而不是新的终点。
 
