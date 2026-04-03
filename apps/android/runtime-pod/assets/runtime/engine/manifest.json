@@ -1,0 +1,24 @@
+{
+  "engineId": "embedded-runtime-task-engine-v1",
+  "engineVersion": "0.1.0",
+  "kind": "descriptor",
+  "supportedTaskKinds": [
+    "runtime-smoke"
+  ],
+  "runtimeHomeLayout": [
+    "config",
+    "logs",
+    "state",
+    "work"
+  ],
+  "capabilities": [
+    "packaged-config-hydration",
+    "structured-state-write",
+    "structured-log-write"
+  ],
+  "limitations": [
+    "No packaged browser lane yet",
+    "No packaged desktop tool lane yet",
+    "No packaged plugin runtime lane yet"
+  ]
+}

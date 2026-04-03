@@ -30,9 +30,13 @@ describe("syncRuntimePodAssets", () => {
 
     expect(manifest.assetBasePath).toBe("embedded-runtime-pod/staged");
     expect(manifest.assetManifestPath).toBe("embedded-runtime-pod/manifest.json");
-    expect(manifest.fileCount).toBe(7);
+    expect(manifest.fileCount).toBe(11);
     expect(manifest.files.map((file) => file.relativePath)).toEqual([
       "bridge/manifest.json",
+      "runtime/config/runtime-env.json",
+      "runtime/engine/manifest.json",
+      "runtime/manifest.json",
+      "runtime/tasks/runtime-smoke.json",
       "toolkit/manifest.json",
       "workspace/content-index.json",
       "workspace/manifest.json",

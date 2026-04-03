@@ -90,6 +90,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "pod_health", command = OpenClawPodCommand.Health.rawValue),
       NodesActionSpec(name = "pod_manifest_describe", command = OpenClawPodCommand.ManifestDescribe.rawValue),
       NodesActionSpec(name = "pod_runtime_describe", command = OpenClawPodCommand.RuntimeDescribe.rawValue),
+      NodesActionSpec(name = "pod_runtime_execute", command = OpenClawPodCommand.RuntimeExecute.rawValue),
       NodesActionSpec(name = "pod_workspace_scan", command = OpenClawPodCommand.WorkspaceScan.rawValue),
       NodesActionSpec(name = "pod_workspace_read", command = OpenClawPodCommand.WorkspaceRead.rawValue),
       NodesActionSpec(name = "ui_state", command = OpenClawUiCommand.State.rawValue),
@@ -236,6 +237,7 @@ internal class LocalHostNodesToolBridge(
           putStringProperty("notificationReplyText")
           putStringProperty("query")
           putStringProperty("path")
+          putStringProperty("taskId")
           putStringProperty("text")
           putStringProperty("value")
           putStringProperty("contentDescription")
@@ -330,6 +332,10 @@ internal class LocalHostNodesToolBridge(
       "ui_state",
       "ui_back",
       "ui_home" -> buildJsonObject {}
+      "pod_runtime_execute" ->
+        buildJsonObject {
+          copyString(params, "taskId")
+        }
       "pod_workspace_scan" ->
         buildJsonObject {
           copyString(params, "query")

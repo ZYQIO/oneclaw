@@ -27,13 +27,9 @@ private val embeddedRuntimeBootstrapHelperCommands =
     "pod.workspace.scan",
     "pod.workspace.read",
   )
-private val embeddedRuntimeMissingDomains =
+private val embeddedRuntimeExecutionCommands =
   listOf(
-    "engine",
-    "environment",
-    "browser",
-    "tools",
-    "plugins",
+    "pod.runtime.execute",
   )
 
 @Serializable
@@ -456,8 +452,32 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   context: Context,
 ): EmbeddedRuntimePodRuntimeDescribeResult {
   val inspection = inspectEmbeddedRuntimePod(context)
+  val carrier = inspectEmbeddedRuntimeCarrier(context = context, manifestVersion = inspection.manifestVersion)
+  val engineIntegrated =
+    carrier.runtimeStageInstalled && carrier.runtimeStageManifestPresent && carrier.runtimeEngineManifestPresent && carrier.runtimeTaskCount > 0
+  val environmentIntegrated = carrier.runtimeStageInstalled
+  val engineStatus =
+    when {
+      engineIntegrated -> "partial_bootstrap"
+      else -> "missing"
+    }
+  val environmentStatus =
+    when {
+      carrier.runtimeHomeReady -> "landed_bootstrap"
+      environmentIntegrated -> "partial_bootstrap"
+      else -> "missing"
+    }
+  val missingDomains = buildList {
+    if (!engineIntegrated) add("engine")
+    if (!environmentIntegrated) add("environment")
+    add("browser")
+    add("tools")
+    add("plugins")
+  }
   val mainlineStatus =
     when {
+      inspection.ready && carrier.runtimeHomeReady && engineIntegrated -> "runtime_execute_ready"
+      inspection.ready && engineIntegrated -> "carrier_ready"
       inspection.ready -> "bootstrap_ready"
       inspection.available -> "bootstrap_partial"
       else -> "bootstrap_missing"
@@ -473,6 +493,17 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("fullDesktopRuntimeBundled", JsonPrimitive(false))
         put("embeddedPodReady", JsonPrimitive(inspection.ready))
         inspection.manifestVersion?.let { put("embeddedPodVersion", JsonPrimitive(it)) }
+        put("runtimeStageInstalled", JsonPrimitive(carrier.runtimeStageInstalled))
+        put("runtimeStageManifestPresent", JsonPrimitive(carrier.runtimeStageManifestPresent))
+        put("runtimeEngineManifestPresent", JsonPrimitive(carrier.runtimeEngineManifestPresent))
+        put("runtimeTaskCount", JsonPrimitive(carrier.runtimeTaskCount))
+        put("runtimeConfigCount", JsonPrimitive(carrier.runtimeConfigCount))
+        put("runtimeHomeReady", JsonPrimitive(carrier.runtimeHomeReady))
+        put("runtimeHomeExists", JsonPrimitive(carrier.runtimeHomeExists))
+        put("runtimeExecutionStateCount", JsonPrimitive(carrier.runtimeExecutionStateCount))
+        carrier.engineId?.let { put("engineId", JsonPrimitive(it)) }
+        carrier.engineVersion?.let { put("engineVersion", JsonPrimitive(it)) }
+        carrier.runtimeHomeVersion?.let { put("runtimeHomeVersion", JsonPrimitive(it)) }
         put("helperBootstrapCommandCount", JsonPrimitive(embeddedRuntimeBootstrapHelperCommands.size))
         put(
           "helperBootstrapCommands",
@@ -482,10 +513,27 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             }
           },
         )
+        put("runtimeExecutionCommandCount", JsonPrimitive(embeddedRuntimeExecutionCommands.size))
+        put(
+          "runtimeExecutionCommands",
+          buildJsonArray {
+            embeddedRuntimeExecutionCommands.forEach { command ->
+              add(JsonPrimitive(command))
+            }
+          },
+        )
+        put(
+          "runtimeTaskIds",
+          buildJsonArray {
+            carrier.runtimeTaskIds.forEach { taskId ->
+              add(JsonPrimitive(taskId))
+            }
+          },
+        )
         put(
           "missingDomains",
           buildJsonArray {
-            embeddedRuntimeMissingDomains.forEach { domain ->
+            missingDomains.forEach { domain ->
               add(JsonPrimitive(domain))
             }
           },
@@ -520,17 +568,17 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             add(
               buildDesktopRuntimeDomain(
                 id = "engine",
-                status = "missing",
-                integrated = false,
-                summary = "No embedded desktop execution engine is wired into Android yet.",
+                status = engineStatus,
+                integrated = engineIntegrated,
+                summary = "A bounded packaged task engine now exists, but it is still a curated carrier rather than full desktop JS or browser parity.",
               ),
             )
             add(
               buildDesktopRuntimeDomain(
                 id = "environment",
-                status = "missing",
-                integrated = false,
-                summary = "No app-private runtime environment supervisor or process contract exists yet.",
+                status = environmentStatus,
+                integrated = environmentIntegrated,
+                summary = "The app can now materialize an app-private runtime home with config, state, logs, and work directories for packaged runtime tasks.",
               ),
             )
             add(
@@ -559,10 +607,19 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             )
           },
         )
-        put("recommendedNextSlice", JsonPrimitive("engine_environment_carrier"))
+        put(
+          "recommendedNextSlice",
+          JsonPrimitive(if (carrier.runtimeHomeReady) "browser_or_tool_lane" else "runtime_execute_replay"),
+        )
         put(
           "recommendedNextStep",
-          JsonPrimitive("Package a real embedded execution engine together with an app-private runtime environment before browser, tools, or plugins."),
+          JsonPrimitive(
+            if (carrier.runtimeHomeReady) {
+              "Use the packaged runtime carrier as the base for the first bounded browser or desktop tool lane."
+            } else {
+              "Run pod.runtime.execute with the runtime-smoke task on-device to verify the packaged carrier end to end before widening browser, tools, or plugins."
+            },
+          ),
         )
       },
   )

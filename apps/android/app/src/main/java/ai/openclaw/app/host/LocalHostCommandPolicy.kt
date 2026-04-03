@@ -50,6 +50,7 @@ internal object LocalHostCommandPolicy {
       OpenClawPodCommand.Health.rawValue,
       OpenClawPodCommand.ManifestDescribe.rawValue,
       OpenClawPodCommand.RuntimeDescribe.rawValue,
+      OpenClawPodCommand.RuntimeExecute.rawValue,
       OpenClawPodCommand.WorkspaceScan.rawValue,
       OpenClawPodCommand.WorkspaceRead.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,

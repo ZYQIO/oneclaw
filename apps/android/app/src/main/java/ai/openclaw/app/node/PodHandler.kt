@@ -3,6 +3,7 @@ package ai.openclaw.app.node
 import android.content.Context
 import ai.openclaw.app.describeEmbeddedRuntimeDesktopRuntime
 import ai.openclaw.app.describeEmbeddedRuntimePodManifest
+import ai.openclaw.app.executeEmbeddedRuntimePodTask
 import ai.openclaw.app.readEmbeddedRuntimePodWorkspaceFile
 import ai.openclaw.app.inspectEmbeddedRuntimePod
 import ai.openclaw.app.scanEmbeddedRuntimePodWorkspace
@@ -63,6 +64,30 @@ class PodHandler(
         inspection = inspection.toJson(),
         localExecutionAvailable = inspection.ready,
         extra = describeResult.payload ?: buildJsonObject {},
+      ).toString(),
+    )
+  }
+
+  fun handlePodRuntimeExecute(paramsJson: String?): GatewaySession.InvokeResult {
+    val inspection = inspectEmbeddedRuntimePod(appContext)
+    val params = parseRuntimeExecuteParams(paramsJson)
+    val executeResult =
+      executeEmbeddedRuntimePodTask(
+        context = appContext,
+        taskId = params.taskId,
+      )
+    if (!executeResult.ok) {
+      return GatewaySession.InvokeResult.error(
+        code = executeResult.code ?: "UNAVAILABLE",
+        message = executeResult.message ?: "UNAVAILABLE: runtime task execution failed",
+      )
+    }
+    return GatewaySession.InvokeResult.ok(
+      buildPayload(
+        command = "pod.runtime.execute",
+        inspection = inspection.toJson(),
+        localExecutionAvailable = inspection.ready,
+        extra = executeResult.payload ?: buildJsonObject {},
       ).toString(),
     )
   }
@@ -176,6 +201,24 @@ class PodHandler(
     return PodWorkspaceReadParams(path = path, maxChars = maxChars)
   }
 
+  private fun parseRuntimeExecuteParams(paramsJson: String?): PodRuntimeExecuteParams {
+    val params =
+      try {
+        paramsJson
+          ?.trim()
+          ?.takeIf { it.isNotEmpty() }
+          ?.let { json.parseToJsonElement(it) as? JsonObject }
+      } catch (_: Throwable) {
+        null
+      } ?: return PodRuntimeExecuteParams()
+
+    val taskId =
+      primitiveContent(params, "taskId")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    return PodRuntimeExecuteParams(taskId = taskId)
+  }
+
   private fun primitiveContent(
     params: JsonObject,
     key: String,
@@ -192,5 +235,9 @@ class PodHandler(
   private data class PodWorkspaceReadParams(
     val path: String? = null,
     val maxChars: Int = 4000,
+  )
+
+  private data class PodRuntimeExecuteParams(
+    val taskId: String? = null,
   )
 }

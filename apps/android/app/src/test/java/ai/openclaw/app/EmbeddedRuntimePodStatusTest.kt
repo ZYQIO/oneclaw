@@ -17,6 +17,7 @@ class EmbeddedRuntimePodStatusTest {
   fun snapshot_reportsVersionNotExtractedBeforeInstall() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
 
     val snapshot = embeddedRuntimePodStatusSnapshot(context)
 
@@ -26,8 +27,8 @@ class EmbeddedRuntimePodStatusTest {
     assertEquals("not_extracted", snapshot.getValue("reason").jsonPrimitive.content)
     assertEquals("embedded-runtime-pod/manifest.json", snapshot.getValue("assetManifestPath").jsonPrimitive.content)
     assertEquals("filesDir/openclaw/embedded-runtime-pod", snapshot.getValue("installRoot").jsonPrimitive.content)
-    assertEquals("0.2.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
-    assertEquals(7, snapshot.getValue("manifestFileCount").jsonPrimitive.int)
+    assertEquals("0.3.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
+    assertEquals(11, snapshot.getValue("manifestFileCount").jsonPrimitive.int)
     assertEquals(false, snapshot.getValue("installRootExists").jsonPrimitive.boolean)
     assertEquals(0, snapshot.getValue("verifiedFileCount").jsonPrimitive.int)
   }
@@ -36,23 +37,25 @@ class EmbeddedRuntimePodStatusTest {
   fun snapshot_reportsReadyAfterInstall() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
 
     val inspection = ensureEmbeddedRuntimePodInstalled(context)
     val snapshot = embeddedRuntimePodStatusSnapshot(context)
-    val versionDir = context.filesDir.resolve("openclaw/embedded-runtime-pod/0.2.0")
+    val versionDir = context.filesDir.resolve("openclaw/embedded-runtime-pod/0.3.0")
 
     assertTrue(inspection.ready)
     assertEquals("ready", inspection.reason)
     assertEquals(true, snapshot.getValue("available").jsonPrimitive.boolean)
     assertEquals(true, snapshot.getValue("ready").jsonPrimitive.boolean)
     assertEquals("ready", snapshot.getValue("reason").jsonPrimitive.content)
-    assertEquals("0.2.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
+    assertEquals("0.3.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
     assertEquals(true, snapshot.getValue("manifestVersionExtracted").jsonPrimitive.boolean)
     assertEquals(1, snapshot.getValue("installedVersionCount").jsonPrimitive.int)
-    assertEquals(7, snapshot.getValue("verifiedFileCount").jsonPrimitive.int)
+    assertEquals(11, snapshot.getValue("verifiedFileCount").jsonPrimitive.int)
     assertTrue(versionDir.resolve("manifest.json").isFile)
     assertTrue(versionDir.resolve("layout.json").isFile)
     assertTrue(versionDir.resolve("bridge/manifest.json").isFile)
+    assertTrue(versionDir.resolve("runtime/manifest.json").isFile)
     assertTrue(versionDir.resolve("workspace/content-index.json").isFile)
   }
 
@@ -60,6 +63,7 @@ class EmbeddedRuntimePodStatusTest {
   fun describeEmbeddedRuntimePodManifest_reportsInstalledManifestAndLayout() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
     ensureEmbeddedRuntimePodInstalled(context)
 
     val describeResult = describeEmbeddedRuntimePodManifest(context)
@@ -68,10 +72,28 @@ class EmbeddedRuntimePodStatusTest {
     val payload = describeResult.payload ?: error("expected payload")
     assertEquals("installed", payload.getValue("manifestSource").jsonPrimitive.content)
     assertEquals("installed", payload.getValue("layoutSource").jsonPrimitive.content)
-    assertEquals(3, payload.getValue("stageCount").jsonPrimitive.int)
-    assertEquals(7, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(4, payload.getValue("stageCount").jsonPrimitive.int)
+    assertEquals(11, payload.getValue("fileCount").jsonPrimitive.int)
     assertEquals(true, payload.getValue("workspaceStageDeclared").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
-    assertEquals("0.2.0", payload.getValue("podManifest").jsonObject.getValue("version").jsonPrimitive.content)
+    assertEquals("0.3.0", payload.getValue("podManifest").jsonObject.getValue("version").jsonPrimitive.content)
+  }
+
+  @Test
+  fun executeEmbeddedRuntimePodTask_materializesRuntimeHome() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+
+    val result = executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+
+    assertTrue(result.ok)
+    val payload = result.payload ?: error("expected payload")
+    assertEquals("runtime-smoke", payload.getValue("taskId").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("runtimeHomeReady").jsonPrimitive.boolean)
+    assertEquals(1, payload.getValue("executionCount").jsonPrimitive.int)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.3.0/config/runtime-env.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.3.0/state/runtime-smoke.json").isFile)
   }
 }

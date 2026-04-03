@@ -35,6 +35,7 @@ Usage:
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_QUERY=<query>] \
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT=5] \
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH=<relative-path>] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_POD_RUNTIME_TASK_ID=runtime-smoke] \
   ./apps/android/scripts/local-host-embedded-runtime-pod-smoke.sh
 
 What it does:
@@ -44,9 +45,10 @@ What it does:
   4. Calls /invoke pod.health
   5. Calls /invoke pod.manifest.describe
   6. Calls /invoke pod.runtime.describe
-  7. Calls /invoke pod.workspace.scan
-  8. Calls /invoke pod.workspace.read
-  9. Verifies the phone-side results against repo pod-spec.json and content-index.json
+  7. Calls /invoke pod.runtime.execute
+  8. Calls /invoke pod.workspace.scan
+  9. Calls /invoke pod.workspace.read
+  10. Verifies the phone-side results against repo pod-spec.json and content-index.json
 
 Requirements:
   - curl
@@ -106,6 +108,7 @@ fi
 QUERY="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_QUERY:-$DEFAULT_QUERY}"
 LIMIT="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT:-5}"
 EXPECTED_PATH="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_EXPECTED_PATH:-$DEFAULT_EXPECTED_PATH}"
+RUNTIME_TASK_ID="${OPENCLAW_ANDROID_LOCAL_HOST_POD_RUNTIME_TASK_ID:-runtime-smoke}"
 EXPECTED_WORKSPACE_FILE=""
 EXPECTED_WORKSPACE_FILE_SIZE=""
 if [[ -n "$EXPECTED_PATH" && -f "$RUNTIME_POD_DIR/assets/workspace/$EXPECTED_PATH" ]]; then
@@ -145,6 +148,7 @@ capabilities_json="$ARTIFACT_DIR/capabilities.json"
 health_json="$ARTIFACT_DIR/pod-health.json"
 manifest_json="$ARTIFACT_DIR/pod-manifest-describe.json"
 runtime_describe_json="$ARTIFACT_DIR/pod-runtime-describe.json"
+runtime_execute_json="$ARTIFACT_DIR/pod-runtime-execute.json"
 workspace_json="$ARTIFACT_DIR/pod-workspace-scan.json"
 workspace_read_json="$ARTIFACT_DIR/pod-workspace-read.json"
 summary_json="$ARTIFACT_DIR/summary.json"
@@ -201,6 +205,7 @@ status_pod_verified_count="$(jq -r '.host.embeddedRuntimePod.verifiedFileCount /
 cap_has_health="$(jq -r --arg command 'pod.health' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_manifest_describe="$(jq -r --arg command 'pod.manifest.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_runtime_describe="$(jq -r --arg command 'pod.runtime.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
+cap_has_runtime_execute="$(jq -r --arg command 'pod.runtime.execute' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_scan="$(jq -r --arg command 'pod.workspace.scan' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_read="$(jq -r --arg command 'pod.workspace.read' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
@@ -208,21 +213,25 @@ cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
 [[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
 [[ "$cap_has_manifest_describe" == "true" ]] || record_failure "capabilities_missing_pod_manifest_describe"
 [[ "$cap_has_runtime_describe" == "true" ]] || record_failure "capabilities_missing_pod_runtime_describe"
+[[ "$cap_has_runtime_execute" == "true" ]] || record_failure "capabilities_missing_pod_runtime_execute"
 [[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
 [[ "$cap_has_workspace_read" == "true" ]] || record_failure "capabilities_missing_pod_workspace_read"
 
-if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_runtime_describe" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
+if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_runtime_describe" != "true" || "$cap_has_runtime_execute" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
   skip_helper_invocations=1
   failure_hint="install the current debug app on the device, rerun pnpm android:local-host:token -- --json, then rerun pnpm android:local-host:embedded-runtime-pod:smoke"
   printf '{}\n' >"$health_json"
   printf '{}\n' >"$manifest_json"
   printf '{}\n' >"$runtime_describe_json"
+  printf '{}\n' >"$runtime_execute_json"
   printf '{}\n' >"$workspace_json"
   printf '{}\n' >"$workspace_read_json"
 else
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.manifest.describe"}' | tee "$manifest_json" >/dev/null
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.runtime.describe"}' | tee "$runtime_describe_json" >/dev/null
+  runtime_execute_body="$(jq -cn --arg taskId "$RUNTIME_TASK_ID" '{command:"pod.runtime.execute", params:{taskId:$taskId}}')"
+  post_json "$BASE_URL/api/local-host/v1/invoke" "$runtime_execute_body" | tee "$runtime_execute_json" >/dev/null
   workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
   workspace_read_body="$(jq -cn --arg path "$EXPECTED_PATH" '{command:"pod.workspace.read", params:{path:$path, maxChars:4096}}')"
@@ -258,6 +267,15 @@ runtime_describe_environment_domain="$(jq -r '(.payload.domains // []) | map(.id
 runtime_describe_browser_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("browser") != null' "$runtime_describe_json")"
 runtime_describe_tools_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("tools") != null' "$runtime_describe_json")"
 runtime_describe_plugins_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("plugins") != null' "$runtime_describe_json")"
+
+runtime_execute_ok="$(jq -r '.ok // false' "$runtime_execute_json")"
+runtime_execute_command="$(jq -r '.payload.command // ""' "$runtime_execute_json")"
+runtime_execute_task_id="$(jq -r '.payload.taskId // ""' "$runtime_execute_json")"
+runtime_execute_runtime_home_ready="$(jq -r '.payload.runtimeHomeReady // false' "$runtime_execute_json")"
+runtime_execute_engine_id="$(jq -r '.payload.engineId // ""' "$runtime_execute_json")"
+runtime_execute_execution_count="$(jq -r '.payload.executionCount // -1' "$runtime_execute_json")"
+runtime_execute_state_path="$(jq -r '.payload.stateFilePath // ""' "$runtime_execute_json")"
+runtime_execute_log_path="$(jq -r '.payload.logFilePath // ""' "$runtime_execute_json")"
 
 workspace_ok="$(jq -r '.ok // false' "$workspace_json")"
 workspace_command="$(jq -r '.payload.command // ""' "$workspace_json")"
@@ -320,6 +338,15 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$runtime_describe_tools_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_tools_domain"
   [[ "$runtime_describe_plugins_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_plugins_domain"
 
+  [[ "$runtime_execute_ok" == "true" ]] || record_failure "pod_runtime_execute_not_ok"
+  [[ "$runtime_execute_command" == "pod.runtime.execute" ]] || record_failure "pod_runtime_execute_command_mismatch"
+  [[ "$runtime_execute_task_id" == "$RUNTIME_TASK_ID" ]] || record_failure "pod_runtime_execute_task_mismatch"
+  [[ "$runtime_execute_runtime_home_ready" == "true" ]] || record_failure "pod_runtime_execute_runtime_home_not_ready"
+  [[ "$runtime_execute_engine_id" == "embedded-runtime-task-engine-v1" ]] || record_failure "pod_runtime_execute_engine_id_mismatch"
+  [[ "$runtime_execute_execution_count" -ge 1 ]] || record_failure "pod_runtime_execute_execution_count_invalid"
+  [[ "$runtime_execute_state_path" == *"/state/"* ]] || record_failure "pod_runtime_execute_missing_state_path"
+  [[ "$runtime_execute_log_path" == *"/logs/"* ]] || record_failure "pod_runtime_execute_missing_log_path"
+
   [[ "$workspace_ok" == "true" ]] || record_failure "pod_workspace_scan_not_ok"
   [[ "$workspace_command" == "pod.workspace.scan" ]] || record_failure "pod_workspace_scan_command_mismatch"
   [[ "$workspace_stage_present" == "true" ]] || record_failure "pod_workspace_stage_missing"
@@ -370,6 +397,7 @@ jq -n \
   --arg capHasHealth "$cap_has_health" \
   --arg capHasManifestDescribe "$cap_has_manifest_describe" \
   --arg capHasRuntimeDescribe "$cap_has_runtime_describe" \
+  --arg capHasRuntimeExecute "$cap_has_runtime_execute" \
   --arg capHasWorkspaceScan "$cap_has_workspace_scan" \
   --arg capHasWorkspaceRead "$cap_has_workspace_read" \
   --arg capWriteEnabled "$cap_write_enabled" \
@@ -400,6 +428,14 @@ jq -n \
   --arg runtimeDescribeBrowserDomain "$runtime_describe_browser_domain" \
   --arg runtimeDescribeToolsDomain "$runtime_describe_tools_domain" \
   --arg runtimeDescribePluginsDomain "$runtime_describe_plugins_domain" \
+  --arg runtimeExecuteOk "$runtime_execute_ok" \
+  --arg runtimeExecuteCommand "$runtime_execute_command" \
+  --arg runtimeExecuteTaskId "$runtime_execute_task_id" \
+  --arg runtimeExecuteRuntimeHomeReady "$runtime_execute_runtime_home_ready" \
+  --arg runtimeExecuteEngineId "$runtime_execute_engine_id" \
+  --arg runtimeExecuteExecutionCount "$runtime_execute_execution_count" \
+  --arg runtimeExecuteStatePath "$runtime_execute_state_path" \
+  --arg runtimeExecuteLogPath "$runtime_execute_log_path" \
   --arg workspaceOk "$workspace_ok" \
   --arg workspaceCommand "$workspace_command" \
   --arg workspaceStagePresent "$workspace_stage_present" \
@@ -449,6 +485,7 @@ jq -n \
       hasPodHealth: ($capHasHealth == "true"),
       hasPodManifestDescribe: ($capHasManifestDescribe == "true"),
       hasPodRuntimeDescribe: ($capHasRuntimeDescribe == "true"),
+      hasPodRuntimeExecute: ($capHasRuntimeExecute == "true"),
       hasPodWorkspaceScan: ($capHasWorkspaceScan == "true"),
       hasPodWorkspaceRead: ($capHasWorkspaceRead == "true"),
       writeEnabled: ($capWriteEnabled == "true")
@@ -486,6 +523,16 @@ jq -n \
       hasToolsDomain: ($runtimeDescribeToolsDomain == "true"),
       hasPluginsDomain: ($runtimeDescribePluginsDomain == "true")
     },
+    podRuntimeExecute: {
+      ok: ($runtimeExecuteOk == "true"),
+      command: (if $runtimeExecuteCommand == "" then null else $runtimeExecuteCommand end),
+      taskId: (if $runtimeExecuteTaskId == "" then null else $runtimeExecuteTaskId end),
+      runtimeHomeReady: ($runtimeExecuteRuntimeHomeReady == "true"),
+      engineId: (if $runtimeExecuteEngineId == "" then null else $runtimeExecuteEngineId end),
+      executionCount: ($runtimeExecuteExecutionCount | tonumber),
+      stateFilePath: (if $runtimeExecuteStatePath == "" then null else $runtimeExecuteStatePath end),
+      logFilePath: (if $runtimeExecuteLogPath == "" then null else $runtimeExecuteLogPath end)
+    },
     podWorkspaceScan: {
       ok: ($workspaceOk == "true"),
       command: (if $workspaceCommand == "" then null else $workspaceCommand end),
@@ -519,6 +566,8 @@ printf 'runtime_pod.manifest ok=%s source=%s layout=%s stages=%s files=%s worksp
   "$manifest_ok" "$manifest_source" "$manifest_layout_source" "$manifest_stage_count" "$manifest_file_count" "$manifest_workspace_stage_file_count"
 printf 'runtime_pod.runtime_describe ok=%s branch=%s status=%s engine=%s browser=%s tools=%s plugins=%s\n' \
   "$runtime_describe_ok" "$runtime_describe_branch" "$runtime_describe_status" "$runtime_describe_engine_domain" "$runtime_describe_browser_domain" "$runtime_describe_tools_domain" "$runtime_describe_plugins_domain"
+printf 'runtime_pod.runtime_execute ok=%s task=%s home=%s engine=%s count=%s\n' \
+  "$runtime_execute_ok" "$runtime_execute_task_id" "$runtime_execute_runtime_home_ready" "$runtime_execute_engine_id" "$runtime_execute_execution_count"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \
   "$workspace_ok" "$workspace_stage_present" "$workspace_document_count" "$workspace_matched_file_count" "$workspace_returned_file_count" "$workspace_first_path"
 printf 'runtime_pod.workspace_read ok=%s path=%s size=%s truncated=%s kind=%s\n' \
@@ -540,6 +589,7 @@ echo "artifacts.capabilities=$capabilities_json"
 echo "artifacts.health=$health_json"
 echo "artifacts.manifest=$manifest_json"
 echo "artifacts.runtime_describe=$runtime_describe_json"
+echo "artifacts.runtime_execute=$runtime_execute_json"
 echo "artifacts.workspace_scan=$workspace_json"
 echo "artifacts.workspace_read=$workspace_read_json"
 echo "artifacts.summary=$summary_json"

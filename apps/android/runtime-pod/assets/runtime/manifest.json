@@ -1,0 +1,12 @@
+{
+  "stage": "runtime",
+  "purpose": "Bounded runtime carrier metadata for the Android embedded pod spike.",
+  "engineId": "embedded-runtime-task-engine-v1",
+  "engineManifestPath": "engine/manifest.json",
+  "configFiles": [
+    "config/runtime-env.json"
+  ],
+  "taskIds": [
+    "runtime-smoke"
+  ]
+}

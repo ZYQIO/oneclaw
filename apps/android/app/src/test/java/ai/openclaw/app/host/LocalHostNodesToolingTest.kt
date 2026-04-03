@@ -41,6 +41,7 @@ class LocalHostNodesToolingTest {
     assertTrue("pod_health" in actions)
     assertTrue("pod_manifest_describe" in actions)
     assertTrue("pod_runtime_describe" in actions)
+    assertTrue("pod_runtime_execute" in actions)
     assertTrue("pod_workspace_scan" in actions)
     assertTrue("pod_workspace_read" in actions)
     assertTrue("ui_state" in actions)
@@ -178,7 +179,7 @@ class LocalHostNodesToolingTest {
             org.junit.Assert.assertEquals("pod.manifest.describe", command)
             org.junit.Assert.assertEquals("{}", paramsJson)
             GatewaySession.InvokeResult.ok(
-              """{"ok":true,"manifestSource":"installed","fileCount":7}""",
+              """{"ok":true,"manifestSource":"installed","fileCount":11}""",
             )
           },
           allowAdvancedRemoteCommands = { false },
@@ -222,6 +223,34 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("mainlineBranch"))
       assertTrue(result.outputText.contains("bootstrap_ready"))
+    }
+
+  @Test
+  fun podRuntimeExecute_mapsTaskIdForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.runtime.execute", command)
+            assertTrue(paramsJson.orEmpty().contains("\"taskId\":\"runtime-smoke\""))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"taskId":"runtime-smoke","runtimeHomeReady":true,"executionCount":1}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_runtime_execute","taskId":"runtime-smoke"}""",
+        )
+
+      assertTrue(result.outputText.contains("runtime-smoke"))
+      assertTrue(result.outputText.contains("runtimeHomeReady"))
     }
 
   @Test

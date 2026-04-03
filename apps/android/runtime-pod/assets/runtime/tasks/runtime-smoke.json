@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "taskId": "runtime-smoke",
+  "displayName": "Runtime Smoke",
+  "kind": "runtime-smoke",
+  "summary": "Materialize the app-private runtime home, hydrate packaged runtime config, and persist a structured execution record.",
+  "packagedConfigPath": "config/runtime-env.json",
+  "packagedWorkspacePath": "workspace/notes/runtime-brief.txt",
+  "stateFile": "state/runtime-smoke.json",
+  "logFile": "logs/runtime-engine.log"
+}
