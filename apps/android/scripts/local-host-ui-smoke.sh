@@ -4,6 +4,7 @@ set -euo pipefail
 BASE_URL="${OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL:-}"
 TOKEN="${OPENCLAW_ANDROID_LOCAL_HOST_TOKEN:-}"
 USE_ADB_FORWARD="${OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD:-0}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 PORT="${OPENCLAW_ANDROID_LOCAL_HOST_PORT:-3945}"
 APP_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE:-ai.openclaw.app}"
 CONNECT_LABEL="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CONNECT_LABEL:-Connect}"
@@ -26,6 +27,7 @@ Usage:
   OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> \
   [OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL=http://127.0.0.1:3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE=ai.openclaw.app] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CONNECT_LABEL=Connect] \
@@ -57,9 +59,18 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+has_cmd() {
+  local name=$1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    [[ -x "$name" || -f "$name" ]]
+    return
+  fi
+  command -v "$name" >/dev/null 2>&1
+}
+
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
+  if ! has_cmd "$name"; then
     echo "$name required but missing." >&2
     exit 1
   fi
@@ -74,12 +85,12 @@ if [[ "$MATCH_MODE" != "exact" && "$MATCH_MODE" != "contains" ]]; then
 fi
 
 if [[ "$USE_ADB_FORWARD" == "1" || -n "$CROSS_APP_PACKAGE" ]]; then
-  require_cmd adb
+  require_cmd "$ADB_BIN"
 fi
 
 device_count=0
-if command -v adb >/dev/null 2>&1; then
-  device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+if has_cmd "$ADB_BIN"; then
+  device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
 fi
 
 if [[ "$USE_ADB_FORWARD" == "1" ]]; then
@@ -87,7 +98,7 @@ if [[ "$USE_ADB_FORWARD" == "1" ]]; then
     echo "No connected Android device (adb state=device)." >&2
     exit 1
   fi
-  adb forward "tcp:$PORT" "tcp:$PORT" >/dev/null
+  "$ADB_BIN" forward "tcp:$PORT" "tcp:$PORT" >/dev/null
   if [[ -z "$BASE_URL" ]]; then
     BASE_URL="http://127.0.0.1:$PORT"
   fi
@@ -398,7 +409,7 @@ if [[ -n "$CROSS_APP_PACKAGE" ]]; then
   fi
 
   if [[ "$device_count" -gt 0 ]]; then
-    top_activity_line="$(adb shell dumpsys activity activities | tr -d '\r' | awk '/topResumedActivity/ {print; exit}')"
+    top_activity_line="$("$ADB_BIN" shell dumpsys activity activities | tr -d '\r' | awk '/topResumedActivity/ {print; exit}')"
     printf '%s\n' "$top_activity_line" >"$CROSS_APP_TOP_ACTIVITY"
   fi
 fi

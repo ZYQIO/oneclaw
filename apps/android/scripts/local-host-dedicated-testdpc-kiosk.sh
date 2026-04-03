@@ -9,6 +9,7 @@ TESTDPC_POLICY_ACTIVITY="${OPENCLAW_ANDROID_TESTDPC_POLICY_ACTIVITY:-$TESTDPC_PA
 TESTDPC_KIOSK_ACTIVITY="${OPENCLAW_ANDROID_TESTDPC_KIOSK_ACTIVITY:-$TESTDPC_PACKAGE/.policy.locktask.KioskModeActivity}"
 TESTDPC_KIOSK_EXTRA_KEY="${OPENCLAW_ANDROID_TESTDPC_KIOSK_EXTRA_KEY:-com.afwsamples.testdpc.policy.locktask.LOCKED_APP_PACKAGE_LIST}"
 LOCKED_PACKAGES_CSV="${OPENCLAW_ANDROID_LOCK_TASK_PACKAGES:-ai.openclaw.app}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
 OPEN_POLICY=false
 APPLY=false
@@ -32,6 +33,7 @@ Important side effects in apply mode:
   - This is only meant for a spare phone that is already provisioned
 
 Environment overrides:
+  OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb
   OPENCLAW_ANDROID_TESTDPC_PACKAGE=com.afwsamples.testdpc
   OPENCLAW_ANDROID_LOCK_TASK_PACKAGES=ai.openclaw.app,com.android.settings
 EOF
@@ -64,10 +66,15 @@ done
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
 }
 
 trim_cr() {
@@ -82,10 +89,11 @@ bool_json() {
   fi
 }
 
-require_cmd adb
+require_cmd "$ADB_BIN"
 require_cmd jq
+ADB_BIN_DISPLAY="$(printf '%q' "$ADB_BIN")"
 
-device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
 if [[ "$device_count" -lt 1 ]]; then
   echo "No connected Android device (adb state=device)." >&2
   exit 1
@@ -103,9 +111,9 @@ if [[ "$(jq 'length' <<<"$normalized_packages_json")" -lt 1 ]]; then
 fi
 normalized_packages_csv="$(jq -r 'join(",")' <<<"$normalized_packages_json")"
 
-owners_output="$(adb shell dpm list-owners 2>&1 | trim_cr || true)"
+owners_output="$("$ADB_BIN" shell dpm list-owners 2>&1 | trim_cr || true)"
 testdpc_installed=false
-if adb shell pm path "$TESTDPC_PACKAGE" >/dev/null 2>&1; then
+if "$ADB_BIN" shell pm path "$TESTDPC_PACKAGE" >/dev/null 2>&1; then
   testdpc_installed=true
 fi
 
@@ -142,9 +150,9 @@ if [[ "$(jq 'length' <<<"$blockers_json")" -gt 0 ]]; then
   ready_for_apply=false
 fi
 
-enable_command="adb shell pm enable '$TESTDPC_KIOSK_ACTIVITY'"
-launch_command="adb shell am start -n '$TESTDPC_KIOSK_ACTIVITY' --esa '$TESTDPC_KIOSK_EXTRA_KEY' '$normalized_packages_csv'"
-open_policy_command="adb shell am start -n '$TESTDPC_POLICY_ACTIVITY'"
+enable_command="$ADB_BIN_DISPLAY shell pm enable '$TESTDPC_KIOSK_ACTIVITY'"
+launch_command="$ADB_BIN_DISPLAY shell am start -n '$TESTDPC_KIOSK_ACTIVITY' --esa '$TESTDPC_KIOSK_EXTRA_KEY' '$normalized_packages_csv'"
+open_policy_command="$ADB_BIN_DISPLAY shell am start -n '$TESTDPC_POLICY_ACTIVITY'"
 
 policy_open_attempted=false
 policy_open_succeeded=false
@@ -152,7 +160,7 @@ policy_open_output=""
 if [[ "$OPEN_POLICY" == "true" ]]; then
   policy_open_attempted=true
   set +e
-  policy_open_output="$(adb shell am start -n "$TESTDPC_POLICY_ACTIVITY" 2>&1 | trim_cr)"
+  policy_open_output="$("$ADB_BIN" shell am start -n "$TESTDPC_POLICY_ACTIVITY" 2>&1 | trim_cr)"
   policy_open_exit_code=$?
   set -e
   if [[ "$policy_open_exit_code" -eq 0 ]]; then
@@ -171,10 +179,10 @@ if [[ "$APPLY" == "true" ]]; then
     :
   else
     set +e
-    enable_output="$(adb shell pm enable "$TESTDPC_KIOSK_ACTIVITY" 2>&1 | trim_cr)"
+    enable_output="$("$ADB_BIN" shell pm enable "$TESTDPC_KIOSK_ACTIVITY" 2>&1 | trim_cr)"
     enable_exit_code=$?
     if [[ "$enable_exit_code" -eq 0 ]]; then
-      launch_output="$(adb shell am start -n "$TESTDPC_KIOSK_ACTIVITY" --esa "$TESTDPC_KIOSK_EXTRA_KEY" "$normalized_packages_csv" 2>&1 | trim_cr)"
+      launch_output="$("$ADB_BIN" shell am start -n "$TESTDPC_KIOSK_ACTIVITY" --esa "$TESTDPC_KIOSK_EXTRA_KEY" "$normalized_packages_csv" 2>&1 | trim_cr)"
       launch_exit_code=$?
     else
       launch_exit_code=1

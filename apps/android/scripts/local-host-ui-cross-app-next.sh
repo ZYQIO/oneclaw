@@ -93,6 +93,7 @@ append_recommended_env() {
 build_forwarded_env_assignments() {
   local env_name
   local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN
     OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
     OPENCLAW_ANDROID_LOCAL_HOST_PORT
     OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC

@@ -1,6 +1,7 @@
 package ai.openclaw.app.node
 
 import android.content.Context
+import ai.openclaw.app.describeEmbeddedRuntimeDesktopRuntime
 import ai.openclaw.app.describeEmbeddedRuntimePodManifest
 import ai.openclaw.app.readEmbeddedRuntimePodWorkspaceFile
 import ai.openclaw.app.inspectEmbeddedRuntimePod
@@ -40,6 +41,25 @@ class PodHandler(
     return GatewaySession.InvokeResult.ok(
       buildPayload(
         command = "pod.manifest.describe",
+        inspection = inspection.toJson(),
+        localExecutionAvailable = inspection.ready,
+        extra = describeResult.payload ?: buildJsonObject {},
+      ).toString(),
+    )
+  }
+
+  fun handlePodRuntimeDescribe(_paramsJson: String?): GatewaySession.InvokeResult {
+    val inspection = inspectEmbeddedRuntimePod(appContext)
+    val describeResult = describeEmbeddedRuntimeDesktopRuntime(appContext)
+    if (!describeResult.ok) {
+      return GatewaySession.InvokeResult.error(
+        code = describeResult.code ?: "UNAVAILABLE",
+        message = describeResult.message ?: "UNAVAILABLE: runtime metadata unavailable",
+      )
+    }
+    return GatewaySession.InvokeResult.ok(
+      buildPayload(
+        command = "pod.runtime.describe",
         inspection = inspection.toJson(),
         localExecutionAvailable = inspection.ready,
         extra = describeResult.payload ?: buildJsonObject {},

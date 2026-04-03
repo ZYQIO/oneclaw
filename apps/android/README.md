@@ -7,6 +7,7 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - Progress tracker / 进度跟踪: `apps/android/local-host-progress.md`
 - Self-check gate / 自检门槛: `apps/android/local-host-self-check.md`
 - Session handoff / 接续手册: `apps/android/local-host-handoff.md`
+- Desktop-runtime mainline / 桌面 Runtime 主线: `apps/android/local-host-desktop-runtime-mainline.md`
 - Dedicated-device plan / 专机部署方案: `apps/android/local-host-dedicated-device.md`
 - Desktop-runtime packaging feasibility / 桌面运行时封装评估: `apps/android/local-host-desktop-runtime-feasibility.md`
 - Embedded-runtime pod plan / 嵌入式运行时 Pod 方案: `apps/android/local-host-embedded-runtime-pod-plan.md`
@@ -17,9 +18,10 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - When the phone is connected to a trusted desktop, the desktop can now inspect its own `openai-codex` OAuth state and push that credential into the phone's guarded local-host API so the phone can recover from missing / stale auth without another browser login.
 - The app now supports a settings-driven English / Simplified Chinese toggle across the tab bar, Connect tab, Settings tab, onboarding flow, Chat / Voice primary surfaces, Voice runtime/microphone status copy, Voice reply / TTS detail status copy, common gateway auth/pairing edge states, the browser-based Codex auth success/failure page, and several runtime/auth status strings. Some deeper secondary copy still remains to be localized.
 - It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, browser tools, or plugin runtime.
+- On branch `android-desktop-runtime-mainline-20260403`, the Android mainline now explicitly targets selected desktop-runtime integration; the current helper pod remains the bootstrap carrier, and `pod.runtime.describe` reports the live gap map for engine, environment, browser, tools, and plugins.
 - Local-host `/status` now also reports `embeddedRuntimePodAvailable` plus an `embeddedRuntimePod` object, and app startup now attempts to extract the shipped pod into `filesDir/openclaw/embedded-runtime-pod/<version>/`, verify checksums, and report `verifiedFileCount` plus extracted-version readiness instead of only manifest presence.
 - The repo now has both `pnpm android:local-host:embedded-runtime-pod:prepare` and `pnpm android:local-host:embedded-runtime-pod:sync-assets`: `prepare` emits the raw `.tmp/android-runtime-pod/manifest.json`, `layout.json`, and staged tree, while `sync-assets` rewrites that payload into APK-safe asset metadata and staged files that the Android build now wires into generated assets automatically.
-- The first four deterministic helpers are now landed as `pod.health`, `pod.manifest.describe`, `pod.workspace.scan`, and `pod.workspace.read`: all four are exposed as read-only `invoke` commands and `nodes` actions, so remote callers can verify pod readiness, inspect packaged manifest/layout metadata, inspect the packaged workspace inventory, and read one packaged workspace document without touching any shell/browser path.
+- The read-only pod surface now includes `pod.health`, `pod.manifest.describe`, `pod.runtime.describe`, `pod.workspace.scan`, and `pod.workspace.read`: remote callers can verify pod readiness, inspect packaged manifest/layout metadata, inspect the desktop-runtime mainline gap map, inspect the packaged workspace inventory, and read one packaged workspace document without touching any shell/browser path.
 - The current embedded pod payload is versioned as `0.2.0`, which makes workspace-asset changes extract into a fresh app-private version directory instead of silently reusing the previous payload.
 - This is now a real packaging-plus-extraction-plus-helper-quartet path, but it is still not a full embedded desktop runtime yet: the next step is keeping the current helper boundary replayable and only adding another pod helper if it clearly removes duplicated logic.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
@@ -164,6 +166,8 @@ pnpm android:run
 
 If `adb devices -l` shows `unauthorized`, re-plug and accept the trust prompt again.
 
+When `adb` is not reliably on `PATH`, the adb-backed repo helpers below also accept `OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb`.
+
 ## Local Host Token Bootstrap
 
 When the phone is already on a debug build, you can now fetch the current local-host bearer token over trusted adb without manually re-reading the Connect tab every time:
@@ -227,7 +231,7 @@ pnpm android:local-host:embedded-runtime-pod:smoke
 The pod smoke validates:
 
 - `/status` reports `embeddedRuntimePod` as ready
-- `/invoke/capabilities` advertises `pod.health`, `pod.manifest.describe`, `pod.workspace.scan`, and `pod.workspace.read`
+- `/invoke/capabilities` advertises `pod.health`, `pod.manifest.describe`, `pod.runtime.describe`, `pod.workspace.scan`, and `pod.workspace.read`
 - `pod.health` matches the repo's current `pod-spec.json` version and asset file count
 - `pod.manifest.describe` matches the repo's current stage count, asset file count, and installed manifest/layout metadata
 - `pod.workspace.scan` matches the repo's current `content-index.json` document count and can read the packaged handoff template out of the extracted app-private workspace
@@ -419,6 +423,7 @@ pnpm android:local-host:ui:cross-app
 
 Optional overrides:
 
+- `OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb`
 - `OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=5000`
 - `OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=500`

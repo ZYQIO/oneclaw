@@ -8,6 +8,7 @@ WAIT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_WAIT_MS:-30000}"
 EVENT_WAIT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_EVENT_WAIT_MS:-4000}"
 THINKING="${OPENCLAW_ANDROID_LOCAL_HOST_THINKING:-low}"
 USE_ADB_FORWARD="${OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD:-0}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 PORT="${OPENCLAW_ANDROID_LOCAL_HOST_PORT:-3945}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-local-host-streaming.XXXXXX)}"
 
@@ -17,6 +18,7 @@ Usage:
   OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> \
   [OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL=http://127.0.0.1:3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_MESSAGE="Reply with 20 short numbered lines"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_WAIT_MS=30000] \
@@ -44,9 +46,18 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+has_cmd() {
+  local name=$1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    [[ -x "$name" || -f "$name" ]]
+    return
+  fi
+  command -v "$name" >/dev/null 2>&1
+}
+
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
+  if ! has_cmd "$name"; then
     echo "$name required but missing." >&2
     exit 1
   fi
@@ -56,13 +67,13 @@ require_cmd curl
 require_cmd jq
 
 if [[ "$USE_ADB_FORWARD" == "1" ]]; then
-  require_cmd adb
-  device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+  require_cmd "$ADB_BIN"
+  device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
   if [[ "$device_count" -lt 1 ]]; then
     echo "No connected Android device (adb state=device)." >&2
     exit 1
   fi
-  adb forward "tcp:$PORT" "tcp:$PORT" >/dev/null
+  "$ADB_BIN" forward "tcp:$PORT" "tcp:$PORT" >/dev/null
   if [[ -z "$BASE_URL" ]]; then
     BASE_URL="http://127.0.0.1:$PORT"
   fi

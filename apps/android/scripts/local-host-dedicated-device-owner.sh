@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 READINESS_SCRIPT="$SCRIPT_DIR/local-host-dedicated-readiness.sh"
 DPC_COMPONENT="${OPENCLAW_ANDROID_DPC_COMPONENT:-com.afwsamples.testdpc/.DeviceAdminReceiver}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-device-owner.XXXXXX)}"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
 READINESS_DIR="$ARTIFACT_DIR/readiness"
@@ -12,6 +13,7 @@ APPLY=false
 usage() {
   cat <<'EOF'
 Usage:
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_DPC_COMPONENT=com.afwsamples.testdpc/.DeviceAdminReceiver] \
   ./apps/android/scripts/local-host-dedicated-device-owner.sh
 
@@ -44,14 +46,20 @@ fi
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
 }
 
-require_cmd adb
+require_cmd "$ADB_BIN"
 require_cmd jq
+ADB_BIN_DISPLAY="$(printf '%q' "$ADB_BIN")"
 
 mkdir -p "$ARTIFACT_DIR" "$READINESS_DIR"
 
@@ -71,7 +79,7 @@ blockers_json="$(jq -c '.viability.deviceOwnerBlockers // []' "$READINESS_SUMMAR
 blockers_count="$(jq -r '.viability.deviceOwnerBlockers | length' "$READINESS_SUMMARY")"
 already_has_owner="$(jq -r '.state.hasDeviceOwner // false' "$READINESS_SUMMARY")"
 owners_output="$(jq -r '.raw.owners // ""' "$READINESS_SUMMARY")"
-provision_command="adb shell dpm set-device-owner '$DPC_COMPONENT'"
+provision_command="$ADB_BIN_DISPLAY shell dpm set-device-owner '$DPC_COMPONENT'"
 apply_attempted=false
 apply_succeeded=false
 apply_exit_code=0
@@ -87,7 +95,7 @@ if [[ "$APPLY" == "true" ]]; then
     apply_stdout="device already has an owner: $owners_output"
   else
     set +e
-    apply_stdout="$(adb shell dpm set-device-owner "$DPC_COMPONENT" 2>&1)"
+    apply_stdout="$("$ADB_BIN" shell dpm set-device-owner "$DPC_COMPONENT" 2>&1)"
     apply_exit_code=$?
     set -e
     if [[ "$apply_exit_code" -eq 0 ]]; then

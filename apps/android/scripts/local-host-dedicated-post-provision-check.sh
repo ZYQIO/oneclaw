@@ -7,6 +7,7 @@ ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t opencla
 PACKAGE_NAME="${OPENCLAW_ANDROID_PACKAGE:-ai.openclaw.app}"
 MAIN_ACTIVITY_COMPONENT="${OPENCLAW_ANDROID_MAIN_ACTIVITY:-$PACKAGE_NAME/.MainActivity}"
 APK_PATH_OVERRIDE="${OPENCLAW_ANDROID_APK_PATH:-}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
 LAUNCH=false
 
@@ -26,6 +27,7 @@ Optional behavior:
   --launch   Launch OpenClaw before the final lock-task snapshot
 
 Environment overrides:
+  OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb
   OPENCLAW_ANDROID_PACKAGE=ai.openclaw.app
   OPENCLAW_ANDROID_MAIN_ACTIVITY=ai.openclaw.app/.MainActivity
   OPENCLAW_ANDROID_APK_PATH=/path/to/openclaw.apk
@@ -55,13 +57,22 @@ done
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
 }
 
-require_cmd adb
+shell_quote() {
+  printf '%q' "$1"
+}
+
+require_cmd "$ADB_BIN"
 require_cmd jq
 
 trim_cr() {
@@ -78,7 +89,7 @@ bool_json() {
 
 shell_prop() {
   local key=$1
-  adb shell getprop "$key" | trim_cr
+  "$ADB_BIN" shell getprop "$key" | trim_cr
 }
 
 xml_boolean_value() {
@@ -173,14 +184,14 @@ model="$(shell_prop ro.product.model)"
 android_release="$(shell_prop ro.build.version.release)"
 sdk_int="$(shell_prop ro.build.version.sdk)"
 
-owners_output="$(adb shell dpm list-owners 2>&1 | trim_cr || true)"
-device_policy_dump="$(adb shell dumpsys device_policy | trim_cr)"
-activity_dump="$(adb shell dumpsys activity activities | trim_cr)"
-package_dump="$(adb shell dumpsys package "$PACKAGE_NAME" | trim_cr || true)"
-resolve_output="$(adb shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>&1 | trim_cr || true)"
+owners_output="$("$ADB_BIN" shell dpm list-owners 2>&1 | trim_cr || true)"
+device_policy_dump="$("$ADB_BIN" shell dumpsys device_policy | trim_cr)"
+activity_dump="$("$ADB_BIN" shell dumpsys activity activities | trim_cr)"
+package_dump="$("$ADB_BIN" shell dumpsys package "$PACKAGE_NAME" | trim_cr || true)"
+resolve_output="$("$ADB_BIN" shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>&1 | trim_cr || true)"
 
 package_installed=false
-if adb shell pm path "$PACKAGE_NAME" >/dev/null 2>&1; then
+if "$ADB_BIN" shell pm path "$PACKAGE_NAME" >/dev/null 2>&1; then
   package_installed=true
 fi
 
@@ -209,9 +220,9 @@ lock_task_package_allowlisted="$(jq -n --argjson packages "$lock_task_packages_j
 
 run_as_available=false
 plain_prefs_xml=""
-if adb shell run-as "$PACKAGE_NAME" ls shared_prefs >/dev/null 2>&1; then
+if "$ADB_BIN" shell run-as "$PACKAGE_NAME" ls shared_prefs >/dev/null 2>&1; then
   run_as_available=true
-  plain_prefs_xml="$(adb shell run-as "$PACKAGE_NAME" cat shared_prefs/openclaw.node.xml 2>/dev/null | trim_cr || true)"
+  plain_prefs_xml="$("$ADB_BIN" shell run-as "$PACKAGE_NAME" cat shared_prefs/openclaw.node.xml 2>/dev/null | trim_cr || true)"
 fi
 
 dedicated_enabled=""
@@ -253,13 +264,13 @@ lock_task_mode_state_after_launch="$lock_task_mode_state"
 if [[ "$LAUNCH" == "true" ]]; then
   launch_attempted=true
   set +e
-  launch_output="$(adb shell am start -W -n "$MAIN_ACTIVITY_COMPONENT" 2>&1 | trim_cr)"
+  launch_output="$("$ADB_BIN" shell am start -W -n "$MAIN_ACTIVITY_COMPONENT" 2>&1 | trim_cr)"
   launch_exit_code=$?
   set -e
   if [[ "$launch_exit_code" -eq 0 ]]; then
     launch_succeeded=true
     sleep 2
-    activity_dump_after_launch="$(adb shell dumpsys activity activities | trim_cr)"
+    activity_dump_after_launch="$("$ADB_BIN" shell dumpsys activity activities | trim_cr)"
     top_activity_after_launch="$(printf '%s\n' "$activity_dump_after_launch" | grep -m1 -E 'topResumedActivity|mResumedActivity' || true)"
     lock_task_mode_state_after_launch="$(printf '%s\n' "$activity_dump_after_launch" | sed -n 's/.*mLockTaskModeState=\(.*\)$/\1/p' | head -n 1)"
   fi
@@ -312,6 +323,9 @@ elif [[ "$dedicated_enabled_true" != "true" || "$onboarding_completed_true" != "
   recommended_command="pnpm android:local-host:dedicated:post-provision -- --launch"
 else
   recommended_action="healthy"
+fi
+if [[ -n "${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-}" && -n "$recommended_command" ]]; then
+  recommended_command="OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=$(shell_quote "$ADB_BIN") $recommended_command"
 fi
 
 recommendations_json='[]'

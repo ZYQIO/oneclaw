@@ -102,6 +102,37 @@ class PodHandlerTest {
   }
 
   @Test
+  fun handlePodRuntimeDescribe_reportsDesktopRuntimeMainlineGapMap() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodRuntimeDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("pod.runtime.describe", payload.getValue("command").jsonPrimitive.content)
+    assertEquals(
+      "android-desktop-runtime-mainline-20260403",
+      payload.getValue("mainlineBranch").jsonPrimitive.content,
+    )
+    assertEquals(false, payload.getValue("fullDesktopRuntimeBundled").jsonPrimitive.boolean)
+    val domainIds =
+      payload.getValue("domains").jsonArray.map { item ->
+        item.jsonObject.getValue("id").jsonPrimitive.content
+      }
+    assertTrue("engine" in domainIds)
+    assertTrue("environment" in domainIds)
+    assertTrue("browser" in domainIds)
+    assertTrue("tools" in domainIds)
+    assertTrue("plugins" in domainIds)
+    val missingDomains = payload.getValue("missingDomains").jsonArray.map { it.jsonPrimitive.content }
+    assertTrue("engine" in missingDomains)
+    assertTrue("browser" in missingDomains)
+  }
+
+  @Test
   fun handlePodWorkspaceScan_reportsWorkspaceAssetsAfterInstall() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()

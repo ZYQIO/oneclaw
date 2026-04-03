@@ -4,6 +4,7 @@ set -euo pipefail
 BASE_URL="${OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL:-}"
 TOKEN="${OPENCLAW_ANDROID_LOCAL_HOST_TOKEN:-}"
 PORT="${OPENCLAW_ANDROID_LOCAL_HOST_PORT:-3945}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 APP_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_PACKAGE:-ai.openclaw.app}"
 APP_COMPONENT="${OPENCLAW_ANDROID_LOCAL_HOST_UI_APP_COMPONENT:-ai.openclaw.app/.MainActivity}"
 TARGET_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE:-com.android.settings}"
@@ -71,6 +72,7 @@ usage() {
 Usage:
   OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> \
   [OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_PACKAGE=com.android.settings] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_OBSERVE_WINDOW_MS=5000] \
   [OPENCLAW_ANDROID_LOCAL_HOST_UI_CROSS_APP_POLL_INTERVAL_MS=500] \
@@ -140,10 +142,15 @@ done
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
 }
 
 shell_quote() {
@@ -270,6 +277,7 @@ build_probe_rerun_hint() {
   local -a parts=()
   local env_name
   local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN
     OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
     OPENCLAW_ANDROID_LOCAL_HOST_PORT
     OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC
@@ -518,7 +526,7 @@ if [[ -z "$TOKEN" ]]; then
 fi
 
 require_cmd curl
-require_cmd adb
+require_cmd "$ADB_BIN"
 
 follow_up_requested_count=0
 if [[ "$follow_up_wait_requested" == "true" ]]; then
@@ -537,13 +545,13 @@ if [[ "$follow_up_input_requested" == "true" ]]; then
   follow_up_requested_count=$((follow_up_requested_count + 1))
 fi
 
-device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
 if [[ "$device_count" -lt 1 ]]; then
   echo "No connected Android device (adb state=device)." >&2
   exit 1
 fi
 
-adb forward "tcp:$PORT" "tcp:$PORT" >/dev/null
+"$ADB_BIN" forward "tcp:$PORT" "tcp:$PORT" >/dev/null
 if [[ -z "$BASE_URL" ]]; then
   BASE_URL="http://127.0.0.1:$PORT"
 fi
@@ -624,13 +632,13 @@ status_probe() {
 
 current_top_activity_line() {
   local activity_dump
-  activity_dump="$(adb shell dumpsys activity activities | tr -d '\r')"
+  activity_dump="$("$ADB_BIN" shell dumpsys activity activities | tr -d '\r')"
   awk '/topResumedActivity/ {print; exit}' <<<"$activity_dump"
 }
 
 current_focus_line() {
   local window_dump
-  window_dump="$(adb shell dumpsys window windows | tr -d '\r')"
+  window_dump="$("$ADB_BIN" shell dumpsys window windows | tr -d '\r')"
   awk '/mCurrentFocus=/ {print; exit}' <<<"$window_dump"
 }
 
@@ -779,7 +787,7 @@ if ! jq -e --arg package "$APP_PACKAGE" '
 fi
 
 if [[ "$RESET_TARGET_BEFORE_LAUNCH" == "true" ]]; then
-  adb shell am force-stop "$TARGET_PACKAGE" >/dev/null
+  "$ADB_BIN" shell am force-stop "$TARGET_PACKAGE" >/dev/null
   target_reset_applied=true
 fi
 
@@ -1128,7 +1136,7 @@ elif [[ "$target_top_count" -gt 0 && "$first_status_failure_round" -ge 0 ]]; the
   classification="foregrounded_then_remote_unreachable"
 fi
 
-adb shell am start -n "$APP_COMPONENT" >/dev/null
+"$ADB_BIN" shell am start -n "$APP_COMPONENT" >/dev/null
 sleep "$(sleep_seconds_from_ms "$RECOVERY_WAIT_MS")"
 status_probe "$RECOVERY_STATUS_JSON" "$RECOVERY_STATUS_CODE"
 recovery_http_code="$(cat "$RECOVERY_STATUS_CODE" 2>/dev/null || printf '%s' "000")"

@@ -11,6 +11,7 @@ WAIT_MS="${OPENCLAW_ANDROID_LOCAL_HOST_WAIT_MS:-30000}"
 INVOKE_COMMAND="${OPENCLAW_ANDROID_LOCAL_HOST_INVOKE_COMMAND:-device.status}"
 INVOKE_PARAMS="${OPENCLAW_ANDROID_LOCAL_HOST_INVOKE_PARAMS:-}"
 USE_ADB_FORWARD="${OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD:-0}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 PORT="${OPENCLAW_ANDROID_LOCAL_HOST_PORT:-3945}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-local-host.XXXXXX)}"
 
@@ -20,6 +21,7 @@ Usage:
   OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> \
   [OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL=http://127.0.0.1:3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_MESSAGE="Hello"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_INVOKE_COMMAND=device.status] \
@@ -45,6 +47,15 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+has_cmd() {
+  local name=$1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    [[ -x "$name" || -f "$name" ]]
+    return
+  fi
+  command -v "$name" >/dev/null 2>&1
+}
+
 if ! command -v curl >/dev/null 2>&1; then
   echo "curl required but missing." >&2
   exit 1
@@ -56,16 +67,16 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 if [[ "$USE_ADB_FORWARD" == "1" ]]; then
-  if ! command -v adb >/dev/null 2>&1; then
-    echo "adb required when OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1." >&2
+  if ! has_cmd "$ADB_BIN"; then
+    echo "$ADB_BIN required when OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1." >&2
     exit 1
   fi
-  device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+  device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
   if [[ "$device_count" -lt 1 ]]; then
     echo "No connected Android device (adb state=device)." >&2
     exit 1
   fi
-  adb forward "tcp:$PORT" "tcp:$PORT" >/dev/null
+  "$ADB_BIN" forward "tcp:$PORT" "tcp:$PORT" >/dev/null
   if [[ -z "$BASE_URL" ]]; then
     BASE_URL="http://127.0.0.1:$PORT"
   fi

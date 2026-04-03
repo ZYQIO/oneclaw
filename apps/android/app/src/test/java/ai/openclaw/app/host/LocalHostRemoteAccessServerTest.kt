@@ -214,6 +214,7 @@ class LocalHostRemoteAccessServerTest {
       assertTrue(response.body.contains("\"device.status\""))
       assertTrue(response.body.contains("\"pod.health\""))
       assertTrue(response.body.contains("\"pod.manifest.describe\""))
+      assertTrue(response.body.contains("\"pod.runtime.describe\""))
       assertTrue(response.body.contains("\"pod.workspace.scan\""))
       assertTrue(response.body.contains("\"pod.workspace.read\""))
       assertTrue(response.body.contains("\"notifications.list\""))

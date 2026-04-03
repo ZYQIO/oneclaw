@@ -2,6 +2,14 @@
 
 Scope / 范围: track the Android effort to run OpenClaw locally on the phone, authenticate with Codex, and expose a safe remote-control surface. / 追踪 Android 端在手机本机运行 OpenClaw、使用 Codex 授权，并暴露安全远程控制面的推进情况。
 
+## Branch Pivot / 主线切换
+
+As of April 3, 2026, branch `android-desktop-runtime-mainline-20260403` changes the active Android mainline from “ship the Android-native local-host MVP first” to “integrate a selected desktop-runtime slice into Android.” / 截至 2026 年 4 月 3 日，分支 `android-desktop-runtime-mainline-20260403` 已将 Android 的活动主线从“先交付 Android-native local-host MVP”切换为“把一段精选桌面 runtime 切片整合进 Android”。
+
+- The new objective lives in `apps/android/local-host-desktop-runtime-mainline.md`. / 新主线目标写在 `apps/android/local-host-desktop-runtime-mainline.md`。
+- The milestone table below still matters, but it now describes validated baseline capabilities and bootstrap plumbing. / 下面的 milestone 表仍然重要，但它现在描述的是已验证的基线能力和 bootstrap 管线。
+- The embedded-runtime pod plan remains useful as the bootstrap-carrier plan, not the end-state product definition. / embedded-runtime pod 方案继续有用，但它现在是 bootstrap 载体方案，而不是终态产品定义。
+
 ## Objective / 目标
 
 Ship an Android-hosted MVP that can: / 交付一个运行在 Android 手机上的 MVP，具备以下能力：

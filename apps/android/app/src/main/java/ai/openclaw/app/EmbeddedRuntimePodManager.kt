@@ -16,9 +16,25 @@ private const val embeddedRuntimePodLayoutAssetPath = "embedded-runtime-pod/layo
 private const val embeddedRuntimePodInstallRootDisplayPath = "filesDir/openclaw/embedded-runtime-pod"
 private const val embeddedRuntimePodWorkspaceReadDefaultChars = 4000
 private const val embeddedRuntimePodWorkspaceReadMaxChars = 16000
+private const val embeddedRuntimeDesktopMainlineBranch = "android-desktop-runtime-mainline-20260403"
 
 private val embeddedRuntimePodJson = Json { ignoreUnknownKeys = true }
 private val embeddedRuntimePodTextExtensions = setOf("json", "md", "txt", "yaml", "yml")
+private val embeddedRuntimeBootstrapHelperCommands =
+  listOf(
+    "pod.health",
+    "pod.manifest.describe",
+    "pod.workspace.scan",
+    "pod.workspace.read",
+  )
+private val embeddedRuntimeMissingDomains =
+  listOf(
+    "engine",
+    "environment",
+    "browser",
+    "tools",
+    "plugins",
+  )
 
 @Serializable
 private data class EmbeddedRuntimePodAssetManifestStage(
@@ -103,6 +119,13 @@ data class EmbeddedRuntimePodWorkspaceReadResult(
 )
 
 data class EmbeddedRuntimePodManifestDescribeResult(
+  val ok: Boolean,
+  val payload: JsonObject? = null,
+  val code: String? = null,
+  val message: String? = null,
+)
+
+data class EmbeddedRuntimePodRuntimeDescribeResult(
   val ok: Boolean,
   val payload: JsonObject? = null,
   val code: String? = null,
@@ -429,6 +452,122 @@ fun describeEmbeddedRuntimePodManifest(
   )
 }
 
+fun describeEmbeddedRuntimeDesktopRuntime(
+  context: Context,
+): EmbeddedRuntimePodRuntimeDescribeResult {
+  val inspection = inspectEmbeddedRuntimePod(context)
+  val mainlineStatus =
+    when {
+      inspection.ready -> "bootstrap_ready"
+      inspection.available -> "bootstrap_partial"
+      else -> "bootstrap_missing"
+    }
+
+  return EmbeddedRuntimePodRuntimeDescribeResult(
+    ok = true,
+    payload =
+      buildJsonObject {
+        put("mainlineBranch", JsonPrimitive(embeddedRuntimeDesktopMainlineBranch))
+        put("distributionLane", JsonPrimitive("internal_or_sideload_first"))
+        put("mainlineStatus", JsonPrimitive(mainlineStatus))
+        put("fullDesktopRuntimeBundled", JsonPrimitive(false))
+        put("embeddedPodReady", JsonPrimitive(inspection.ready))
+        inspection.manifestVersion?.let { put("embeddedPodVersion", JsonPrimitive(it)) }
+        put("helperBootstrapCommandCount", JsonPrimitive(embeddedRuntimeBootstrapHelperCommands.size))
+        put(
+          "helperBootstrapCommands",
+          buildJsonArray {
+            embeddedRuntimeBootstrapHelperCommands.forEach { command ->
+              add(JsonPrimitive(command))
+            }
+          },
+        )
+        put(
+          "missingDomains",
+          buildJsonArray {
+            embeddedRuntimeMissingDomains.forEach { domain ->
+              add(JsonPrimitive(domain))
+            }
+          },
+        )
+        put(
+          "domains",
+          buildJsonArray {
+            add(
+              buildDesktopRuntimeDomain(
+                id = "packaging",
+                status = if (inspection.ready) "landed_bootstrap" else "partial_bootstrap",
+                integrated = inspection.available,
+                summary = "Build-time packaging, app-private extraction, and verification are wired into Android.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "helperSurface",
+                status = "landed_bootstrap",
+                integrated = true,
+                summary = "Read-only helper entrypoints exist for pod health, manifest metadata, workspace inventory, and workspace reads.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "workspaceBridge",
+                status = if (inspection.ready) "landed_bootstrap" else "partial_bootstrap",
+                integrated = true,
+                summary = "Packaged workspace metadata and packaged document reads are already replayable.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "engine",
+                status = "missing",
+                integrated = false,
+                summary = "No embedded desktop execution engine is wired into Android yet.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "environment",
+                status = "missing",
+                integrated = false,
+                summary = "No app-private runtime environment supervisor or process contract exists yet.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "browser",
+                status = "missing",
+                integrated = false,
+                summary = "No bounded desktop browser runtime or browser automation bridge exists yet.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "tools",
+                status = "missing",
+                integrated = false,
+                summary = "No curated desktop tool execution lane is packaged yet.",
+              ),
+            )
+            add(
+              buildDesktopRuntimeDomain(
+                id = "plugins",
+                status = "missing",
+                integrated = false,
+                summary = "No packaged plugin runtime surface is exposed yet.",
+              ),
+            )
+          },
+        )
+        put("recommendedNextSlice", JsonPrimitive("engine_environment_carrier"))
+        put(
+          "recommendedNextStep",
+          JsonPrimitive("Package a real embedded execution engine together with an app-private runtime environment before browser, tools, or plugins."),
+        )
+      },
+  )
+}
+
 private fun embeddedRuntimePodInstallRoot(context: Context): File =
   context.filesDir.resolve("openclaw/embedded-runtime-pod")
 
@@ -580,6 +719,20 @@ private fun primitiveContent(
   val primitive = jsonObject[key] as? JsonPrimitive ?: return null
   return primitive.content.takeUnless { it == "null" }
 }
+
+private fun buildDesktopRuntimeDomain(
+  id: String,
+  status: String,
+  integrated: Boolean,
+  summary: String,
+): JsonObject =
+  buildJsonObject {
+    put("id", JsonPrimitive(id))
+    put("status", JsonPrimitive(status))
+    put("targeted", JsonPrimitive(true))
+    put("integrated", JsonPrimitive(integrated))
+    put("summary", JsonPrimitive(summary))
+  }
 
 private fun sha256(file: File): String {
   val digest = MessageDigest.getInstance("SHA-256")

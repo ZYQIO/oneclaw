@@ -2,6 +2,14 @@
 
 Purpose / 用途: make it easy to resume the Android local-host effort in a fresh chat without re-discovering the current state. / 让新会话可以快速接手 Android 本机 Host 项目，不必重新摸索当前状态。
 
+## Branch Pivot / 主线切换
+
+As of April 3, 2026, branch `android-desktop-runtime-mainline-20260403` promotes desktop-runtime integration into the active Android mainline. The helper pod is now the bootstrap carrier, not the end state. / 截至 2026 年 4 月 3 日，分支 `android-desktop-runtime-mainline-20260403` 已把“桌面 runtime 集成”提升为 Android 当前主线；helper pod 现在是 bootstrap 载体，不再是终态。
+
+- The authoritative plan for that pivot now lives in `apps/android/local-host-desktop-runtime-mainline.md`. / 这次主线切换的权威方案现在写在 `apps/android/local-host-desktop-runtime-mainline.md`。
+- The old Android-native `Local Host` MVP below should now be read as validated baseline context, not the new finish line. / 下面这套旧的 Android-native `Local Host` MVP 叙述，现在应视为已验证基线，而不是新的终点。
+- Do not reopen the assumption that the helper quartet alone answers the desktop-runtime question. / 不要再回到“helper quartet 本身就回答了桌面 runtime 问题”的假设。
+
 ## Current Objective / 当前目标
 
 The active goal is still the same: / 当前目标仍然不变：

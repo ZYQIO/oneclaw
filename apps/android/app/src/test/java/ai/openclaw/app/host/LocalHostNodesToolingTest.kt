@@ -40,6 +40,7 @@ class LocalHostNodesToolingTest {
     assertTrue("device_permissions" in actions)
     assertTrue("pod_health" in actions)
     assertTrue("pod_manifest_describe" in actions)
+    assertTrue("pod_runtime_describe" in actions)
     assertTrue("pod_workspace_scan" in actions)
     assertTrue("pod_workspace_read" in actions)
     assertTrue("ui_state" in actions)
@@ -193,6 +194,34 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("manifestSource"))
       assertTrue(result.outputText.contains("fileCount"))
+    }
+
+  @Test
+  fun podRuntimeDescribe_mapsInvokeCommandForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.runtime.describe", command)
+            org.junit.Assert.assertEquals("{}", paramsJson)
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"mainlineBranch":"android-desktop-runtime-mainline-20260403","mainlineStatus":"bootstrap_ready"}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_runtime_describe"}""",
+        )
+
+      assertTrue(result.outputText.contains("mainlineBranch"))
+      assertTrue(result.outputText.contains("bootstrap_ready"))
     }
 
   @Test

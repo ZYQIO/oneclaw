@@ -142,6 +142,7 @@ class InvokeDispatcher(
       OpenClawDeviceCommand.Health.rawValue -> deviceHandler.handleDeviceHealth(paramsJson)
       OpenClawPodCommand.Health.rawValue -> podHandler.handlePodHealth(paramsJson)
       OpenClawPodCommand.ManifestDescribe.rawValue -> podHandler.handlePodManifestDescribe(paramsJson)
+      OpenClawPodCommand.RuntimeDescribe.rawValue -> podHandler.handlePodRuntimeDescribe(paramsJson)
       OpenClawPodCommand.WorkspaceScan.rawValue -> podHandler.handlePodWorkspaceScan(paramsJson)
       OpenClawPodCommand.WorkspaceRead.rawValue -> podHandler.handlePodWorkspaceRead(paramsJson)
 

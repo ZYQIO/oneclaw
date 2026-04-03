@@ -75,6 +75,7 @@ build_probe_command() {
   local -a parts=()
   local env_name
   local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN
     OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
     OPENCLAW_ANDROID_LOCAL_HOST_PORT
     OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC
@@ -140,6 +141,7 @@ build_sweep_recommended_command() {
   local -a parts=()
   local env_name
   local env_names=(
+    OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN
     OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL
     OPENCLAW_ANDROID_LOCAL_HOST_PORT
     OPENCLAW_ANDROID_LOCAL_HOST_UI_REQUEST_TIMEOUT_SEC

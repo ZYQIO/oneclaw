@@ -10,6 +10,7 @@ CONTENT_INDEX_PATH="$RUNTIME_POD_DIR/assets/workspace/content-index.json"
 BASE_URL="${OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL:-}"
 TOKEN="${OPENCLAW_ANDROID_LOCAL_HOST_TOKEN:-}"
 USE_ADB_FORWARD="${OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD:-0}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 PORT="${OPENCLAW_ANDROID_LOCAL_HOST_PORT:-3945}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-runtime-pod-smoke.XXXXXX)}"
 
@@ -29,6 +30,7 @@ Usage:
   OPENCLAW_ANDROID_LOCAL_HOST_TOKEN=<token> \
   [OPENCLAW_ANDROID_LOCAL_HOST_BASE_URL=http://127.0.0.1:3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_USE_ADB_FORWARD=1] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_LOCAL_HOST_PORT=3945] \
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_QUERY=<query>] \
   [OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_LIMIT=5] \
@@ -41,9 +43,10 @@ What it does:
   3. Calls /invoke/capabilities and checks pod helper allowlisting
   4. Calls /invoke pod.health
   5. Calls /invoke pod.manifest.describe
-  6. Calls /invoke pod.workspace.scan
-  7. Calls /invoke pod.workspace.read
-  8. Verifies the phone-side results against repo pod-spec.json and content-index.json
+  6. Calls /invoke pod.runtime.describe
+  7. Calls /invoke pod.workspace.scan
+  8. Calls /invoke pod.workspace.read
+  9. Verifies the phone-side results against repo pod-spec.json and content-index.json
 
 Requirements:
   - curl
@@ -61,9 +64,18 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
+has_cmd() {
+  local name=$1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    [[ -x "$name" || -f "$name" ]]
+    return
+  fi
+  command -v "$name" >/dev/null 2>&1
+}
+
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
+  if ! has_cmd "$name"; then
     echo "$name required but missing." >&2
     exit 1
   fi
@@ -102,13 +114,13 @@ if [[ -n "$EXPECTED_PATH" && -f "$RUNTIME_POD_DIR/assets/workspace/$EXPECTED_PAT
 fi
 
 if [[ "$USE_ADB_FORWARD" == "1" ]]; then
-  require_cmd adb
-  device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+  require_cmd "$ADB_BIN"
+  device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
   if [[ "$device_count" -lt 1 ]]; then
     echo "No connected Android device (adb state=device)." >&2
     exit 1
   fi
-  adb forward "tcp:$PORT" "tcp:$PORT" >/dev/null
+  "$ADB_BIN" forward "tcp:$PORT" "tcp:$PORT" >/dev/null
   if [[ -z "$BASE_URL" ]]; then
     BASE_URL="http://127.0.0.1:$PORT"
   fi
@@ -132,6 +144,7 @@ status_json="$ARTIFACT_DIR/status.json"
 capabilities_json="$ARTIFACT_DIR/capabilities.json"
 health_json="$ARTIFACT_DIR/pod-health.json"
 manifest_json="$ARTIFACT_DIR/pod-manifest-describe.json"
+runtime_describe_json="$ARTIFACT_DIR/pod-runtime-describe.json"
 workspace_json="$ARTIFACT_DIR/pod-workspace-scan.json"
 workspace_read_json="$ARTIFACT_DIR/pod-workspace-read.json"
 summary_json="$ARTIFACT_DIR/summary.json"
@@ -187,25 +200,29 @@ status_pod_verified_count="$(jq -r '.host.embeddedRuntimePod.verifiedFileCount /
 
 cap_has_health="$(jq -r --arg command 'pod.health' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_manifest_describe="$(jq -r --arg command 'pod.manifest.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
+cap_has_runtime_describe="$(jq -r --arg command 'pod.runtime.describe' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_scan="$(jq -r --arg command 'pod.workspace.scan' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_has_workspace_read="$(jq -r --arg command 'pod.workspace.read' '(.commands // []) | index($command) != null' "$capabilities_json")"
 cap_write_enabled="$(jq -r '.writeEnabled // false' "$capabilities_json")"
 
 [[ "$cap_has_health" == "true" ]] || record_failure "capabilities_missing_pod_health"
 [[ "$cap_has_manifest_describe" == "true" ]] || record_failure "capabilities_missing_pod_manifest_describe"
+[[ "$cap_has_runtime_describe" == "true" ]] || record_failure "capabilities_missing_pod_runtime_describe"
 [[ "$cap_has_workspace_scan" == "true" ]] || record_failure "capabilities_missing_pod_workspace_scan"
 [[ "$cap_has_workspace_read" == "true" ]] || record_failure "capabilities_missing_pod_workspace_read"
 
-if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
+if [[ "$cap_has_health" != "true" || "$cap_has_manifest_describe" != "true" || "$cap_has_runtime_describe" != "true" || "$cap_has_workspace_scan" != "true" || "$cap_has_workspace_read" != "true" ]]; then
   skip_helper_invocations=1
   failure_hint="install the current debug app on the device, rerun pnpm android:local-host:token -- --json, then rerun pnpm android:local-host:embedded-runtime-pod:smoke"
   printf '{}\n' >"$health_json"
   printf '{}\n' >"$manifest_json"
+  printf '{}\n' >"$runtime_describe_json"
   printf '{}\n' >"$workspace_json"
   printf '{}\n' >"$workspace_read_json"
 else
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.health"}' | tee "$health_json" >/dev/null
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.manifest.describe"}' | tee "$manifest_json" >/dev/null
+  post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.runtime.describe"}' | tee "$runtime_describe_json" >/dev/null
   workspace_body="$(jq -cn --arg query "$QUERY" --argjson limit "$LIMIT" '{command:"pod.workspace.scan", params:{query:$query, limit:$limit}}')"
   post_json "$BASE_URL/api/local-host/v1/invoke" "$workspace_body" | tee "$workspace_json" >/dev/null
   workspace_read_body="$(jq -cn --arg path "$EXPECTED_PATH" '{command:"pod.workspace.read", params:{path:$path, maxChars:4096}}')"
@@ -231,6 +248,16 @@ manifest_workspace_installed="$(jq -r '.payload.workspaceStageInstalled // false
 manifest_version="$(jq -r '.payload.podManifest.version // ""' "$manifest_json")"
 manifest_layout_version="$(jq -r '.payload.podLayout.version // ""' "$manifest_json")"
 manifest_workspace_stage_file_count="$(jq -r '.payload.fileStageCounts.workspace // -1' "$manifest_json")"
+
+runtime_describe_ok="$(jq -r '.ok // false' "$runtime_describe_json")"
+runtime_describe_command="$(jq -r '.payload.command // ""' "$runtime_describe_json")"
+runtime_describe_branch="$(jq -r '.payload.mainlineBranch // ""' "$runtime_describe_json")"
+runtime_describe_status="$(jq -r '.payload.mainlineStatus // ""' "$runtime_describe_json")"
+runtime_describe_engine_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("engine") != null' "$runtime_describe_json")"
+runtime_describe_environment_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("environment") != null' "$runtime_describe_json")"
+runtime_describe_browser_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("browser") != null' "$runtime_describe_json")"
+runtime_describe_tools_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("tools") != null' "$runtime_describe_json")"
+runtime_describe_plugins_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("plugins") != null' "$runtime_describe_json")"
 
 workspace_ok="$(jq -r '.ok // false' "$workspace_json")"
 workspace_command="$(jq -r '.payload.command // ""' "$workspace_json")"
@@ -283,6 +310,16 @@ if [[ "$skip_helper_invocations" == "0" ]]; then
   [[ "$manifest_layout_version" == "$EXPECTED_VERSION" ]] || record_failure "pod_manifest_describe_layout_version_mismatch"
   [[ "$manifest_workspace_stage_file_count" == "$EXPECTED_WORKSPACE_STAGE_FILE_COUNT" ]] || record_failure "pod_manifest_describe_workspace_file_count_mismatch"
 
+  [[ "$runtime_describe_ok" == "true" ]] || record_failure "pod_runtime_describe_not_ok"
+  [[ "$runtime_describe_command" == "pod.runtime.describe" ]] || record_failure "pod_runtime_describe_command_mismatch"
+  [[ "$runtime_describe_branch" == "android-desktop-runtime-mainline-20260403" ]] || record_failure "pod_runtime_describe_branch_mismatch"
+  [[ "$runtime_describe_status" != "" ]] || record_failure "pod_runtime_describe_missing_status"
+  [[ "$runtime_describe_engine_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_engine_domain"
+  [[ "$runtime_describe_environment_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_environment_domain"
+  [[ "$runtime_describe_browser_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_browser_domain"
+  [[ "$runtime_describe_tools_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_tools_domain"
+  [[ "$runtime_describe_plugins_domain" == "true" ]] || record_failure "pod_runtime_describe_missing_plugins_domain"
+
   [[ "$workspace_ok" == "true" ]] || record_failure "pod_workspace_scan_not_ok"
   [[ "$workspace_command" == "pod.workspace.scan" ]] || record_failure "pod_workspace_scan_command_mismatch"
   [[ "$workspace_stage_present" == "true" ]] || record_failure "pod_workspace_stage_missing"
@@ -332,6 +369,7 @@ jq -n \
   --arg statusPodVerifiedCount "$status_pod_verified_count" \
   --arg capHasHealth "$cap_has_health" \
   --arg capHasManifestDescribe "$cap_has_manifest_describe" \
+  --arg capHasRuntimeDescribe "$cap_has_runtime_describe" \
   --arg capHasWorkspaceScan "$cap_has_workspace_scan" \
   --arg capHasWorkspaceRead "$cap_has_workspace_read" \
   --arg capWriteEnabled "$cap_write_enabled" \
@@ -353,6 +391,15 @@ jq -n \
   --arg manifestVersion "$manifest_version" \
   --arg manifestLayoutVersion "$manifest_layout_version" \
   --arg manifestWorkspaceStageFileCount "$manifest_workspace_stage_file_count" \
+  --arg runtimeDescribeOk "$runtime_describe_ok" \
+  --arg runtimeDescribeCommand "$runtime_describe_command" \
+  --arg runtimeDescribeBranch "$runtime_describe_branch" \
+  --arg runtimeDescribeStatus "$runtime_describe_status" \
+  --arg runtimeDescribeEngineDomain "$runtime_describe_engine_domain" \
+  --arg runtimeDescribeEnvironmentDomain "$runtime_describe_environment_domain" \
+  --arg runtimeDescribeBrowserDomain "$runtime_describe_browser_domain" \
+  --arg runtimeDescribeToolsDomain "$runtime_describe_tools_domain" \
+  --arg runtimeDescribePluginsDomain "$runtime_describe_plugins_domain" \
   --arg workspaceOk "$workspace_ok" \
   --arg workspaceCommand "$workspace_command" \
   --arg workspaceStagePresent "$workspace_stage_present" \
@@ -401,6 +448,7 @@ jq -n \
     capabilities: {
       hasPodHealth: ($capHasHealth == "true"),
       hasPodManifestDescribe: ($capHasManifestDescribe == "true"),
+      hasPodRuntimeDescribe: ($capHasRuntimeDescribe == "true"),
       hasPodWorkspaceScan: ($capHasWorkspaceScan == "true"),
       hasPodWorkspaceRead: ($capHasWorkspaceRead == "true"),
       writeEnabled: ($capWriteEnabled == "true")
@@ -426,6 +474,17 @@ jq -n \
       manifestVersion: (if $manifestVersion == "" then null else $manifestVersion end),
       layoutVersion: (if $manifestLayoutVersion == "" then null else $manifestLayoutVersion end),
       workspaceStageFileCount: ($manifestWorkspaceStageFileCount | tonumber)
+    },
+    podRuntimeDescribe: {
+      ok: ($runtimeDescribeOk == "true"),
+      command: (if $runtimeDescribeCommand == "" then null else $runtimeDescribeCommand end),
+      mainlineBranch: (if $runtimeDescribeBranch == "" then null else $runtimeDescribeBranch end),
+      mainlineStatus: (if $runtimeDescribeStatus == "" then null else $runtimeDescribeStatus end),
+      hasEngineDomain: ($runtimeDescribeEngineDomain == "true"),
+      hasEnvironmentDomain: ($runtimeDescribeEnvironmentDomain == "true"),
+      hasBrowserDomain: ($runtimeDescribeBrowserDomain == "true"),
+      hasToolsDomain: ($runtimeDescribeToolsDomain == "true"),
+      hasPluginsDomain: ($runtimeDescribePluginsDomain == "true")
     },
     podWorkspaceScan: {
       ok: ($workspaceOk == "true"),
@@ -458,6 +517,8 @@ printf 'runtime_pod.health ok=%s ready=%s local=%s version=%s verified=%s\n' \
   "$health_ok" "$health_ready" "$health_local_execution" "$health_version" "$health_verified_count"
 printf 'runtime_pod.manifest ok=%s source=%s layout=%s stages=%s files=%s workspace_files=%s\n' \
   "$manifest_ok" "$manifest_source" "$manifest_layout_source" "$manifest_stage_count" "$manifest_file_count" "$manifest_workspace_stage_file_count"
+printf 'runtime_pod.runtime_describe ok=%s branch=%s status=%s engine=%s browser=%s tools=%s plugins=%s\n' \
+  "$runtime_describe_ok" "$runtime_describe_branch" "$runtime_describe_status" "$runtime_describe_engine_domain" "$runtime_describe_browser_domain" "$runtime_describe_tools_domain" "$runtime_describe_plugins_domain"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \
   "$workspace_ok" "$workspace_stage_present" "$workspace_document_count" "$workspace_matched_file_count" "$workspace_returned_file_count" "$workspace_first_path"
 printf 'runtime_pod.workspace_read ok=%s path=%s size=%s truncated=%s kind=%s\n' \
@@ -478,6 +539,7 @@ echo "artifacts.status=$status_json"
 echo "artifacts.capabilities=$capabilities_json"
 echo "artifacts.health=$health_json"
 echo "artifacts.manifest=$manifest_json"
+echo "artifacts.runtime_describe=$runtime_describe_json"
 echo "artifacts.workspace_scan=$workspace_json"
 echo "artifacts.workspace_read=$workspace_read_json"
 echo "artifacts.summary=$summary_json"

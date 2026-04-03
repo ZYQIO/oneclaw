@@ -49,6 +49,7 @@ internal object LocalHostCommandPolicy {
       OpenClawNotificationsCommand.List.rawValue,
       OpenClawPodCommand.Health.rawValue,
       OpenClawPodCommand.ManifestDescribe.rawValue,
+      OpenClawPodCommand.RuntimeDescribe.rawValue,
       OpenClawPodCommand.WorkspaceScan.rawValue,
       OpenClawPodCommand.WorkspaceRead.rawValue,
       OpenClawPhotosCommand.Latest.rawValue,

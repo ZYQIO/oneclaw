@@ -6,6 +6,7 @@ TESTDPC_REPO="${OPENCLAW_ANDROID_TESTDPC_REPO:-googlesamples/android-testdpc}"
 TESTDPC_PACKAGE="${OPENCLAW_ANDROID_TESTDPC_PACKAGE:-com.afwsamples.testdpc}"
 TESTDPC_POLICY_ACTIVITY="${OPENCLAW_ANDROID_TESTDPC_POLICY_ACTIVITY:-$TESTDPC_PACKAGE/.PolicyManagementActivity}"
 TESTDPC_APK_OVERRIDE="${OPENCLAW_ANDROID_TESTDPC_APK:-}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 RELEASE_JSON="$ARTIFACT_DIR/testdpc-release.json"
 APK_PATH="$ARTIFACT_DIR/testdpc-latest.apk"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
@@ -32,6 +33,7 @@ Important notes:
 
 Environment overrides:
   OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR=/tmp/openclaw-dpc
+  OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb
   OPENCLAW_ANDROID_TESTDPC_REPO=googlesamples/android-testdpc
   OPENCLAW_ANDROID_TESTDPC_PACKAGE=com.afwsamples.testdpc
   OPENCLAW_ANDROID_TESTDPC_APK=/path/to/TestDPC.apk
@@ -65,10 +67,15 @@ done
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
 }
 
 trim_cr() {
@@ -83,11 +90,12 @@ bool_json() {
   fi
 }
 
-require_cmd adb
+require_cmd "$ADB_BIN"
 require_cmd curl
 require_cmd jq
+ADB_BIN_DISPLAY="$(printf '%q' "$ADB_BIN")"
 
-device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
 if [[ "$device_count" -lt 1 ]]; then
   echo "No connected Android device (adb state=device)." >&2
   exit 1
@@ -119,19 +127,19 @@ fi
 
 installed=false
 installed_version=""
-if adb shell pm path "$TESTDPC_PACKAGE" >/dev/null 2>&1; then
+if "$ADB_BIN" shell pm path "$TESTDPC_PACKAGE" >/dev/null 2>&1; then
   installed=true
-  installed_version="$(adb shell dumpsys package "$TESTDPC_PACKAGE" 2>/dev/null | trim_cr | sed -n 's/^[[:space:]]*versionName=//p' | head -n 1)"
+  installed_version="$("$ADB_BIN" shell dumpsys package "$TESTDPC_PACKAGE" 2>/dev/null | trim_cr | sed -n 's/^[[:space:]]*versionName=//p' | head -n 1)"
 fi
 
-owners_output="$(adb shell dpm list-owners 2>&1 | trim_cr || true)"
+owners_output="$("$ADB_BIN" shell dpm list-owners 2>&1 | trim_cr || true)"
 is_device_owner=false
 if [[ "$owners_output" == *"Device Owner"* && "$owners_output" == *"$TESTDPC_PACKAGE"* ]]; then
   is_device_owner=true
 fi
 
-install_command="adb install -r -d '$resolved_apk_path'"
-launch_command="adb shell am start -n '$TESTDPC_POLICY_ACTIVITY'"
+install_command="$ADB_BIN_DISPLAY install -r -d '$resolved_apk_path'"
+launch_command="$ADB_BIN_DISPLAY shell am start -n '$TESTDPC_POLICY_ACTIVITY'"
 
 install_attempted=false
 install_succeeded=false
@@ -142,7 +150,7 @@ launch_output=""
 if [[ "$APPLY" == "true" ]]; then
   install_attempted=true
   set +e
-  install_output="$(adb install -r -d "$resolved_apk_path" 2>&1 | trim_cr)"
+  install_output="$("$ADB_BIN" install -r -d "$resolved_apk_path" 2>&1 | trim_cr)"
   install_exit_code=$?
   set -e
   if [[ "$install_exit_code" -eq 0 ]]; then
@@ -156,7 +164,7 @@ if [[ "$LAUNCH" == "true" ]]; then
     launch_output="Skipped launch because install did not succeed."
   else
     set +e
-    launch_output="$(adb shell am start -n "$TESTDPC_POLICY_ACTIVITY" 2>&1 | trim_cr)"
+    launch_output="$("$ADB_BIN" shell am start -n "$TESTDPC_POLICY_ACTIVITY" 2>&1 | trim_cr)"
     launch_exit_code=$?
     set -e
     if [[ "$launch_exit_code" -eq 0 ]]; then

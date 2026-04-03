@@ -3,11 +3,13 @@ set -euo pipefail
 
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-dedicated-readiness.XXXXXX)}"
 DPC_COMPONENT="${OPENCLAW_ANDROID_DPC_COMPONENT:-com.afwsamples.testdpc/.DeviceAdminReceiver}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
 SUMMARY_JSON="$ARTIFACT_DIR/summary.json"
 
 usage() {
   cat <<'EOF'
 Usage:
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_DPC_COMPONENT=com.afwsamples.testdpc/.DeviceAdminReceiver] \
   ./apps/android/scripts/local-host-dedicated-readiness.sh
 
@@ -30,10 +32,19 @@ fi
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
+}
+
+shell_quote() {
+  printf '%q' "$1"
 }
 
 bool_json() {
@@ -90,10 +101,10 @@ build_recommended_command() {
   esac
 }
 
-require_cmd adb
+require_cmd "$ADB_BIN"
 require_cmd jq
 
-device_count="$(adb devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
+device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
 if [[ "$device_count" -lt 1 ]]; then
   echo "No connected Android device (adb state=device)." >&2
   exit 1
@@ -107,7 +118,7 @@ trim_cr() {
 
 shell_prop() {
   local key=$1
-  adb shell getprop "$key" | trim_cr
+  "$ADB_BIN" shell getprop "$key" | trim_cr
 }
 
 manufacturer="$(shell_prop ro.product.manufacturer)"
@@ -119,19 +130,19 @@ bootloader_locked="$(shell_prop ro.boot.flash.locked)"
 verified_boot_state="$(shell_prop ro.boot.verifiedbootstate)"
 oem_unlock_supported="$(shell_prop ro.oem_unlock_supported)"
 fingerprint="$(shell_prop ro.build.fingerprint)"
-device_provisioned="$(adb shell settings get global device_provisioned | trim_cr)"
-user_setup_complete="$(adb shell settings get secure user_setup_complete | trim_cr)"
-users_output="$(adb shell pm list users | trim_cr)"
-owners_output="$(adb shell dpm list-owners 2>&1 | trim_cr || true)"
-accounts_output="$(adb shell dumpsys account | trim_cr)"
+device_provisioned="$("$ADB_BIN" shell settings get global device_provisioned | trim_cr)"
+user_setup_complete="$("$ADB_BIN" shell settings get secure user_setup_complete | trim_cr)"
+users_output="$("$ADB_BIN" shell pm list users | trim_cr)"
+owners_output="$("$ADB_BIN" shell dpm list-owners 2>&1 | trim_cr || true)"
+accounts_output="$("$ADB_BIN" shell dumpsys account | trim_cr)"
 dpc_package="${DPC_COMPONENT%%/*}"
 dpc_installed=false
 openclaw_installed=false
 
-if adb shell pm path "$dpc_package" >/dev/null 2>&1; then
+if "$ADB_BIN" shell pm path "$dpc_package" >/dev/null 2>&1; then
   dpc_installed=true
 fi
-if adb shell pm path ai.openclaw.app >/dev/null 2>&1; then
+if "$ADB_BIN" shell pm path ai.openclaw.app >/dev/null 2>&1; then
   openclaw_installed=true
 fi
 
@@ -192,6 +203,9 @@ recommendations_json="$(jq -cn --argjson prev "$recommendations_json" '$prev + [
 
 recommended_action="$(recommend_dedicated_action "$has_device_owner" "$device_owner_via_adb_ready" "$dpc_installed")"
 recommended_command="$(build_recommended_command "$recommended_action")"
+if [[ -n "${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-}" && -n "$recommended_command" ]]; then
+  recommended_command="OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=$(shell_quote "$ADB_BIN") $recommended_command"
+fi
 
 jq -n \
   --arg manufacturer "$manufacturer" \

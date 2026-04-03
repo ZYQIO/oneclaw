@@ -10,7 +10,7 @@ ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t opencla
 usage() {
   cat <<'EOF'
 Usage:
-  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=adb] \
+  [OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb] \
   [OPENCLAW_ANDROID_LOCAL_HOST_OPENAI_NETWORK_HOSTS="chatgpt.com auth.openai.com"] \
   [OPENCLAW_ANDROID_LOCAL_HOST_OPENAI_NETWORK_PORT=443] \
   [OPENCLAW_ANDROID_LOCAL_HOST_OPENAI_NETWORK_TIMEOUT_SEC=5] \
@@ -36,14 +36,20 @@ fi
 
 require_cmd() {
   local name=$1
-  if ! command -v "$name" >/dev/null 2>&1; then
-    echo "$name required but missing." >&2
-    exit 1
+  if [[ "$name" == */* || "$name" == *:* ]]; then
+    if [[ -x "$name" || -f "$name" ]]; then
+      return 0
+    fi
+  elif command -v "$name" >/dev/null 2>&1; then
+    return 0
   fi
+  echo "$name required but missing." >&2
+  exit 1
 }
 
 require_cmd "$ADB_BIN"
 require_cmd jq
+ADB_BIN_DISPLAY="$(printf '%q' "$ADB_BIN")"
 
 device_count="$("$ADB_BIN" devices | awk 'NR>1 && $2=="device" {c+=1} END {print c+0}')"
 if [[ "$device_count" -lt 1 ]]; then
@@ -152,15 +158,15 @@ recommended_command="cat \"$summary_json\""
 if [[ "$chatgpt_any" == "false" && "$auth_any" == "true" ]]; then
   classification="responses_host_unreachable"
   recommended_action="check-chatgpt-path"
-  recommended_command="adb shell 'toybox nc -4 -z -w $TIMEOUT_SEC chatgpt.com $PORT; toybox nc -6 -z -w $TIMEOUT_SEC chatgpt.com $PORT'"
+  recommended_command="$ADB_BIN_DISPLAY shell 'toybox nc -4 -z -w $TIMEOUT_SEC chatgpt.com $PORT; toybox nc -6 -z -w $TIMEOUT_SEC chatgpt.com $PORT'"
 elif [[ "$chatgpt_any" == "true" && "$auth_any" == "false" ]]; then
   classification="auth_host_unreachable"
   recommended_action="check-auth-path"
-  recommended_command="adb shell 'toybox nc -4 -z -w $TIMEOUT_SEC auth.openai.com $PORT; toybox nc -6 -z -w $TIMEOUT_SEC auth.openai.com $PORT'"
+  recommended_command="$ADB_BIN_DISPLAY shell 'toybox nc -4 -z -w $TIMEOUT_SEC auth.openai.com $PORT; toybox nc -6 -z -w $TIMEOUT_SEC auth.openai.com $PORT'"
 elif [[ "$chatgpt_any" == "false" && "$auth_any" == "false" ]]; then
   classification="openai_hosts_unreachable"
   recommended_action="check-device-network"
-  recommended_command="adb shell 'getprop | grep -E \"dns|httpdns|v4priority\"'"
+  recommended_command="$ADB_BIN_DISPLAY shell 'getprop | grep -E \"dns|httpdns|v4priority\"'"
 elif [[ "$chatgpt_ipv4" == "true" && "$chatgpt_ipv6" == "false" ]]; then
   classification="responses_ipv6_unreachable"
   recommended_action="prefer-ipv4-or-fix-ipv6"
