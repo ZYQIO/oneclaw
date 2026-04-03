@@ -74,6 +74,7 @@ internal object LocalHostCommandPolicy {
       OpenClawNotificationsCommand.Actions.rawValue,
       OpenClawSmsCommand.Send.rawValue,
       OpenClawPodCommand.BrowserAuthStart.rawValue,
+      OpenClawPodCommand.DesktopMaterialize.rawValue,
       OpenClawUiCommand.LaunchApp.rawValue,
       OpenClawUiCommand.InputText.rawValue,
       OpenClawUiCommand.Tap.rawValue,

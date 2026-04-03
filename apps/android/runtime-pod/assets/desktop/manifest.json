@@ -1,0 +1,16 @@
+{
+  "stage": "desktop",
+  "purpose": "Packaged desktop-environment bundle for Android app-private materialization.",
+  "engineManifestPath": "engine/manifest.json",
+  "environmentManifestPath": "environment/manifest.json",
+  "browserManifestPath": "browser/manifest.json",
+  "toolsManifestPath": "tools/manifest.json",
+  "pluginsManifestPath": "plugins/manifest.json",
+  "supervisorManifestPath": "supervisor/manifest.json",
+  "profileDescriptorPaths": [
+    "profiles/openclaw-desktop-host.json"
+  ],
+  "profileIds": [
+    "openclaw-desktop-host"
+  ]
+}

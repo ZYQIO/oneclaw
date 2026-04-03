@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "profileId": "openclaw-desktop-host",
+  "displayName": "OpenClaw Desktop Host",
+  "engineId": "openclaw-desktop-engine-carrier",
+  "environmentId": "openclaw-desktop-runtime-home",
+  "browserId": "openclaw-desktop-browser-lane",
+  "toolsetId": "openclaw-desktop-toolset",
+  "pluginSetId": "openclaw-desktop-plugin-set",
+  "supervisorId": "openclaw-desktop-runtime-supervisor",
+  "requiredDomains": [
+    "engine",
+    "environment",
+    "browser",
+    "tools",
+    "plugins",
+    "supervisor"
+  ],
+  "runtimeHomeDependencies": [
+    "runtime",
+    "browser",
+    "toolkit",
+    "workspace"
+  ],
+  "defaultCommands": [
+    "pod.runtime.execute",
+    "pod.browser.auth.start",
+    "pod.desktop.materialize"
+  ]
+}

@@ -35,21 +35,29 @@ describe("prepareRuntimePod", () => {
     });
 
     expect(result.podId).toBe("ai.openclaw.android.embedded-runtime-pod");
-    expect(result.stages).toHaveLength(5);
-    expect(result.files).toHaveLength(16);
+    expect(result.stages).toHaveLength(6);
+    expect(result.files).toHaveLength(24);
 
     const manifestText = await readFile(result.manifestPath, "utf8");
     const layoutText = await readFile(result.layoutPath, "utf8");
     const manifest = JSON.parse(manifestText) as { fileCount: number; stageCount: number; version: string };
     const layout = JSON.parse(layoutText) as { files: Array<{ relativePath: string }> };
 
-    expect(manifest.version).toBe("0.5.0");
-    expect(manifest.stageCount).toBe(5);
-    expect(manifest.fileCount).toBe(16);
+    expect(manifest.version).toBe("0.6.0");
+    expect(manifest.stageCount).toBe(6);
+    expect(manifest.fileCount).toBe(24);
     expect(layout.files.map((file) => file.relativePath)).toEqual([
       "bridge/manifest.json",
       "browser/auth/openai-codex-auth.json",
       "browser/manifest.json",
+      "desktop/browser/manifest.json",
+      "desktop/engine/manifest.json",
+      "desktop/environment/manifest.json",
+      "desktop/manifest.json",
+      "desktop/plugins/manifest.json",
+      "desktop/profiles/openclaw-desktop-host.json",
+      "desktop/supervisor/manifest.json",
+      "desktop/tools/manifest.json",
       "runtime/config/runtime-env.json",
       "runtime/engine/manifest.json",
       "runtime/manifest.json",
@@ -66,7 +74,7 @@ describe("prepareRuntimePod", () => {
     ]);
 
     const stagedFiles = await listFiles(result.stagedRoot);
-    expect(stagedFiles).toHaveLength(16);
+    expect(stagedFiles).toHaveLength(24);
     for (const entry of stagedFiles) {
       expect((await stat(entry)).isFile()).toBe(true);
     }

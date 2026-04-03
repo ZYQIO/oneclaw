@@ -144,6 +144,7 @@ class InvokeDispatcher(
       OpenClawPodCommand.ManifestDescribe.rawValue -> podHandler.handlePodManifestDescribe(paramsJson)
       OpenClawPodCommand.BrowserDescribe.rawValue -> podHandler.handlePodBrowserDescribe(paramsJson)
       OpenClawPodCommand.BrowserAuthStart.rawValue -> podHandler.handlePodBrowserAuthStart(paramsJson)
+      OpenClawPodCommand.DesktopMaterialize.rawValue -> podHandler.handlePodDesktopMaterialize(paramsJson)
       OpenClawPodCommand.RuntimeDescribe.rawValue -> podHandler.handlePodRuntimeDescribe(paramsJson)
       OpenClawPodCommand.RuntimeExecute.rawValue -> podHandler.handlePodRuntimeExecute(paramsJson)
       OpenClawPodCommand.WorkspaceScan.rawValue -> podHandler.handlePodWorkspaceScan(paramsJson)

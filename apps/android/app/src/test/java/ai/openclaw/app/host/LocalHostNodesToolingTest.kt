@@ -46,6 +46,7 @@ class LocalHostNodesToolingTest {
     assertTrue("pod_workspace_scan" in actions)
     assertTrue("pod_workspace_read" in actions)
     assertFalse("pod_browser_auth_start" in actions)
+    assertFalse("pod_desktop_materialize" in actions)
     assertTrue("ui_state" in actions)
     assertTrue("ui_wait_for_text" in actions)
     assertFalse("ui_launch_app" in actions)
@@ -181,7 +182,7 @@ class LocalHostNodesToolingTest {
             org.junit.Assert.assertEquals("pod.manifest.describe", command)
             org.junit.Assert.assertEquals("{}", paramsJson)
             GatewaySession.InvokeResult.ok(
-              """{"ok":true,"manifestSource":"installed","fileCount":16}""",
+              """{"ok":true,"manifestSource":"installed","fileCount":24}""",
             )
           },
           allowAdvancedRemoteCommands = { false },
@@ -253,6 +254,34 @@ class LocalHostNodesToolingTest {
 
       assertTrue(result.outputText.contains("openai-codex-oauth"))
       assertTrue(result.outputText.contains("launch_requested"))
+    }
+
+  @Test
+  fun podDesktopMaterialize_mapsProfileIdForOperatorSessions() =
+    runTest {
+      val bridge =
+        LocalHostNodesToolBridge(
+          json = json,
+          invoke = { command, paramsJson ->
+            org.junit.Assert.assertEquals("pod.desktop.materialize", command)
+            assertTrue(paramsJson.orEmpty().contains("\"profileId\":\"openclaw-desktop-host\""))
+            GatewaySession.InvokeResult.ok(
+              """{"ok":true,"profileId":"openclaw-desktop-host","desktopHomeReady":true}""",
+            )
+          },
+          allowAdvancedRemoteCommands = { false },
+          allowWriteRemoteCommands = { false },
+        )
+
+      val result =
+        bridge.executeToolCall(
+          role = "operator",
+          name = "nodes",
+          argumentsJson = """{"action":"pod_desktop_materialize","profileId":"openclaw-desktop-host"}""",
+        )
+
+      assertTrue(result.outputText.contains("openclaw-desktop-host"))
+      assertTrue(result.outputText.contains("desktopHomeReady"))
     }
 
   @Test
@@ -507,6 +536,7 @@ class LocalHostNodesToolingTest {
     assertTrue("ui_home" in actions)
     assertTrue("ui_launch_app" in actions)
     assertTrue("ui_input_text" in actions)
+    assertTrue("pod_desktop_materialize" in actions)
   }
 
   @Test

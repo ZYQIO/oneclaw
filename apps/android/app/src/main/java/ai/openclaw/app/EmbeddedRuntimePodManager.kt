@@ -36,6 +36,10 @@ private val embeddedRuntimeBrowserLaunchCommands =
   listOf(
     "pod.browser.auth.start",
   )
+private val embeddedRuntimeDesktopMaterializeCommands =
+  listOf(
+    "pod.desktop.materialize",
+  )
 
 @Serializable
 private data class EmbeddedRuntimePodAssetManifestStage(
@@ -459,6 +463,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   val inspection = inspectEmbeddedRuntimePod(context)
   val carrier = inspectEmbeddedRuntimeCarrier(context = context, manifestVersion = inspection.manifestVersion)
   val browser = inspectEmbeddedRuntimeBrowserLane(context = context, manifestVersion = inspection.manifestVersion)
+  val desktop = inspectEmbeddedRuntimeDesktopEnvironment(context = context, manifestVersion = inspection.manifestVersion)
   val engineIntegrated =
     carrier.runtimeStageInstalled && carrier.runtimeStageManifestPresent && carrier.runtimeEngineManifestPresent && carrier.runtimeTaskCount > 0
   val environmentIntegrated = carrier.runtimeStageInstalled
@@ -496,7 +501,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
       browser.browserStageInstalled || browser.browserAuthFlowCount > 0 -> "bootstrap_present"
       else -> "missing"
     }
+  val desktopStatus =
+    when {
+      desktop.desktopHomeReady -> "landed_bootstrap"
+      desktop.desktopBundleReady -> "packaged_bundle"
+      desktop.desktopStageInstalled || desktop.profileCount > 0 -> "partial_bootstrap"
+      else -> "missing"
+    }
   val missingDomains = buildList {
+    if (!desktop.desktopBundleReady) add("desktopEnvironment")
     if (!engineIntegrated) add("engine")
     if (!environmentIntegrated) add("environment")
     if (!browserIntegrated) add("browser")
@@ -505,6 +518,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   }
   val mainlineStatus =
     when {
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent -> "desktop_home_configured"
+      inspection.ready && desktop.desktopHomeReady -> "desktop_home_ready"
+      inspection.ready && desktop.desktopBundleReady -> "desktop_bundle_ready"
       inspection.ready &&
         carrier.runtimeHomeReady &&
         toolsIntegrated &&
@@ -534,8 +556,27 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("distributionLane", JsonPrimitive("internal_or_sideload_first"))
         put("mainlineStatus", JsonPrimitive(mainlineStatus))
         put("fullDesktopRuntimeBundled", JsonPrimitive(false))
+        put("desktopEnvironmentBundled", JsonPrimitive(desktop.desktopBundleReady))
         put("embeddedPodReady", JsonPrimitive(inspection.ready))
         inspection.manifestVersion?.let { put("embeddedPodVersion", JsonPrimitive(it)) }
+        put("desktopStageInstalled", JsonPrimitive(desktop.desktopStageInstalled))
+        put("desktopStageManifestPresent", JsonPrimitive(desktop.desktopStageManifestPresent))
+        put("desktopHomeReady", JsonPrimitive(desktop.desktopHomeReady))
+        put("desktopHomeExists", JsonPrimitive(desktop.desktopHomeExists))
+        put("desktopBundleReady", JsonPrimitive(desktop.desktopBundleReady))
+        put("desktopEngineManifestPresent", JsonPrimitive(desktop.engineManifestPresent))
+        put("desktopEnvironmentManifestPresent", JsonPrimitive(desktop.environmentManifestPresent))
+        put("desktopBrowserManifestPresent", JsonPrimitive(desktop.browserManifestPresent))
+        put("desktopToolsManifestPresent", JsonPrimitive(desktop.toolsManifestPresent))
+        put("desktopPluginsManifestPresent", JsonPrimitive(desktop.pluginsManifestPresent))
+        put("desktopSupervisorManifestPresent", JsonPrimitive(desktop.supervisorManifestPresent))
+        put("desktopBrowserFlowCount", JsonPrimitive(desktop.browserFlowCount))
+        put("desktopToolCount", JsonPrimitive(desktop.toolCount))
+        put("desktopPluginCount", JsonPrimitive(desktop.pluginCount))
+        put("desktopProfileCount", JsonPrimitive(desktop.profileCount))
+        put("desktopMaterializeStatePresent", JsonPrimitive(desktop.materializeStatePresent))
+        put("desktopMaterializeLogPresent", JsonPrimitive(desktop.materializeLogPresent))
+        desktop.activeProfileId?.let { put("desktopActiveProfileId", JsonPrimitive(it)) }
         put("runtimeStageInstalled", JsonPrimitive(carrier.runtimeStageInstalled))
         put("runtimeStageManifestPresent", JsonPrimitive(carrier.runtimeStageManifestPresent))
         put("runtimeEngineManifestPresent", JsonPrimitive(carrier.runtimeEngineManifestPresent))
@@ -598,6 +639,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             }
           },
         )
+        put("desktopMaterializeCommandCount", JsonPrimitive(embeddedRuntimeDesktopMaterializeCommands.size))
+        put(
+          "desktopMaterializeCommands",
+          buildJsonArray {
+            embeddedRuntimeDesktopMaterializeCommands.forEach { command ->
+              add(JsonPrimitive(command))
+            }
+          },
+        )
         put(
           "runtimeTaskIds",
           buildJsonArray {
@@ -623,6 +673,14 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           },
         )
         put(
+          "desktopProfileIds",
+          buildJsonArray {
+            desktop.profileIds.forEach { profileId ->
+              add(JsonPrimitive(profileId))
+            }
+          },
+        )
+        put(
           "missingDomains",
           buildJsonArray {
             missingDomains.forEach { domain ->
@@ -633,6 +691,23 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put(
           "domains",
           buildJsonArray {
+            add(
+              buildDesktopRuntimeDomain(
+                id = "desktopEnvironment",
+                status = desktopStatus,
+                integrated = desktop.desktopBundleReady,
+                summary =
+                  when {
+                    desktop.desktopHomeReady ->
+                      "A packaged desktop-environment bundle is now materialized into app-private storage with active profile, logs, state, and component manifests."
+                    desktop.desktopBundleReady ->
+                      "A cohesive desktop-environment bundle is now packaged into the APK as one desktop stage and is ready for app-private materialization."
+                    desktop.desktopStageInstalled ->
+                      "Desktop stage assets have started to land, but the full environment bundle is not assembled yet."
+                    else -> "No packaged desktop-environment stage exists yet."
+                  },
+              ),
+            )
             add(
               buildDesktopRuntimeDomain(
                 id = "packaging",
@@ -718,7 +793,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 id = "plugins",
                 status = "missing",
                 integrated = false,
-                summary = "No packaged plugin runtime surface is exposed yet.",
+                summary =
+                  if (desktop.pluginsManifestPresent) {
+                    "The desktop bundle now carries an allowlisted plugin-set descriptor, but no executable plugin runtime surface is exposed yet."
+                  } else {
+                    "No packaged plugin runtime surface is exposed yet."
+                  },
               ),
             )
           },
@@ -727,6 +807,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           "recommendedNextSlice",
           JsonPrimitive(
             when {
+              !desktop.desktopBundleReady -> "desktop_bundle_packaging"
+              !desktop.desktopHomeReady -> "desktop_home_materialize"
               !carrier.runtimeHomeReady -> "runtime_execute_replay"
               !toolsIntegrated -> "tool_lane_bootstrap"
               carrier.runtimeToolExecutionStateCount < 1 -> "tool_lane_replay"
@@ -741,6 +823,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           "recommendedNextStep",
           JsonPrimitive(
             when {
+              !desktop.desktopBundleReady ->
+                "Package the desktop stage so engine, environment, browser, tools, plugins, and supervisor metadata ship together in the APK."
+              !desktop.desktopHomeReady ->
+                "Run pod.desktop.materialize on-device to materialize the packaged desktop environment into app-private storage before widening execution parity."
               !carrier.runtimeHomeReady ->
                 "Run pod.runtime.execute with the runtime-smoke task on-device to verify the packaged carrier end to end before widening browser, tools, or plugins."
               !toolsIntegrated ->

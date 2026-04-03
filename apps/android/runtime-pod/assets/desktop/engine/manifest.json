@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "domain": "engine",
+  "componentId": "openclaw-desktop-engine-carrier",
+  "componentVersion": "0.6.0",
+  "bundleState": "bootstrap_ready",
+  "summary": "Packaged engine carrier for Android-hosted desktop-runtime bootstrap.",
+  "runtimeDependencies": [
+    "runtime",
+    "workspace"
+  ],
+  "capabilities": [
+    "bounded-task-execution",
+    "desktop-home-bootstrap"
+  ]
+}

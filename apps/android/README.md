@@ -17,15 +17,16 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - `Local Host` currently provides on-device Codex-backed chat, a curated Android command surface, an app-private on-device workspace for text files with search/edit/copy/move support, and a dedicated idle-phone deployment mode that can keep the host service alive across app relaunches, package upgrades, and reboots.
 - When the phone is connected to a trusted desktop, the desktop can now inspect its own `openai-codex` OAuth state and push that credential into the phone's guarded local-host API so the phone can recover from missing / stale auth without another browser login.
 - The app now supports a settings-driven English / Simplified Chinese toggle across the tab bar, Connect tab, Settings tab, onboarding flow, Chat / Voice primary surfaces, Voice runtime/microphone status copy, Voice reply / TTS detail status copy, common gateway auth/pairing edge states, the browser-based Codex auth success/failure page, and several runtime/auth status strings. Some deeper secondary copy still remains to be localized.
-- It does **not** yet bundle the full desktop Gateway/CLI runtime, shell access, generic browser tools, or plugin runtime.
-- On branch `android-desktop-runtime-mainline-20260403`, the Android mainline now explicitly targets selected desktop-runtime integration; the current helper pod remains the bootstrap carrier, and `pod.runtime.describe` reports the live gap map for engine, environment, browser, tools, and plugins.
+- It does **not** yet provide full executable parity for the desktop Gateway/CLI runtime, unrestricted shell access, generic browser tooling, or plugin runtime.
+- On branch `android-desktop-runtime-mainline-20260403`, the Android mainline now explicitly targets packaging and materializing the full desktop-environment bundle; `pod.runtime.describe` now reports the live gap map for `desktopEnvironment`, engine, environment, browser, tools, and plugins.
 - Local-host `/status` now also reports `embeddedRuntimePodAvailable` plus an `embeddedRuntimePod` object, and app startup now attempts to extract the shipped pod into `filesDir/openclaw/embedded-runtime-pod/<version>/`, verify checksums, and report `verifiedFileCount` plus extracted-version readiness instead of only manifest presence.
 - The repo now has both `pnpm android:local-host:embedded-runtime-pod:prepare` and `pnpm android:local-host:embedded-runtime-pod:sync-assets`: `prepare` emits the raw `.tmp/android-runtime-pod/manifest.json`, `layout.json`, and staged tree, while `sync-assets` rewrites that payload into APK-safe asset metadata and staged files that the Android build now wires into generated assets automatically.
 - The read-only pod surface now includes `pod.health`, `pod.manifest.describe`, `pod.browser.describe`, `pod.runtime.describe`, `pod.workspace.scan`, and `pod.workspace.read`: remote callers can verify pod readiness, inspect packaged manifest/layout metadata, inspect the bounded browser lane, inspect the desktop-runtime mainline gap map, inspect the packaged workspace inventory, and read one packaged workspace document without touching any generic shell/browser path.
 - The bounded runtime-carrier surface now also includes `pod.runtime.execute`, which runs both the packaged `runtime-smoke` carrier task and the first packaged desktop-tool task `tool-brief-inspect`, materializes an app-private runtime home, hydrates packaged config, and persists structured state plus logs without opening an unrestricted shell lane.
 - The bounded browser surface now also includes `pod.browser.auth.start`, which only reuses the app's existing OpenAI Codex OAuth browser flow and persists structured launch state instead of opening a generic browser runtime lane.
-- The current embedded pod payload is versioned as `0.5.0`, which adds a packaged `browser/` auth stage on top of the earlier runtime + toolkit carrier and still extracts into a fresh app-private version directory instead of silently reusing the previous payload.
-- This is now a real packaging-plus-extraction-plus-runtime-carrier path with the first bounded packaged desktop tool lane plus the first bounded browser-auth lane, but it is still not a full embedded desktop runtime yet: generic browser tooling and plugin lanes remain explicitly out of scope until these bounded lanes have boring replay proof on-device.
+- The new desktop-environment surface now also includes `pod.desktop.materialize`, which materializes the packaged `desktop/` stage into `filesDir/openclaw/embedded-desktop-home/<version>/` with engine, environment, browser, tools, plugins, supervisor manifests, and an active profile.
+- The current embedded pod payload is versioned as `0.6.0`, which adds a packaged `desktop/` environment stage on top of the earlier runtime + toolkit + browser carrier and still extracts into a fresh app-private version directory instead of silently reusing the previous payload.
+- This is now a real packaging-plus-extraction-plus-runtime-carrier path with a cohesive desktop bundle in the APK plus a direct app-private materialization step, but it is still not a full embedded desktop runtime yet: generic browser tooling, unrestricted shell parity, and executable plugin/runtime parity remain incomplete.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
 
 ### Dedicated Host Deployment / 专用 Host 部署
@@ -279,7 +280,7 @@ The browser-lane smoke:
 - reads `pod.browser.describe` before launch
 - calls `pod.browser.auth.start` for the allowlisted `openai-codex-oauth` flow when `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1`
 - polls `pod.browser.describe` until the browser lane has replayable state on disk
-- re-reads `pod.runtime.describe` and checks that the mainline has advanced to `browser_lane_replayed` or `browser_lane_configured`
+- re-reads `pod.runtime.describe` and checks that the mainline has advanced to one of the new desktop-bundle/home states or the older browser-lane states
 
 Useful overrides:
 
@@ -291,7 +292,7 @@ Useful overrides:
 Artifact output includes `pod-browser-describe-before.json`, `pod-browser-auth-start.json`, `pod-browser-describe-after.json`, `pod-runtime-describe-after.json`, and `summary.json`.
 
 - Use the default `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1` pass to prove that the packaged browser lane leaves replayable state/log evidence on disk.
-- After you finish the external browser auth flow on the device, rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0` to confirm that the stored credential path has converged from `browser_lane_replayed` to `browser_lane_configured`.
+- After you finish the external browser auth flow on the device, rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0` to confirm that the stored credential path has converged from a replayed desktop-bundle/home state to a configured one.
 
 ## Embedded Runtime Pod Doctor
 
@@ -313,8 +314,9 @@ The desktop-runtime doctor:
 Common outcomes:
 
 - `classification=embedded_pod_unhealthy`: fix the packaged pod baseline first
-- `classification=browser_lane_replayed`: the packaged browser lane left replayable state on disk, and the next step is to complete auth then rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0`
-- `classification=browser_lane_configured`: the packaged browser lane is replayed and now also backed by a stored credential
+- `classification=desktop_bundle_ready`: the packaged desktop bundle is now in the APK, and the next step is to materialize the desktop home on-device
+- `classification=desktop_home_ready`: the desktop home is materialized, and the next step is to continue the remaining runtime/auth convergence
+- `classification=desktop_home_configured`: the desktop home is materialized and the bounded browser lane is also backed by a stored credential
 
 ## Local Host Doctor
 

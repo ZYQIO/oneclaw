@@ -197,7 +197,7 @@ elif [[ "$browser_smoke_ok" != "true" ]]; then
   if [[ -n "$browser_smoke_hint" ]]; then
     recommended_command="$browser_smoke_hint"
   fi
-elif [[ "$browser_mainline_status" == "browser_lane_configured" ]]; then
+elif [[ "$browser_mainline_status" == "browser_lane_configured" || "$browser_mainline_status" == "desktop_home_configured" ]]; then
   classification="browser_lane_configured"
   recommended_action="none"
   recommended_command=""
@@ -205,9 +205,20 @@ elif [[ "$browser_mainline_status" == "browser_lane_replayed" ]]; then
   classification="browser_lane_replayed"
   recommended_action="complete-browser-auth"
   recommended_command="OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 pnpm android:local-host:embedded-runtime-pod:doctor"
+elif [[ "$browser_mainline_status" == "desktop_bundle_ready" ]]; then
+  classification="desktop_bundle_ready"
+  recommended_action="materialize-desktop-home"
+  recommended_command="cat \"$BROWSER_SMOKE_SUMMARY\""
+elif [[ "$browser_mainline_status" == "desktop_home_ready" ]]; then
+  classification="desktop_home_ready"
+  recommended_action="continue-runtime-convergence"
+  recommended_command="cat \"$BROWSER_SMOKE_SUMMARY\""
 else
   classification="${browser_mainline_status:-desktop_runtime_ready}"
-  if [[ "$browser_recommended_next_slice" == "browser_lane_complete" ]]; then
+  if [[ "$browser_recommended_next_slice" == "desktop_home_materialize" ]]; then
+    recommended_action="materialize-desktop-home"
+    recommended_command="cat \"$BROWSER_SMOKE_SUMMARY\""
+  elif [[ "$browser_recommended_next_slice" == "browser_lane_complete" ]]; then
     recommended_action="complete-browser-auth"
     recommended_command="OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 pnpm android:local-host:embedded-runtime-pod:doctor"
   elif [[ "$browser_recommended_next_slice" == "plugin_lane" ]]; then

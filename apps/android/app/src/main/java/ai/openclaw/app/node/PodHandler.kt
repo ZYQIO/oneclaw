@@ -3,10 +3,12 @@ package ai.openclaw.app.node
 import android.content.Context
 import ai.openclaw.app.EmbeddedRuntimePodBrowserDescribeResult
 import ai.openclaw.app.EmbeddedRuntimePodBrowserStartResult
+import ai.openclaw.app.EmbeddedRuntimePodDesktopMaterializeResult
 import ai.openclaw.app.describeEmbeddedRuntimePodBrowser
 import ai.openclaw.app.describeEmbeddedRuntimeDesktopRuntime
 import ai.openclaw.app.describeEmbeddedRuntimePodManifest
 import ai.openclaw.app.executeEmbeddedRuntimePodTask
+import ai.openclaw.app.materializeEmbeddedRuntimeDesktopEnvironment
 import ai.openclaw.app.readEmbeddedRuntimePodWorkspaceFile
 import ai.openclaw.app.inspectEmbeddedRuntimePod
 import ai.openclaw.app.scanEmbeddedRuntimePodWorkspace
@@ -22,6 +24,7 @@ class PodHandler(
   private val appContext: Context,
   private val browserDescribe: (Context) -> EmbeddedRuntimePodBrowserDescribeResult = ::describeEmbeddedRuntimePodBrowser,
   private val browserAuthStart: (Context, String?) -> EmbeddedRuntimePodBrowserStartResult = ::startEmbeddedRuntimePodBrowserAuth,
+  private val desktopMaterialize: (Context, String?) -> EmbeddedRuntimePodDesktopMaterializeResult = ::materializeEmbeddedRuntimeDesktopEnvironment,
 ) {
   private val json = Json { ignoreUnknownKeys = true }
 
@@ -90,6 +93,26 @@ class PodHandler(
         inspection = inspection.toJson(),
         localExecutionAvailable = inspection.ready,
         extra = startResult.payload ?: buildJsonObject {},
+      ).toString(),
+    )
+  }
+
+  fun handlePodDesktopMaterialize(paramsJson: String?): GatewaySession.InvokeResult {
+    val inspection = inspectEmbeddedRuntimePod(appContext)
+    val params = parseDesktopMaterializeParams(paramsJson)
+    val materializeResult = desktopMaterialize(appContext, params.profileId)
+    if (!materializeResult.ok) {
+      return GatewaySession.InvokeResult.error(
+        code = materializeResult.code ?: "UNAVAILABLE",
+        message = materializeResult.message ?: "UNAVAILABLE: desktop environment materialization failed",
+      )
+    }
+    return GatewaySession.InvokeResult.ok(
+      buildPayload(
+        command = "pod.desktop.materialize",
+        inspection = inspection.toJson(),
+        localExecutionAvailable = inspection.ready,
+        extra = materializeResult.payload ?: buildJsonObject {},
       ).toString(),
     )
   }
@@ -282,6 +305,24 @@ class PodHandler(
     return PodBrowserAuthParams(flowId = flowId)
   }
 
+  private fun parseDesktopMaterializeParams(paramsJson: String?): PodDesktopMaterializeParams {
+    val params =
+      try {
+        paramsJson
+          ?.trim()
+          ?.takeIf { it.isNotEmpty() }
+          ?.let { json.parseToJsonElement(it) as? JsonObject }
+      } catch (_: Throwable) {
+        null
+      } ?: return PodDesktopMaterializeParams()
+
+    val profileId =
+      primitiveContent(params, "profileId")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    return PodDesktopMaterializeParams(profileId = profileId)
+  }
+
   private fun primitiveContent(
     params: JsonObject,
     key: String,
@@ -306,5 +347,9 @@ class PodHandler(
 
   private data class PodBrowserAuthParams(
     val flowId: String? = null,
+  )
+
+  private data class PodDesktopMaterializeParams(
+    val profileId: String? = null,
   )
 }

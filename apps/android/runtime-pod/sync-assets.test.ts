@@ -31,12 +31,20 @@ describe("syncRuntimePodAssets", () => {
 
     expect(manifest.assetBasePath).toBe("embedded-runtime-pod/staged");
     expect(manifest.assetManifestPath).toBe("embedded-runtime-pod/manifest.json");
-    expect(manifest.version).toBe("0.5.0");
-    expect(manifest.fileCount).toBe(16);
+    expect(manifest.version).toBe("0.6.0");
+    expect(manifest.fileCount).toBe(24);
     expect(manifest.files.map((file) => file.relativePath)).toEqual([
       "bridge/manifest.json",
       "browser/auth/openai-codex-auth.json",
       "browser/manifest.json",
+      "desktop/browser/manifest.json",
+      "desktop/engine/manifest.json",
+      "desktop/environment/manifest.json",
+      "desktop/manifest.json",
+      "desktop/plugins/manifest.json",
+      "desktop/profiles/openclaw-desktop-host.json",
+      "desktop/supervisor/manifest.json",
+      "desktop/tools/manifest.json",
       "runtime/config/runtime-env.json",
       "runtime/engine/manifest.json",
       "runtime/manifest.json",

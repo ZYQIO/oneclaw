@@ -91,6 +91,7 @@ internal class LocalHostNodesToolBridge(
       NodesActionSpec(name = "pod_manifest_describe", command = OpenClawPodCommand.ManifestDescribe.rawValue),
       NodesActionSpec(name = "pod_browser_describe", command = OpenClawPodCommand.BrowserDescribe.rawValue),
       NodesActionSpec(name = "pod_browser_auth_start", command = OpenClawPodCommand.BrowserAuthStart.rawValue),
+      NodesActionSpec(name = "pod_desktop_materialize", command = OpenClawPodCommand.DesktopMaterialize.rawValue),
       NodesActionSpec(name = "pod_runtime_describe", command = OpenClawPodCommand.RuntimeDescribe.rawValue),
       NodesActionSpec(name = "pod_runtime_execute", command = OpenClawPodCommand.RuntimeExecute.rawValue),
       NodesActionSpec(name = "pod_workspace_scan", command = OpenClawPodCommand.WorkspaceScan.rawValue),
@@ -241,6 +242,7 @@ internal class LocalHostNodesToolBridge(
           putStringProperty("path")
           putStringProperty("taskId")
           putStringProperty("flowId")
+          putStringProperty("profileId")
           putStringProperty("text")
           putStringProperty("value")
           putStringProperty("contentDescription")
@@ -339,6 +341,10 @@ internal class LocalHostNodesToolBridge(
       "pod_browser_auth_start" ->
         buildJsonObject {
           copyString(params, "flowId")
+        }
+      "pod_desktop_materialize" ->
+        buildJsonObject {
+          copyString(params, "profileId")
         }
       "pod_runtime_execute" ->
         buildJsonObject {

@@ -303,7 +303,7 @@ if [[ "$failure_hint" == "" ]]; then
   [[ "$runtime_after_browser_replay_ready" == "$browser_after_replay_ready" ]] || record_failure "pod_runtime_describe_after_replay_mismatch"
 
   if [[ "$START_BROWSER" == "1" ]]; then
-    [[ "$runtime_after_mainline_status" == "browser_lane_replayed" || "$runtime_after_mainline_status" == "browser_lane_configured" ]] || record_failure "pod_runtime_describe_after_browser_status_mismatch"
+    [[ "$runtime_after_mainline_status" == "browser_lane_replayed" || "$runtime_after_mainline_status" == "browser_lane_configured" || "$runtime_after_mainline_status" == "desktop_bundle_ready" || "$runtime_after_mainline_status" == "desktop_home_ready" || "$runtime_after_mainline_status" == "desktop_home_configured" ]] || record_failure "pod_runtime_describe_after_browser_status_mismatch"
   fi
 fi
 

@@ -12,7 +12,7 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 
 ## Current Baseline / 当前基线
 
-- The packaged pod payload is now `0.5.0` and includes a packaged `browser/` stage on top of the earlier `runtime/` plus `toolkit/` carrier. / 当前打包 pod payload 已更新到 `0.5.0`，并在原有 `runtime/` 加 `toolkit/` carrier 之上新增了打包 `browser/` stage。
+- The packaged pod payload is now `0.6.0` and includes a packaged `desktop/` stage on top of the earlier `runtime/`, `toolkit/`, and `browser/` carrier stages. / 当前打包 pod payload 已更新到 `0.6.0`，并在既有 `runtime/`、`toolkit/` 与 `browser/` carrier stages 之上新增了打包 `desktop/` stage。
 - `pod.runtime.execute` still carries the first bounded execution lane, `pod.browser.describe` now reports the first bounded browser-auth lane, and `pod.browser.auth.start` reuses the app's existing OpenAI Codex OAuth browser flow instead of pretending Android already has a generic browser runtime. / `pod.runtime.execute` 仍然承载第一条有边界执行通道，`pod.browser.describe` 现在开始报告第一条有边界 browser-auth lane，而 `pod.browser.auth.start` 只是复用 app 现有的 OpenAI Codex OAuth 浏览器流程，并不假装 Android 已经拥有通用浏览器 runtime。
 
 - Build-time packaging, app-private extraction, checksum verification, and read-only pod invocation are already landed. / 构建期打包、app 私有目录解包、checksum 校验和只读 pod 调用已经落地。
@@ -100,3 +100,10 @@ This mainline is only done when all of the following are true. / 只有以下条
 - `apps/android/local-host-desktop-runtime-feasibility.md` stays as the feasibility input. / `apps/android/local-host-desktop-runtime-feasibility.md` 继续作为可行性输入文档。
 - `apps/android/local-host-embedded-runtime-pod-plan.md` now describes the bootstrap carrier, not the end-state mainline. / `apps/android/local-host-embedded-runtime-pod-plan.md` 现在描述的是 bootstrap 载体，不再是终态主线。
 - `apps/android/local-host-progress.md` and `apps/android/local-host-handoff.md` should treat the old Android-native MVP as validated baseline context, not the new finish line. / `apps/android/local-host-progress.md` 和 `apps/android/local-host-handoff.md` 应把旧的 Android-native MVP 当作已验证基线，而不是新的终点。
+
+## Correction Update / 纠偏更新
+
+- The branch objective is now explicitly corrected back to the full packaged desktop environment, not a "selected slice" framing.
+- Payload `0.6.0` adds a packaged `desktop/` stage that groups engine, environment, browser, tools, plugins, supervisor manifests, and one desktop profile descriptor into one cohesive APK bundle.
+- `pod.desktop.materialize` now materializes that packaged bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`, which turns "desktop environment inside the APK" into a real app-private home layout rather than only a status-map claim.
+- The next gap is no longer "can the APK carry the bundle?" but "how much of that bundled environment is executable with boring replay proof on-device?"

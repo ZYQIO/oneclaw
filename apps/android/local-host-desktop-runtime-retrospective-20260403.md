@@ -37,3 +37,9 @@ This checkpoint records the first three desktop-runtime slices after the Android
 
 - Do not reopen the old assumption that helper metadata alone answers the desktop-runtime question. / 不要重新回到“helper metadata 本身就回答了 desktop-runtime 问题”的旧假设。
 - Do not widen into generic browser tooling before the bounded auth lane is replayable on-device. / 在 bounded auth lane 拿到真机可复跑证据之前，不要扩成通用 browser tooling。
+
+## Iteration 6 / 第六个小切片
+
+- Payload `0.6.0` now carries a packaged `desktop/` environment stage with engine, environment, browser, tools, plugins, supervisor manifests, and one desktop profile descriptor.
+- `pod.desktop.materialize` now materializes `filesDir/openclaw/embedded-desktop-home/<version>/`, so the branch has a real app-private desktop home layout instead of only a gap-map description.
+- This iteration is the explicit correction back toward the branch's full-desktop objective after the earlier drift into "selected slice" framing.

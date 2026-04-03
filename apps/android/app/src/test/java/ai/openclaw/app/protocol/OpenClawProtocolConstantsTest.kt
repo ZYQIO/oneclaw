@@ -64,6 +64,7 @@ class OpenClawProtocolConstantsTest {
     assertEquals("pod.manifest.describe", OpenClawPodCommand.ManifestDescribe.rawValue)
     assertEquals("pod.browser.describe", OpenClawPodCommand.BrowserDescribe.rawValue)
     assertEquals("pod.browser.auth.start", OpenClawPodCommand.BrowserAuthStart.rawValue)
+    assertEquals("pod.desktop.materialize", OpenClawPodCommand.DesktopMaterialize.rawValue)
     assertEquals("pod.runtime.describe", OpenClawPodCommand.RuntimeDescribe.rawValue)
     assertEquals("pod.runtime.execute", OpenClawPodCommand.RuntimeExecute.rawValue)
     assertEquals("pod.workspace.scan", OpenClawPodCommand.WorkspaceScan.rawValue)

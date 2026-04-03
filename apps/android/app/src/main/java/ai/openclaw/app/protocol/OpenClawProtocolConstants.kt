@@ -86,6 +86,7 @@ enum class OpenClawPodCommand(val rawValue: String) {
   ManifestDescribe("pod.manifest.describe"),
   BrowserDescribe("pod.browser.describe"),
   BrowserAuthStart("pod.browser.auth.start"),
+  DesktopMaterialize("pod.desktop.materialize"),
   RuntimeDescribe("pod.runtime.describe"),
   RuntimeExecute("pod.runtime.execute"),
   WorkspaceScan("pod.workspace.scan"),

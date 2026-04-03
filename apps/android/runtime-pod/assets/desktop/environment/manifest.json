@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "domain": "environment",
+  "componentId": "openclaw-desktop-runtime-home",
+  "componentVersion": "0.6.0",
+  "bundleState": "bootstrap_ready",
+  "summary": "App-private desktop home layout with config, logs, state, work, browser, tools, plugins, and supervisor metadata.",
+  "directoryLayout": [
+    "config",
+    "engine",
+    "environment",
+    "browser",
+    "tools",
+    "plugins",
+    "profiles",
+    "supervisor",
+    "logs",
+    "state",
+    "work"
+  ],
+  "capabilities": [
+    "config-injection",
+    "app-private-home",
+    "state-persistence",
+    "log-persistence",
+    "restart-contract"
+  ]
+}
