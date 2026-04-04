@@ -19,6 +19,8 @@ private const val embeddedDesktopHomeRootDisplayPathForRuntime = "filesDir/openc
 private const val embeddedRuntimeDefaultTaskId = "runtime-smoke"
 private const val embeddedRuntimeDesktopProfileReplayWorkFile = "work/runtime-smoke-desktop-profile.json"
 private const val embeddedRuntimeDesktopProfileReplayStateFile = "state/runtime-smoke-desktop-profile.json"
+private const val embeddedRuntimeDesktopHealthReportStateFile = "state/runtime-smoke-health-report.json"
+private const val embeddedRuntimeDesktopRestartContractStateFile = "state/runtime-smoke-restart-contract.json"
 private const val embeddedRuntimeDesktopLogFileNameForRuntime = "desktop-home.log"
 
 private val embeddedRuntimeRuntimeJson = Json { ignoreUnknownKeys = true }
@@ -121,6 +123,14 @@ data class EmbeddedRuntimeDesktopProfileReplayInspection(
   val statePresent: Boolean = false,
   val resultPresent: Boolean = false,
   val status: String? = null,
+  val environmentSupervisionReady: Boolean = false,
+  val healthReportPresent: Boolean = false,
+  val healthStatus: String? = null,
+  val healthReportPath: String? = null,
+  val restartContractPresent: Boolean = false,
+  val restartStatus: String? = null,
+  val restartGeneration: Int = 0,
+  val restartContractPath: String? = null,
   val profileId: String? = null,
   val environmentId: String? = null,
   val supervisorId: String? = null,
@@ -344,6 +354,9 @@ fun executeEmbeddedRuntimePodTask(
   var desktopProfileReplayStatePath: String? = null
   var desktopProfileReplayResultPath: String? = null
   var desktopProfileReplayReady = false
+  var desktopEnvironmentSupervisionReady = false
+  var desktopHealthReportPath: String? = null
+  var desktopRestartContractPath: String? = null
 
   if (task.kind == "desktop-tool") {
     val toolResult =
@@ -379,6 +392,9 @@ fun executeEmbeddedRuntimePodTask(
     desktopProfileReplayStatePath = desktopReplay?.stateFilePath
     desktopProfileReplayResultPath = desktopReplay?.resultFilePath
     desktopProfileReplayReady = desktopReplay != null
+    desktopEnvironmentSupervisionReady = desktopReplay?.environmentSupervisionReady == true
+    desktopHealthReportPath = desktopReplay?.healthReportPath
+    desktopRestartContractPath = desktopReplay?.restartContractPath
   }
 
   val statePayload =
@@ -399,8 +415,11 @@ fun executeEmbeddedRuntimePodTask(
       put("hydratedConfigPath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "config/runtime-env.json")))
       put("runtimeHomePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion)))
       put("desktopProfileReplayReady", JsonPrimitive(desktopProfileReplayReady))
+      put("desktopEnvironmentSupervisionReady", JsonPrimitive(desktopEnvironmentSupervisionReady))
       desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
       desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultPath", JsonPrimitive(it)) }
+      desktopHealthReportPath?.let { put("desktopHealthReportPath", JsonPrimitive(it)) }
+      desktopRestartContractPath?.let { put("desktopRestartContractPath", JsonPrimitive(it)) }
       desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
@@ -441,8 +460,11 @@ fun executeEmbeddedRuntimePodTask(
         put("stateFilePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, task.stateFile)))
         put("logFilePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, task.logFile)))
         put("desktopProfileReplayReady", JsonPrimitive(desktopProfileReplayReady))
+        put("desktopEnvironmentSupervisionReady", JsonPrimitive(desktopEnvironmentSupervisionReady))
         desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
         desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultFilePath", JsonPrimitive(it)) }
+        desktopHealthReportPath?.let { put("desktopHealthReportPath", JsonPrimitive(it)) }
+        desktopRestartContractPath?.let { put("desktopRestartContractPath", JsonPrimitive(it)) }
         desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
         toolId?.let { put("toolId", JsonPrimitive(it)) }
         put("toolkitStageInstalled", JsonPrimitive(toolkitStageInstalled))
@@ -467,15 +489,36 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val desktopHome = embeddedDesktopHomeRootForRuntime(context).resolve(manifestVersion)
   val stateFile = desktopHome.resolve(embeddedRuntimeDesktopProfileReplayStateFile)
   val resultFile = runtimeHome.resolve(embeddedRuntimeDesktopProfileReplayWorkFile)
+  val healthReportFile = desktopHome.resolve(embeddedRuntimeDesktopHealthReportStateFile)
+  val restartContractFile = desktopHome.resolve(embeddedRuntimeDesktopRestartContractStateFile)
   val statePayload = stateFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val healthPayload = healthReportFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val restartPayload = restartContractFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val dependencyStatus = statePayload?.get("dependencyStatus") as? JsonObject
   val missingDependencies = statePayload?.get("missingDependencies") as? JsonArray
   val status = runtimePrimitiveContent(statePayload, "status")
+  val healthStatus = runtimePrimitiveContent(healthPayload, "status")
+  val restartStatus = runtimePrimitiveContent(restartPayload, "status")
+  val environmentSupervisionReady =
+    stateFile.isFile &&
+      resultFile.isFile &&
+      healthReportFile.isFile &&
+      restartContractFile.isFile &&
+      healthStatus != null &&
+      restartStatus != null
   return EmbeddedRuntimeDesktopProfileReplayInspection(
     replayReady = stateFile.isFile && resultFile.isFile && status != null,
     statePresent = stateFile.isFile,
     resultPresent = resultFile.isFile,
     status = status,
+    environmentSupervisionReady = environmentSupervisionReady,
+    healthReportPresent = healthReportFile.isFile,
+    healthStatus = healthStatus,
+    healthReportPath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile),
+    restartContractPresent = restartContractFile.isFile,
+    restartStatus = restartStatus,
+    restartGeneration = runtimePrimitiveInt(restartPayload, "generation") ?: 0,
+    restartContractPath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopRestartContractStateFile),
     profileId = runtimePrimitiveContent(statePayload, "profileId"),
     environmentId = runtimePrimitiveContent(statePayload, "environmentId"),
     supervisorId = runtimePrimitiveContent(statePayload, "supervisorId"),
@@ -609,6 +652,9 @@ private data class EmbeddedRuntimeDesktopProfileReplayExecution(
   val payload: JsonObject,
   val stateFilePath: String,
   val resultFilePath: String,
+  val environmentSupervisionReady: Boolean,
+  val healthReportPath: String,
+  val restartContractPath: String,
 )
 
 private fun executeEmbeddedRuntimeDesktopProfileReplay(
@@ -650,6 +696,68 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "restart" } ||
       runtimeJsonArray(environmentManifest, "capabilities").any { it.content == "restart-contract" }
   val healthReportSupported = runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "health-report" }
+  val healthReportStatus = if (missingDependencies.isEmpty()) "healthy" else "degraded"
+  val healthReportFile = desktopHome.resolve(embeddedRuntimeDesktopHealthReportStateFile)
+  healthReportFile.parentFile?.mkdirs()
+  val healthReportPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(healthReportStatus))
+      put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("profileId", JsonPrimitive(runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"))
+      runtimePrimitiveContent(activeProfile, "environmentId")?.let { put("environmentId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "supervisorId")?.let { put("supervisorId", JsonPrimitive(it)) }
+      put("healthReportSupported", JsonPrimitive(healthReportSupported))
+      put("runtimeHomeReady", JsonPrimitive(carrierInspection.runtimeHomeReady))
+      put("browserReplayReady", JsonPrimitive(browserInspection.browserReplayReady))
+      put("reportedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      put(
+        "dependencyStatus",
+        buildJsonObject {
+          dependencyStatus.forEach { (dependency, ready) ->
+            put(dependency, JsonPrimitive(ready))
+          }
+        },
+      )
+      put(
+        "missingDependencies",
+        buildJsonArray {
+          missingDependencies.forEach { dependency ->
+            add(JsonPrimitive(dependency))
+          }
+        },
+      )
+      put("runtimeStatePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "state/runtime-smoke.json")))
+      put("desktopProfileReplayPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProfileReplayStateFile)))
+    }
+  healthReportFile.writeText("${healthReportPayload}\n", Charsets.UTF_8)
+  val restartContractFile = desktopHome.resolve(embeddedRuntimeDesktopRestartContractStateFile)
+  val previousRestartContract = restartContractFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val previousGeneration = runtimePrimitiveInt(previousRestartContract, "generation") ?: 0
+  val restartGeneration = previousGeneration + 1
+  val restartStatus = if (restartSupported) "ready" else "unsupported"
+  restartContractFile.parentFile?.mkdirs()
+  val restartContractPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(restartStatus))
+      put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("profileId", JsonPrimitive(runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"))
+      runtimePrimitiveContent(activeProfile, "environmentId")?.let { put("environmentId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "supervisorId")?.let { put("supervisorId", JsonPrimitive(it)) }
+      put("restartSupported", JsonPrimitive(restartSupported))
+      put("healthReportSupported", JsonPrimitive(healthReportSupported))
+      put("generation", JsonPrimitive(restartGeneration))
+      put("previousGeneration", JsonPrimitive(previousGeneration))
+      put("restartObserved", JsonPrimitive(previousGeneration > 0))
+      put("restartTaskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("restartCommand", JsonPrimitive("pod.runtime.execute"))
+      put("podVersion", JsonPrimitive(manifestVersion))
+      put("replayedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      put("desktopHomePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion)))
+    }
+  restartContractFile.writeText("${restartContractPayload}\n", Charsets.UTF_8)
+  val environmentSupervisionReady = healthReportFile.isFile && restartContractFile.isFile
   val resultPayload =
     buildJsonObject {
       put("status", JsonPrimitive(if (missingDependencies.isEmpty()) "ready" else "degraded"))
@@ -702,6 +810,12 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       )
       put("restartSupported", JsonPrimitive(restartSupported))
       put("healthReportSupported", JsonPrimitive(healthReportSupported))
+      put("environmentSupervisionReady", JsonPrimitive(environmentSupervisionReady))
+      put("healthStatus", JsonPrimitive(healthReportStatus))
+      put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
+      put("restartStatus", JsonPrimitive(restartStatus))
+      put("restartGeneration", JsonPrimitive(restartGeneration))
+      put("restartContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopRestartContractStateFile)))
       put(
         "dependencyStatus",
         buildJsonObject {
@@ -735,7 +849,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   desktopStateFile.parentFile?.mkdirs()
   desktopStateFile.writeText("${resultPayload}\n", Charsets.UTF_8)
   desktopHome.resolve("logs/$embeddedRuntimeDesktopLogFileNameForRuntime").appendText(
-    "$executedAt runtime-smoke profile=${runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"} status=${runtimePrimitiveContent(resultPayload, "status") ?: "unknown"} missingDependencies=${missingDependencies.joinToString("|").ifEmpty { "none" }}\n",
+    "$executedAt runtime-smoke profile=${runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"} status=${runtimePrimitiveContent(resultPayload, "status") ?: "unknown"} health=$healthReportStatus restartGeneration=$restartGeneration missingDependencies=${missingDependencies.joinToString("|").ifEmpty { "none" }}\n",
     Charsets.UTF_8,
   )
 
@@ -743,6 +857,9 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     payload = resultPayload,
     stateFilePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProfileReplayStateFile),
     resultFilePath = runtimeHomeDisplayPath(manifestVersion, embeddedRuntimeDesktopProfileReplayWorkFile),
+    environmentSupervisionReady = environmentSupervisionReady,
+    healthReportPath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile),
+    restartContractPath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopRestartContractStateFile),
   )
 }
 
@@ -793,6 +910,11 @@ private fun runtimePrimitiveBoolean(
   payload: JsonObject?,
   key: String,
 ): Boolean? = (payload?.get(key) as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+
+private fun runtimePrimitiveInt(
+  payload: JsonObject?,
+  key: String,
+): Int? = (payload?.get(key) as? JsonPrimitive)?.content?.toIntOrNull()
 
 private fun runtimeJsonArray(
   payload: JsonObject?,

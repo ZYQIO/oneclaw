@@ -282,6 +282,7 @@ class PodHandlerTest {
     assertEquals("runtime-smoke", payload.getValue("taskId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("runtimeHomeReady").jsonPrimitive.boolean)
     assertEquals(false, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopEnvironmentSupervisionReady").jsonPrimitive.boolean)
     assertEquals(1, payload.getValue("executionCount").jsonPrimitive.int)
     assertEquals("embedded-runtime-task-engine-v1", payload.getValue("engineId").jsonPrimitive.content)
     assertTrue(payload.getValue("stateFilePath").jsonPrimitive.content.endsWith("/state/runtime-smoke.json"))
@@ -308,8 +309,11 @@ class PodHandlerTest {
     assertTrue(result.ok)
     val payload = parsePayload(result.payloadJson)
     assertEquals(true, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopEnvironmentSupervisionReady").jsonPrimitive.boolean)
     val desktopReplay = payload.getValue("desktopProfileReplay").jsonObject
     assertEquals("openclaw-desktop-host", desktopReplay.getValue("profileId").jsonPrimitive.content)
+    assertEquals("degraded", desktopReplay.getValue("healthStatus").jsonPrimitive.content)
+    assertEquals(1, desktopReplay.getValue("restartGeneration").jsonPrimitive.int)
     assertTrue(
       payload.getValue("desktopProfileReplayStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-desktop-profile.json"),
     )
@@ -317,7 +321,19 @@ class PodHandlerTest {
       payload.getValue("desktopProfileReplayResultFilePath").jsonPrimitive.content.endsWith("/work/runtime-smoke-desktop-profile.json"),
     )
     assertTrue(
+      payload.getValue("desktopHealthReportPath").jsonPrimitive.content.endsWith("/state/runtime-smoke-health-report.json"),
+    )
+    assertTrue(
+      payload.getValue("desktopRestartContractPath").jsonPrimitive.content.endsWith("/state/runtime-smoke-restart-contract.json"),
+    )
+    assertTrue(
       context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-desktop-profile.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-health-report.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-restart-contract.json").isFile,
     )
   }
 
