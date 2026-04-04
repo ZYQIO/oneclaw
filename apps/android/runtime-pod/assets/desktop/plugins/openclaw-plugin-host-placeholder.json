@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "pluginId": "openclaw-plugin-host-placeholder",
+  "displayName": "OpenClaw Host Placeholder Plugin",
+  "kind": "allowlisted-plugin",
+  "summary": "A narrow allowlisted plugin surface packaged for Android desktop-runtime validation.",
+  "runtimeTaskIds": [
+    "plugin-allowlist-inspect"
+  ],
+  "capabilities": [
+    "descriptor-packaged",
+    "bounded-host-surface",
+    "no-external-install"
+  ],
+  "allowedCommands": [
+    "pod.browser.describe",
+    "pod.runtime.describe",
+    "pod.workspace.read"
+  ],
+  "limitations": [
+    "No external plugin installation",
+    "No arbitrary subprocess execution",
+    "No unbounded network access"
+  ]
+}

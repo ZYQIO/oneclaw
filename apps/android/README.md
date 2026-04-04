@@ -22,12 +22,12 @@ Status: **extremely alpha**. The app is actively being rebuilt from the ground u
 - Local-host `/status` now also reports `embeddedRuntimePodAvailable` plus an `embeddedRuntimePod` object, and app startup now attempts to extract the shipped pod into `filesDir/openclaw/embedded-runtime-pod/<version>/`, verify checksums, and report `verifiedFileCount` plus extracted-version readiness instead of only manifest presence.
 - The repo now has both `pnpm android:local-host:embedded-runtime-pod:prepare` and `pnpm android:local-host:embedded-runtime-pod:sync-assets`: `prepare` emits the raw `.tmp/android-runtime-pod/manifest.json`, `layout.json`, and staged tree, while `sync-assets` rewrites that payload into APK-safe asset metadata and staged files that the Android build now wires into generated assets automatically.
 - The read-only pod surface now includes `pod.health`, `pod.manifest.describe`, `pod.browser.describe`, `pod.runtime.describe`, `pod.workspace.scan`, and `pod.workspace.read`: remote callers can verify pod readiness, inspect packaged manifest/layout metadata, inspect the bounded browser lane, inspect the desktop-runtime mainline gap map, inspect the packaged workspace inventory, and read one packaged workspace document without touching any generic shell/browser path.
-- The bounded runtime-carrier surface now also includes `pod.runtime.execute`, which runs both the packaged `runtime-smoke` carrier task and the first packaged desktop-tool task `tool-brief-inspect`, materializes an app-private runtime home, hydrates packaged config, and persists structured state plus logs without opening an unrestricted shell lane.
+- The bounded runtime-carrier surface now also includes `pod.runtime.execute`, which runs the packaged `runtime-smoke` carrier task, the first packaged desktop-tool task `tool-brief-inspect`, and the narrow allowlisted desktop-plugin task `plugin-allowlist-inspect`, materializes an app-private runtime home, hydrates packaged config, and persists structured state plus logs without opening an unrestricted shell lane.
 - The bounded browser surface now also includes `pod.browser.auth.start`, which only reuses the app's existing OpenAI Codex OAuth browser flow and persists structured launch state instead of opening a generic browser runtime lane.
 - The new desktop-environment surface now also includes `pod.desktop.materialize`, which materializes the packaged `desktop/` stage into `filesDir/openclaw/embedded-desktop-home/<version>/` with engine, environment, browser, tools, plugins, supervisor manifests, and an active profile.
-- The current embedded pod payload is versioned as `0.6.0`, which adds a packaged `desktop/` environment stage on top of the earlier runtime + toolkit + browser carrier and still extracts into a fresh app-private version directory instead of silently reusing the previous payload.
-- On April 3, 2026, the connected OPPO / ColorOS `PFEM10` phone verified the full replay path for this branch: after reinstalling the current debug app, `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=desktop_home_configured`, and direct `pod.desktop.materialize` replay also succeeded on-device.
-- This is now a real packaging-plus-extraction-plus-runtime-carrier path with a cohesive desktop bundle in the APK plus a direct app-private materialization step, but it is still not a full embedded desktop runtime yet: generic browser tooling, unrestricted shell parity, and executable plugin/runtime parity remain incomplete.
+- The current embedded pod payload is versioned as `0.7.0`, which keeps the packaged `desktop/` environment stage, adds the first allowlisted packaged plugin descriptor/task, and still extracts into a fresh app-private version directory instead of silently reusing the previous payload.
+- On April 4, 2026, the connected OPPO / ColorOS `PFEM10` phone verified the latest replay path for this branch: after reinstalling the current debug app, `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=plugin_lane_replayed` with `manifestVersion=0.7.0`, `verifiedFileCount=26`, `desktopMaterialize.ok=true`, `pluginExecute.ok=true`, and `runtimeDescribeAfter.recommendedNextSlice=process_model`.
+- This is now a real packaging-plus-extraction-plus-runtime-carrier path with a cohesive desktop bundle in the APK plus app-private desktop-home materialization, profile replay, environment supervision artifacts, and one narrow allowlisted plugin replay, but it is still not a full embedded desktop runtime yet: generic browser tooling, unrestricted shell parity, and a longer-lived process model remain incomplete.
 - If GPT replies work but many desktop-style actions do not, that is expected with the current Android MVP scope.
 
 ### Dedicated Host Deployment / 专用 Host 部署
@@ -277,11 +277,12 @@ pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke
 
 The browser-lane smoke:
 
-- replays `pod.runtime.execute(taskId=runtime-smoke)` and `pod.runtime.execute(taskId=tool-brief-inspect)` first so the runtime carrier is already materialized
+- replays `pod.desktop.materialize` first so the packaged desktop home is materialized on-device
+- replays `pod.runtime.execute(taskId=runtime-smoke)`, `pod.runtime.execute(taskId=tool-brief-inspect)`, and `pod.runtime.execute(taskId=plugin-allowlist-inspect)` so the runtime carrier, packaged tool lane, and narrow allowlisted plugin lane are all replayed from the same bundle
 - reads `pod.browser.describe` before launch
 - calls `pod.browser.auth.start` for the allowlisted `openai-codex-oauth` flow when `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1`
 - polls `pod.browser.describe` until the browser lane has replayable state on disk
-- re-reads `pod.runtime.describe` and checks that the mainline has advanced to one of the new desktop-bundle/home states or the older browser-lane states
+- re-reads `pod.runtime.describe` and checks that the mainline has advanced to one of the desktop-bundle/home/plugin states or the older browser-lane states
 
 Useful overrides:
 
@@ -289,11 +290,13 @@ Useful overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0`
 - `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_POLL_ATTEMPTS=8`
 - `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_POLL_INTERVAL_SEC=2`
+- `OPENCLAW_ANDROID_LOCAL_HOST_DESKTOP_PROFILE_ID=openclaw-desktop-host`
+- `OPENCLAW_ANDROID_LOCAL_HOST_POD_PLUGIN_TASK_ID=plugin-allowlist-inspect`
 
-Artifact output includes `pod-browser-describe-before.json`, `pod-browser-auth-start.json`, `pod-browser-describe-after.json`, `pod-runtime-describe-after.json`, and `summary.json`.
+Artifact output includes `pod-desktop-materialize.json`, `pod-browser-describe-before.json`, `pod-browser-auth-start.json`, `pod-browser-describe-after.json`, `pod-runtime-describe-after.json`, `pod-plugin-execute.json`, and `summary.json`.
 
-- Use the default `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1` pass to prove that the packaged browser lane leaves replayable state/log evidence on disk.
-- After you finish the external browser auth flow on the device, rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0` to confirm that the stored credential path has converged from a replayed desktop-bundle/home state to a configured one.
+- Use the default `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1` pass to prove that the packaged browser lane leaves replayable state/log evidence on disk while the packaged desktop home and allowlisted plugin lane are also replayed from the current APK bundle.
+- After you finish the external browser auth flow on the device, rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0` to confirm that the stored credential path has converged into a configured desktop/plugin state such as `plugin_lane_replayed`.
 
 ## Embedded Runtime Pod Doctor
 
@@ -318,6 +321,7 @@ Common outcomes:
 - `classification=desktop_bundle_ready`: the packaged desktop bundle is now in the APK, and the next step is to materialize the desktop home on-device
 - `classification=desktop_home_ready`: the desktop home is materialized, and the next step is to continue the remaining runtime/auth convergence
 - `classification=desktop_home_configured`: the desktop home is materialized and the bounded browser lane is also backed by a stored credential
+- `classification=plugin_lane_replayed`: the desktop home, bounded browser lane, packaged tool lane, and narrow allowlisted plugin lane have all replayed on-device, and the next step is to deepen the process model
 
 ## Local Host Doctor
 

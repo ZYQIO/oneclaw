@@ -476,6 +476,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
       carrier.toolkitCommandPolicyPresent &&
       carrier.toolDescriptorCount > 0 &&
       carrier.runtimeToolTaskIds.isNotEmpty()
+  val pluginsIntegrated =
+    desktop.pluginsManifestPresent &&
+      desktop.pluginCount > 0 &&
+      carrier.runtimePluginTaskIds.isNotEmpty()
   val engineStatus =
     when {
       engineIntegrated -> "partial_bootstrap"
@@ -502,6 +506,13 @@ fun describeEmbeddedRuntimeDesktopRuntime(
       browser.browserStageInstalled || browser.browserAuthFlowCount > 0 -> "bootstrap_present"
       else -> "missing"
     }
+  val pluginsStatus =
+    when {
+      carrier.runtimePluginExecutionStateCount > 0 -> "landed_bootstrap"
+      pluginsIntegrated -> "partial_bootstrap"
+      desktop.pluginsManifestPresent || carrier.runtimePluginTaskIds.isNotEmpty() -> "bootstrap_present"
+      else -> "missing"
+    }
   val desktopStatus =
     when {
       desktop.desktopHomeReady -> "landed_bootstrap"
@@ -515,10 +526,18 @@ fun describeEmbeddedRuntimeDesktopRuntime(
     if (!environmentIntegrated) add("environment")
     if (!browserIntegrated) add("browser")
     if (!toolsIntegrated) add("tools")
-    add("plugins")
+    if (!pluginsIntegrated) add("plugins")
   }
   val mainlineStatus =
     when {
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent &&
+        carrier.runtimePluginExecutionStateCount > 0 -> "plugin_lane_replayed"
       inspection.ready &&
         desktop.desktopHomeReady &&
         carrier.runtimeHomeReady &&
@@ -613,6 +632,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("toolDescriptorCount", JsonPrimitive(carrier.toolDescriptorCount))
         put("runtimeToolTaskCount", JsonPrimitive(carrier.runtimeToolTaskIds.size))
         put("runtimeToolExecutionStateCount", JsonPrimitive(carrier.runtimeToolExecutionStateCount))
+        put("runtimePluginTaskCount", JsonPrimitive(carrier.runtimePluginTaskIds.size))
+        put("runtimePluginExecutionStateCount", JsonPrimitive(carrier.runtimePluginExecutionStateCount))
         put("browserStageInstalled", JsonPrimitive(browser.browserStageInstalled))
         put("browserStageManifestPresent", JsonPrimitive(browser.browserStageManifestPresent))
         put("browserAuthFlowCount", JsonPrimitive(browser.browserAuthFlowCount))
@@ -682,6 +703,14 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           "runtimeToolTaskIds",
           buildJsonArray {
             carrier.runtimeToolTaskIds.forEach { taskId ->
+              add(JsonPrimitive(taskId))
+            }
+          },
+        )
+        put(
+          "runtimePluginTaskIds",
+          buildJsonArray {
+            carrier.runtimePluginTaskIds.forEach { taskId ->
               add(JsonPrimitive(taskId))
             }
           },
@@ -825,13 +854,18 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             add(
               buildDesktopRuntimeDomain(
                 id = "plugins",
-                status = "missing",
-                integrated = false,
+                status = pluginsStatus,
+                integrated = pluginsIntegrated,
                 summary =
-                  if (desktop.pluginsManifestPresent) {
-                    "The desktop bundle now carries an allowlisted plugin-set descriptor, but no executable plugin runtime surface is exposed yet."
-                  } else {
-                    "No packaged plugin runtime surface is exposed yet."
+                  when {
+                    carrier.runtimePluginExecutionStateCount > 0 ->
+                      "A narrow allowlisted plugin lane now replays through pod.runtime.execute and persists structured plugin evidence on disk without exposing generic plugin installation or arbitrary subprocess execution."
+                    pluginsIntegrated ->
+                      "A narrow allowlisted plugin lane is now bundled behind an explicit plugin allowlist and packaged runtime task."
+                    desktop.pluginsManifestPresent ->
+                      "The desktop bundle now carries an allowlisted plugin-set descriptor, but the packaged plugin task has not been replayed on-device yet."
+                    else ->
+                      "No packaged plugin runtime surface is exposed yet."
                   },
               ),
             )
@@ -851,7 +885,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !browserIntegrated -> "browser_lane_bootstrap"
               !browser.browserReplayReady -> "browser_lane_replay"
               !browser.authCredentialPresent -> "browser_lane_complete"
-              else -> "plugin_lane"
+              !pluginsIntegrated -> "plugin_lane_bootstrap"
+              carrier.runtimePluginExecutionStateCount < 1 -> "plugin_lane_replay"
+              else -> "process_model"
             },
           ),
         )
@@ -879,8 +915,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Run pod.browser.describe, then replay pod.browser.auth.start on-device to prove the bounded browser-auth lane before widening into plugins."
               !browser.authCredentialPresent ->
                 "Complete the bounded browser-auth flow on-device and re-read pod.browser.describe until the replayed lane is also backed by a stored credential."
+              !pluginsIntegrated ->
+                "Attach one narrow allowlisted plugin slice behind pod.runtime.execute instead of widening into generic plugin install or process execution."
+              carrier.runtimePluginExecutionStateCount < 1 ->
+                "Run pod.runtime.execute with the packaged allowlisted plugin task on-device to prove the plugin lane leaves replayable evidence on disk."
               else ->
-                "Keep the packaged browser and tool lanes stable, then attach only the next allowlisted plugin slice that the mainline truly needs."
+                "Keep the bounded plugin lane stable, then deepen the next process-model slice beyond file-level supervision artifacts."
             },
           ),
         )

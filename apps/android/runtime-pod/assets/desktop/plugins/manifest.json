@@ -2,14 +2,21 @@
   "schemaVersion": 1,
   "domain": "plugins",
   "componentId": "openclaw-desktop-plugin-set",
-  "componentVersion": "0.6.0",
+  "componentVersion": "0.7.0",
   "bundleState": "bootstrap_ready",
   "summary": "Allowlisted plugin/runtime surface packaged as part of the desktop-environment bundle.",
   "pluginIds": [
     "openclaw-plugin-host-placeholder"
   ],
+  "pluginDescriptorPaths": [
+    "plugins/openclaw-plugin-host-placeholder.json"
+  ],
+  "runtimeTaskIds": [
+    "plugin-allowlist-inspect"
+  ],
   "capabilities": [
     "allowlisted-plugin-surface",
-    "descriptor-packaged"
+    "descriptor-packaged",
+    "runtime-task-packaged"
   ]
 }

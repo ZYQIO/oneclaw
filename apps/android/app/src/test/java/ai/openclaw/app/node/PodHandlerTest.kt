@@ -56,8 +56,8 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("localExecutionAvailable").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("ready").jsonPrimitive.boolean)
     assertEquals("ready", payload.getValue("reason").jsonPrimitive.content)
-    assertEquals(24, payload.getValue("verifiedFileCount").jsonPrimitive.int)
-    assertEquals("0.6.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
+    assertEquals(26, payload.getValue("verifiedFileCount").jsonPrimitive.int)
+    assertEquals("0.7.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
   }
 
   @Test
@@ -77,7 +77,7 @@ class PodHandlerTest {
     assertEquals("installed", payload.getValue("manifestSource").jsonPrimitive.content)
     assertEquals("installed", payload.getValue("layoutSource").jsonPrimitive.content)
     assertEquals(6, payload.getValue("stageCount").jsonPrimitive.int)
-    assertEquals(24, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(26, payload.getValue("fileCount").jsonPrimitive.int)
     assertEquals(true, payload.getValue("workspaceStageDeclared").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
     val stageNames = payload.getValue("stageNames").jsonArray.map { it.jsonPrimitive.content }
@@ -87,12 +87,13 @@ class PodHandlerTest {
     val fileStageCounts = payload.getValue("fileStageCounts").jsonObject
     assertEquals(2, fileStageCounts.getValue("browser").jsonPrimitive.int)
     assertEquals(5, fileStageCounts.getValue("workspace").jsonPrimitive.int)
-    assertEquals(5, fileStageCounts.getValue("runtime").jsonPrimitive.int)
+    assertEquals(6, fileStageCounts.getValue("runtime").jsonPrimitive.int)
+    assertEquals(9, fileStageCounts.getValue("desktop").jsonPrimitive.int)
     assertEquals(3, fileStageCounts.getValue("toolkit").jsonPrimitive.int)
     val podManifest = payload.getValue("podManifest").jsonObject
-    assertEquals("0.6.0", podManifest.getValue("version").jsonPrimitive.content)
+    assertEquals("0.7.0", podManifest.getValue("version").jsonPrimitive.content)
     val podLayout = payload.getValue("podLayout").jsonObject
-    assertEquals("0.6.0", podLayout.getValue("version").jsonPrimitive.content)
+    assertEquals("0.7.0", podLayout.getValue("version").jsonPrimitive.content)
   }
 
   @Test
@@ -111,7 +112,7 @@ class PodHandlerTest {
     assertEquals("bundled", payload.getValue("layoutSource").jsonPrimitive.content)
     assertEquals(false, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
     assertEquals(6, payload.getValue("stageCount").jsonPrimitive.int)
-    assertEquals(24, payload.getValue("fileCount").jsonPrimitive.int)
+    assertEquals(26, payload.getValue("fileCount").jsonPrimitive.int)
   }
 
   @Test
@@ -138,9 +139,10 @@ class PodHandlerTest {
     assertEquals(1, payload.getValue("desktopProfileCount").jsonPrimitive.int)
     assertEquals(1, payload.getValue("runtimeExecutionCommandCount").jsonPrimitive.int)
     assertEquals(1, payload.getValue("desktopMaterializeCommandCount").jsonPrimitive.int)
-    assertEquals(2, payload.getValue("runtimeTaskCount").jsonPrimitive.int)
+    assertEquals(3, payload.getValue("runtimeTaskCount").jsonPrimitive.int)
     assertEquals(1, payload.getValue("toolDescriptorCount").jsonPrimitive.int)
     assertEquals(1, payload.getValue("runtimeToolTaskCount").jsonPrimitive.int)
+    assertEquals(1, payload.getValue("runtimePluginTaskCount").jsonPrimitive.int)
     assertEquals(false, payload.getValue("runtimeHomeReady").jsonPrimitive.boolean)
     val domainIds =
       payload.getValue("domains").jsonArray.map { item ->
@@ -191,7 +193,7 @@ class PodHandlerTest {
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
     context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
     ensureEmbeddedRuntimePodInstalled(context)
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -263,7 +265,7 @@ class PodHandlerTest {
     assertEquals("openclaw-desktop-host", payload.getValue("profileId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("desktopHomeReady").jsonPrimitive.boolean)
     assertTrue(payload.getValue("activeProfilePath").jsonPrimitive.content.endsWith("/profiles/active-profile.json"))
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/profiles/active-profile.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.7.0/profiles/active-profile.json").isFile)
   }
 
   @Test
@@ -289,9 +291,9 @@ class PodHandlerTest {
     val state = payload.getValue("state").jsonObject
     assertEquals("ok", state.getValue("status").jsonPrimitive.content)
     assertEquals(1, state.getValue("executionCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/config/runtime-env.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/state/runtime-smoke.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/logs/runtime-engine.log").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0/config/runtime-env.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0/state/runtime-smoke.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0/logs/runtime-engine.log").isFile)
   }
 
   @Test
@@ -327,13 +329,13 @@ class PodHandlerTest {
       payload.getValue("desktopRestartContractPath").jsonPrimitive.content.endsWith("/state/runtime-smoke-restart-contract.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-desktop-profile.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.7.0/state/runtime-smoke-desktop-profile.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-health-report.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.7.0/state/runtime-smoke-health-report.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-restart-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.7.0/state/runtime-smoke-restart-contract.json").isFile,
     )
   }
 
@@ -356,7 +358,37 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("packagedToolDescriptorPresent").jsonPrimitive.boolean)
     assertTrue(payload.getValue("toolResultFilePath").jsonPrimitive.content.endsWith("/work/tool-brief-inspect-result.json"))
     assertEquals(1, payload.getValue("toolResult").jsonObject.getValue("headingCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/work/tool-brief-inspect-result.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0/work/tool-brief-inspect-result.json").isFile)
+  }
+
+  @Test
+  fun handlePodRuntimeExecute_runsAllowlistedPluginLane() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodRuntimeExecute("""{"taskId":"plugin-allowlist-inspect"}""")
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("pod.runtime.execute", payload.getValue("command").jsonPrimitive.content)
+    assertEquals("plugin-allowlist-inspect", payload.getValue("taskId").jsonPrimitive.content)
+    assertEquals("openclaw-plugin-host-placeholder", payload.getValue("pluginId").jsonPrimitive.content)
+    assertEquals(true, payload.getValue("desktopPluginsManifestPresent").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("packagedPluginDescriptorPresent").jsonPrimitive.boolean)
+    assertEquals(
+      "packaged_profile_descriptor",
+      payload.getValue("pluginResult").jsonObject.getValue("profileSource").jsonPrimitive.content,
+    )
+    assertTrue(
+      payload.getValue("pluginResultFilePath").jsonPrimitive.content.endsWith("/work/plugin-allowlist-inspect-result.json"),
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0/work/plugin-allowlist-inspect-result.json").isFile,
+    )
   }
 
   @Test
@@ -367,7 +399,7 @@ class PodHandlerTest {
     ensureEmbeddedRuntimePodInstalled(context)
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -402,7 +434,7 @@ class PodHandlerTest {
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
     materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.7.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome

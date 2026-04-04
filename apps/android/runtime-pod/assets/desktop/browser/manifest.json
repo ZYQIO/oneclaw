@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "browser",
   "componentId": "openclaw-desktop-browser-lane",
-  "componentVersion": "0.6.0",
+  "componentVersion": "0.7.0",
   "bundleState": "bootstrap_ready",
   "summary": "Desktop browser surface packaged around bounded auth and selected browser-driven flows.",
   "stageDependencies": [

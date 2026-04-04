@@ -14,6 +14,8 @@ import kotlinx.serialization.json.buildJsonObject
 
 private const val embeddedRuntimeStageDirectoryName = "runtime"
 private const val embeddedToolkitStageDirectoryName = "toolkit"
+private const val embeddedRuntimeDesktopStageDirectoryName = "desktop"
+private const val embeddedRuntimeDefaultDesktopProfileId = "openclaw-desktop-host"
 private const val embeddedRuntimeHomeRootDisplayPath = "filesDir/openclaw/embedded-runtime-home"
 private const val embeddedDesktopHomeRootDisplayPathForRuntime = "filesDir/openclaw/embedded-desktop-home"
 private const val embeddedRuntimeDefaultTaskId = "runtime-smoke"
@@ -51,9 +53,11 @@ private data class EmbeddedRuntimeTaskDefinition(
   val kind: String,
   val summary: String? = null,
   val toolId: String? = null,
+  val pluginId: String? = null,
   val packagedConfigPath: String? = null,
   val packagedWorkspacePath: String? = null,
   val packagedToolDescriptorPath: String? = null,
+  val packagedPluginDescriptorPath: String? = null,
   val stateFile: String,
   val logFile: String,
   val resultFile: String? = null,
@@ -96,6 +100,7 @@ data class EmbeddedRuntimeCarrierInspection(
   val runtimeTaskCount: Int,
   val runtimeTaskIds: List<String>,
   val runtimeToolTaskIds: List<String>,
+  val runtimePluginTaskIds: List<String>,
   val runtimeConfigCount: Int,
   val engineId: String? = null,
   val engineVersion: String? = null,
@@ -109,6 +114,7 @@ data class EmbeddedRuntimeCarrierInspection(
   val toolDescriptorCount: Int = 0,
   val toolIds: List<String> = emptyList(),
   val runtimeToolExecutionStateCount: Int = 0,
+  val runtimePluginExecutionStateCount: Int = 0,
 )
 
 data class EmbeddedRuntimePodRuntimeExecuteResult(
@@ -154,6 +160,7 @@ fun inspectEmbeddedRuntimeCarrier(
       runtimeTaskCount = 0,
       runtimeTaskIds = emptyList(),
       runtimeToolTaskIds = emptyList(),
+      runtimePluginTaskIds = emptyList(),
       runtimeConfigCount = 0,
       runtimeHomeExists = false,
       runtimeHomeReady = false,
@@ -179,6 +186,7 @@ fun inspectEmbeddedRuntimeCarrier(
       .distinct()
       .sorted()
   val runtimeToolTaskIds = runtimeTasks.filter { it.kind == "desktop-tool" }.map { it.taskId }.distinct().sorted()
+  val runtimePluginTaskIds = runtimeTasks.filter { it.kind == "desktop-plugin" }.map { it.taskId }.distinct().sorted()
   val runtimeConfigCount = runtimeStageRoot.resolve("config").takeIf { it.isDirectory }?.listFiles()?.count { it.isFile } ?: 0
 
   val toolkitStageRoot = versionDir.resolve(embeddedToolkitStageDirectoryName)
@@ -208,6 +216,7 @@ fun inspectEmbeddedRuntimeCarrier(
     runtimeTaskCount = runtimeTaskIds.size,
     runtimeTaskIds = runtimeTaskIds,
     runtimeToolTaskIds = runtimeToolTaskIds,
+    runtimePluginTaskIds = runtimePluginTaskIds,
     runtimeConfigCount = runtimeConfigCount,
     engineId = runtimeEngineManifest?.engineId ?: runtimeStageManifest?.engineId,
     engineVersion = runtimeEngineManifest?.engineVersion,
@@ -226,6 +235,7 @@ fun inspectEmbeddedRuntimeCarrier(
     toolDescriptorCount = toolDescriptors.size,
     toolIds = toolIds,
     runtimeToolExecutionStateCount = stateFiles.count { it.nameWithoutExtension in runtimeToolTaskIds },
+    runtimePluginExecutionStateCount = stateFiles.count { it.nameWithoutExtension in runtimePluginTaskIds },
   )
 }
 
@@ -284,7 +294,7 @@ fun executeEmbeddedRuntimePodTask(
       message = "UNSUPPORTED_TASK: ${task.kind} is not supported by the embedded runtime engine",
     )
   }
-  if (task.kind != "runtime-smoke" && task.kind != "desktop-tool") {
+  if (task.kind != "runtime-smoke" && task.kind != "desktop-tool" && task.kind != "desktop-plugin") {
     return EmbeddedRuntimePodRuntimeExecuteResult(
       ok = false,
       code = "UNSUPPORTED_TASK",
@@ -350,6 +360,12 @@ fun executeEmbeddedRuntimePodTask(
   var toolkitStageManifestPresent = false
   var toolkitCommandPolicyPresent = false
   var packagedToolDescriptorPresent = false
+  var pluginId: String? = null
+  var pluginResultFilePath: String? = null
+  var pluginDescriptorPayload: JsonObject? = null
+  var pluginResultPayload: JsonObject? = null
+  var desktopPluginsManifestPresent = false
+  var packagedPluginDescriptorPresent = false
   var desktopProfileReplayPayload: JsonObject? = null
   var desktopProfileReplayStatePath: String? = null
   var desktopProfileReplayResultPath: String? = null
@@ -378,6 +394,27 @@ fun executeEmbeddedRuntimePodTask(
     toolkitStageManifestPresent = toolResult.toolkitStageManifestPresent
     toolkitCommandPolicyPresent = toolResult.toolkitCommandPolicyPresent
     packagedToolDescriptorPresent = toolResult.packagedToolDescriptorPresent
+  }
+  if (task.kind == "desktop-plugin") {
+    val pluginResult =
+      executeAllowlistedPluginTask(
+        context = context,
+        manifestVersion = manifestVersion,
+        versionDir = versionDir,
+        runtimeHome = runtimeHome,
+        task = task,
+        packagedWorkspaceFile = packagedWorkspaceFile,
+      ) ?: return EmbeddedRuntimePodRuntimeExecuteResult(
+        ok = false,
+        code = "UNAVAILABLE",
+        message = "UNAVAILABLE: allowlisted plugin execution failed",
+      )
+    pluginId = pluginResult.pluginId
+    pluginResultFilePath = runtimeHomeDisplayPath(manifestVersion, pluginResult.resultRelativePath)
+    pluginDescriptorPayload = pluginResult.descriptor
+    pluginResultPayload = pluginResult.result
+    desktopPluginsManifestPresent = pluginResult.desktopPluginsManifestPresent
+    packagedPluginDescriptorPresent = pluginResult.packagedPluginDescriptorPresent
   }
   if (task.kind == "runtime-smoke") {
     val desktopReplay =
@@ -424,6 +461,9 @@ fun executeEmbeddedRuntimePodTask(
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
       toolResultPayload?.let { put("toolResult", it) }
+      pluginId?.let { put("pluginId", JsonPrimitive(it)) }
+      pluginResultFilePath?.let { put("pluginResultFilePath", JsonPrimitive(it)) }
+      pluginResultPayload?.let { put("pluginResult", it) }
     }
   stateFile.parentFile?.mkdirs()
   stateFile.writeText("${statePayload}\n", Charsets.UTF_8)
@@ -437,7 +477,7 @@ fun executeEmbeddedRuntimePodTask(
       )
   logFile.parentFile?.mkdirs()
   logFile.appendText(
-    "$now ${task.taskId} kind=${task.kind} engine=${runtimeEngineManifest.engineId} tool=${toolId ?: "none"} pod=$manifestVersion workspace=${task.packagedWorkspacePath}\n",
+    "$now ${task.taskId} kind=${task.kind} engine=${runtimeEngineManifest.engineId} tool=${toolId ?: "none"} plugin=${pluginId ?: "none"} pod=$manifestVersion workspace=${task.packagedWorkspacePath}\n",
     Charsets.UTF_8,
   )
 
@@ -471,6 +511,12 @@ fun executeEmbeddedRuntimePodTask(
         put("toolkitStageManifestPresent", JsonPrimitive(toolkitStageManifestPresent))
         put("toolkitCommandPolicyPresent", JsonPrimitive(toolkitCommandPolicyPresent))
         put("packagedToolDescriptorPresent", JsonPrimitive(packagedToolDescriptorPresent))
+        pluginId?.let { put("pluginId", JsonPrimitive(it)) }
+        put("desktopPluginsManifestPresent", JsonPrimitive(desktopPluginsManifestPresent))
+        put("packagedPluginDescriptorPresent", JsonPrimitive(packagedPluginDescriptorPresent))
+        pluginResultFilePath?.let { put("pluginResultFilePath", JsonPrimitive(it)) }
+        pluginDescriptorPayload?.let { put("pluginDescriptor", it) }
+        pluginResultPayload?.let { put("pluginResult", it) }
         toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
         toolDescriptorPayload?.let { put("toolDescriptor", it) }
         toolResultPayload?.let { put("toolResult", it) }
@@ -540,6 +586,20 @@ private data class PackagedDesktopToolExecution(
   val toolkitStageManifestPresent: Boolean,
   val toolkitCommandPolicyPresent: Boolean,
   val packagedToolDescriptorPresent: Boolean,
+)
+
+private data class EmbeddedRuntimePluginProfileSelection(
+  val payload: JsonObject,
+  val source: String,
+)
+
+private data class PackagedPluginExecution(
+  val pluginId: String,
+  val resultRelativePath: String,
+  val descriptor: JsonObject,
+  val result: JsonObject,
+  val desktopPluginsManifestPresent: Boolean,
+  val packagedPluginDescriptorPresent: Boolean,
 )
 
 private fun executePackagedDesktopTool(
@@ -645,6 +705,161 @@ private fun executePackagedDesktopTool(
     toolkitStageManifestPresent = true,
     toolkitCommandPolicyPresent = true,
     packagedToolDescriptorPresent = true,
+  )
+}
+
+private fun executeAllowlistedPluginTask(
+  context: Context,
+  manifestVersion: String,
+  versionDir: File,
+  runtimeHome: File,
+  task: EmbeddedRuntimeTaskDefinition,
+  packagedWorkspaceFile: File,
+): PackagedPluginExecution? {
+  val desktopStageRoot = versionDir.resolve(embeddedRuntimeDesktopStageDirectoryName)
+  val pluginsManifestFile = desktopStageRoot.resolve("plugins/manifest.json").takeIf { it.isFile } ?: return null
+  val pluginsManifest = readRuntimeJsonObjectOrNull(pluginsManifestFile) ?: return null
+  val pluginId = task.pluginId?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+  val allowlistedPluginIds =
+    runtimeJsonArray(pluginsManifest, "pluginIds").map { it.content.trim() }.filter { it.isNotEmpty() }
+  if (pluginId !in allowlistedPluginIds) return null
+
+  val pluginDescriptorFile =
+    task.packagedPluginDescriptorPath?.let { resolveRelativePath(versionDir, it) }?.takeIf { it.isFile } ?: return null
+  val pluginDescriptor = readRuntimeJsonObjectOrNull(pluginDescriptorFile) ?: return null
+  if (runtimePrimitiveContent(pluginDescriptor, "pluginId") != pluginId) return null
+  val runtimeTaskIds = runtimeJsonArray(pluginDescriptor, "runtimeTaskIds").map { it.content.trim() }.filter { it.isNotEmpty() }
+  if (runtimeTaskIds.isNotEmpty() && task.taskId !in runtimeTaskIds) return null
+
+  val selectedProfile = selectAllowlistedPluginProfile(context, manifestVersion, versionDir) ?: return null
+  val pluginSetId = runtimePrimitiveContent(selectedProfile.payload, "pluginSetId") ?: return null
+  val componentId = runtimePrimitiveContent(pluginsManifest, "componentId") ?: return null
+  if (pluginSetId != componentId) return null
+
+  val inputText = runCatching { packagedWorkspaceFile.readText(Charsets.UTF_8) }.getOrNull() ?: return null
+  val inputLines = inputText.lines()
+  val nonEmptyLines = inputLines.map { it.trim() }.filter { it.isNotEmpty() }
+  val preview = nonEmptyLines.take(2).joinToString(" ").take(240)
+  val browserInspection = inspectEmbeddedRuntimeBrowserLane(context, manifestVersion)
+  val desktopInspection = inspectEmbeddedRuntimeDesktopEnvironment(context, manifestVersion)
+  val resultRelativePath = task.resultFile?.trim()?.takeIf { it.isNotEmpty() } ?: "work/${task.taskId}-result.json"
+  val resultFile = resolveRelativePath(runtimeHome, resultRelativePath) ?: return null
+  resultFile.parentFile?.mkdirs()
+
+  val descriptorPayload =
+    buildJsonObject {
+      put("pluginId", JsonPrimitive(pluginId))
+      put("displayName", JsonPrimitive(runtimePrimitiveContent(pluginDescriptor, "displayName") ?: pluginId))
+      put("kind", JsonPrimitive(runtimePrimitiveContent(pluginDescriptor, "kind") ?: "allowlisted-plugin"))
+      put("summary", JsonPrimitive(runtimePrimitiveContent(pluginDescriptor, "summary") ?: ""))
+      put(
+        "runtimeTaskIds",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "runtimeTaskIds").forEach { add(it) }
+        },
+      )
+      put(
+        "allowedCommands",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "allowedCommands").forEach { add(it) }
+        },
+      )
+      put(
+        "capabilities",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "capabilities").forEach { add(it) }
+        },
+      )
+      put(
+        "limitations",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "limitations").forEach { add(it) }
+        },
+      )
+    }
+  val resultPayload =
+    buildJsonObject {
+      put("pluginId", JsonPrimitive(pluginId))
+      put("pluginDisplayName", JsonPrimitive(runtimePrimitiveContent(pluginDescriptor, "displayName") ?: pluginId))
+      put("pluginKind", JsonPrimitive(runtimePrimitiveContent(pluginDescriptor, "kind") ?: "allowlisted-plugin"))
+      put("taskId", JsonPrimitive(task.taskId))
+      put("allowlisted", JsonPrimitive(true))
+      put("pluginManifestComponentId", JsonPrimitive(componentId))
+      put("pluginCount", JsonPrimitive(allowlistedPluginIds.size))
+      put("profileId", JsonPrimitive(runtimePrimitiveContent(selectedProfile.payload, "profileId") ?: "unknown"))
+      put("profileSource", JsonPrimitive(selectedProfile.source))
+      put("pluginSetId", JsonPrimitive(pluginSetId))
+      put("desktopHomeReady", JsonPrimitive(desktopInspection.desktopHomeReady))
+      put("browserReplayReady", JsonPrimitive(browserInspection.browserReplayReady))
+      put("authCredentialPresent", JsonPrimitive(browserInspection.authCredentialPresent))
+      put("inputPath", JsonPrimitive(task.packagedWorkspacePath ?: ""))
+      put("inputFileName", JsonPrimitive(packagedWorkspaceFile.name))
+      put("inputSizeBytes", JsonPrimitive(packagedWorkspaceFile.length()))
+      put("inputSha256", JsonPrimitive(sha256(packagedWorkspaceFile)))
+      put("lineCount", JsonPrimitive(inputLines.size))
+      put("nonEmptyLineCount", JsonPrimitive(nonEmptyLines.size))
+      put("preview", JsonPrimitive(preview))
+      put(
+        "capabilities",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "capabilities").forEach { add(it) }
+        },
+      )
+      put(
+        "allowedCommands",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "allowedCommands").forEach { add(it) }
+        },
+      )
+      put(
+        "limitations",
+        buildJsonArray {
+          runtimeJsonArray(pluginDescriptor, "limitations").forEach { add(it) }
+        },
+      )
+      put(
+        "keywordHits",
+        buildJsonObject {
+          listOf("plugin", "browser", "workspace", "runtime", "supervisor").forEach { keyword ->
+            put(keyword, JsonPrimitive(countKeywordHits(inputText, keyword)))
+          }
+        },
+      )
+    }
+  resultFile.writeText("${resultPayload}\n", Charsets.UTF_8)
+
+  return PackagedPluginExecution(
+    pluginId = pluginId,
+    resultRelativePath = resultRelativePath,
+    descriptor = descriptorPayload,
+    result = resultPayload,
+    desktopPluginsManifestPresent = true,
+    packagedPluginDescriptorPresent = true,
+  )
+}
+
+private fun selectAllowlistedPluginProfile(
+  context: Context,
+  manifestVersion: String,
+  versionDir: File,
+): EmbeddedRuntimePluginProfileSelection? {
+  val desktopHome = embeddedDesktopHomeRootForRuntime(context).resolve(manifestVersion)
+  val activeProfile =
+    desktopHome.resolve("profiles/active-profile.json").takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  if (activeProfile != null && !runtimePrimitiveContent(activeProfile, "pluginSetId").isNullOrBlank()) {
+    return EmbeddedRuntimePluginProfileSelection(
+      payload = activeProfile,
+      source = "materialized_active_profile",
+    )
+  }
+
+  val packagedProfile =
+    versionDir.resolve("desktop/profiles/$embeddedRuntimeDefaultDesktopProfileId.json").takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+      ?: versionDir.resolve("desktop/profiles/openclaw-desktop-host.json").takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+      ?: return null
+  return EmbeddedRuntimePluginProfileSelection(
+    payload = packagedProfile,
+    source = "packaged_profile_descriptor",
   )
 }
 

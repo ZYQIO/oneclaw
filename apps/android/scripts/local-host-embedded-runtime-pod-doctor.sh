@@ -201,6 +201,10 @@ elif [[ "$browser_mainline_status" == "desktop_home_configured" ]]; then
   classification="desktop_home_configured"
   recommended_action="none"
   recommended_command=""
+elif [[ "$browser_mainline_status" == "plugin_lane_replayed" ]]; then
+  classification="plugin_lane_replayed"
+  recommended_action="advance-process-model"
+  recommended_command=""
 elif [[ "$browser_mainline_status" == "browser_lane_configured" ]]; then
   classification="browser_lane_configured"
   recommended_action="none"
@@ -227,6 +231,9 @@ else
     recommended_command="OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 pnpm android:local-host:embedded-runtime-pod:doctor"
   elif [[ "$browser_recommended_next_slice" == "plugin_lane" ]]; then
     recommended_action="stabilize-before-plugin"
+    recommended_command=""
+  elif [[ "$browser_recommended_next_slice" == "process_model" ]]; then
+    recommended_action="advance-process-model"
     recommended_command=""
   else
     recommended_action="inspect-browser-summary"

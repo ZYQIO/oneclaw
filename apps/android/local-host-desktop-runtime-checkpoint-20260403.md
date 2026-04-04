@@ -8,19 +8,20 @@ Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 ## Read This First / 先看这个
 
 - The branch objective is now the full packaged desktop environment on Android, not the earlier "selected slice" framing.
-- The APK already carries a cohesive `desktop/` bundle in payload `0.6.0`.
+- The APK already carries a cohesive `desktop/` bundle plus the first allowlisted packaged plugin descriptor in payload `0.7.0`.
 - `pod.desktop.materialize` now materializes that bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`.
 - `pod.runtime.execute(taskId=runtime-smoke)` now replays the materialized desktop profile and environment/supervisor manifests into app-private runtime state, and also leaves health-report plus restart-contract artifacts when desktop home is present.
 - This branch still does **not** have full executable desktop parity yet.
 
 ## What Is Already Landed / 已落地内容
 
-- The embedded pod payload is now `0.6.0` and contains `runtime/`, `toolkit/`, `browser/`, `workspace/`, and `desktop/` stages.
+- The embedded pod payload is now `0.7.0` and contains `runtime/`, `toolkit/`, `browser/`, `workspace/`, and `desktop/` stages.
 - The packaged `desktop/` stage now groups engine, environment, browser, tools, plugins, supervisor manifests, plus one desktop profile descriptor into the APK.
 - `pod.runtime.execute(taskId=runtime-smoke)` still provides the first bounded runtime carrier.
 - `pod.runtime.execute(taskId=runtime-smoke)` now also replays the active desktop profile plus packaged environment/supervisor manifests into `runtime-smoke-desktop-profile.json` artifacts under both runtime-home and desktop-home state.
 - That same runtime-smoke path now also writes `runtime-smoke-health-report.json` and `runtime-smoke-restart-contract.json` under desktop-home state so restart/health semantics are no longer only implied by manifest fields.
 - `pod.runtime.execute(taskId=tool-brief-inspect)` still provides the first packaged desktop-tool lane.
+- `pod.runtime.execute(taskId=plugin-allowlist-inspect)` now provides the first narrow allowlisted packaged plugin lane and writes a replayable plugin result under runtime-home `work/`.
 - `pod.browser.describe` and `pod.browser.auth.start` still provide the first bounded browser-auth lane.
 - `pod.desktop.materialize` is now the first direct bridge from "desktop bundle in the APK" to "desktop home in app-private storage".
 - `pod.runtime.describe` now reports desktop-bundle and desktop-home state, including fields such as `desktopEnvironmentBundled`, `desktopBundleReady`, `desktopHomeReady`, and `desktopProfileIds`.
@@ -30,7 +31,7 @@ Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 - `fullDesktopRuntimeBundled` is still `false` in the runtime status payload.
 - There is still no unrestricted shell parity.
 - There is still no generic browser tooling/runtime parity.
-- There is still no executable plugin runtime parity.
+- There is still no generic or open-ended plugin runtime parity.
 - The current desktop bundle now reaches packaging, materialization, and first profile replay, but it is still not a full executable desktop environment.
 - There is still no long-lived process supervisor beyond the file-based restart/health contract artifacts.
 
@@ -46,9 +47,9 @@ Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 ## Current Next Move / 当前下一步
 
 1. Stop widening helper/status-only surfaces.
-2. Treat `desktop_home_replay` and `environment_supervision` as landed bootstrap rather than as open hypotheses.
-3. Keep the packaged browser lane, desktop-home supervision artifacts, and tool/runtime replay boringly stable on-device.
-4. Decide whether the next slice should deepen into a longer-lived process model or attach one narrowly allowlisted plugin lane.
+2. Treat `desktop_home_replay`, `environment_supervision`, and the first allowlisted plugin lane as landed bootstrap rather than open hypotheses.
+3. Keep the packaged browser lane, desktop-home supervision artifacts, tool replay, and plugin replay boringly stable on-device.
+4. Deepen the next slice into a longer-lived `process_model` rather than reopening whether plugin lane should exist.
 
 ## Verification Status / 验证状态
 
@@ -57,7 +58,7 @@ Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 - The same device session also provided direct `pod.desktop.materialize` proof: the command created `filesDir/openclaw/embedded-desktop-home/0.6.0`, returned `desktopHomeReady=true`, and wrote both `profiles/active-profile.json` and `state/desktop-materialize.json` in app-private storage.
 - On April 4, 2026, the same `PFEM10` device reran the updated debug build and exposed the next environment gap explicitly: before `runtime-smoke`, `podRuntimeDescribe.desktopProfileReplayReady=true` but `desktopEnvironmentSupervisionReady=false`, `desktopHealthStatus=null`, `desktopRestartGeneration=0`, and `recommendedNextSlice=environment_supervision`.
 - The follow-up `pod.runtime.execute(taskId=runtime-smoke)` on that same device then wrote `runtime-smoke-health-report.json` and `runtime-smoke-restart-contract.json`, returned `desktopEnvironmentSupervisionReady=true`, `desktopHealthStatus=healthy`, `desktopRestartGeneration=1`, `desktopProfileId=openclaw-desktop-host`, `desktopHealthReportPath=filesDir/openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-health-report.json`, and `desktopRestartContractPath=filesDir/openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-restart-contract.json`.
-- That same April 4 rerun still ended the browser-lane smoke at `runtimeDescribeAfter.recommendedNextSlice=plugin_lane`, which means the branch now explicitly distinguishes "profile replay exists" from "environment supervision exists" before finally moving on to the plugin decision.
+- Later on April 4, 2026, after reinstalling the newest debug app, the same `PFEM10` device also replayed the new packaged plugin slice: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` now converges to `classification=plugin_lane_replayed`, with `manifestVersion=0.7.0`, `verifiedFileCount=26`, `browserLaneSmoke.summary.desktopMaterialize.ok=true`, `browserLaneSmoke.summary.pluginExecute.ok=true`, `browserLaneSmoke.summary.pluginExecute.pluginId=openclaw-plugin-host-placeholder`, and `browserLaneSmoke.summary.runtimeDescribeAfter.recommendedNextSlice=process_model`.
 - The clean targeted Android verification lane is green again after making browser-auth state reads safe under Robolectric when `EncryptedSharedPreferences` cannot reach `AndroidKeyStore`; `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, `InvokeCommandRegistryTest`, `LocalHostNodesToolingTest`, `LocalHostRemoteAccessServerTest`, and `OpenClawProtocolConstantsTest` all pass in the clean rerun.
 - That first materialize rerun also surfaced a real repo bug: remote `/invoke/capabilities` advertised `pod.desktop.materialize`, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` was missing `OpenClawPodCommand.DesktopMaterialize`. The branch now fixes that mismatch.
 - The existing device-facing verification entrypoints remain:

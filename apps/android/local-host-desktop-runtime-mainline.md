@@ -12,12 +12,12 @@ Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 
 ## Current Baseline / 当前基线
 
-- The packaged pod payload is now `0.6.0` and includes a packaged `desktop/` stage on top of the earlier `runtime/`, `toolkit/`, and `browser/` carrier stages. / 当前打包 pod payload 已更新到 `0.6.0`，并在既有 `runtime/`、`toolkit/` 与 `browser/` carrier stages 之上新增了打包 `desktop/` stage。
-- `pod.runtime.execute` still carries the first bounded execution lane, but `runtime-smoke` no longer stops at runtime-home hydration: once desktop home has been materialized it now replays `profiles/active-profile.json` plus packaged environment/supervisor manifests into replayable state artifacts, and leaves explicit health-report plus restart-contract files under desktop-home state. `pod.browser.describe` still reports the first bounded browser-auth lane, and `pod.browser.auth.start` still reuses the app's existing OpenAI Codex OAuth browser flow instead of pretending Android already has a generic browser runtime. / `pod.runtime.execute` 仍然承载第一条有边界执行通道，但 `runtime-smoke` 已不再止步于 runtime-home 水合：当 desktop home 已 materialize 后，它现在会把 `profiles/active-profile.json` 与打包 environment/supervisor manifests replay 成可复跑状态产物，并在 desktop-home state 下留下显式 health-report 与 restart-contract 文件。`pod.browser.describe` 仍在报告第一条有边界 browser-auth lane，而 `pod.browser.auth.start` 也仍然只是复用 app 现有的 OpenAI Codex OAuth 浏览器流程，并不假装 Android 已经拥有通用浏览器 runtime。
+- The packaged pod payload is now `0.7.0` and includes a packaged `desktop/` stage plus the first allowlisted packaged plugin descriptor on top of the earlier `runtime/`, `toolkit/`, and `browser/` carrier stages. / 当前打包 pod payload 已更新到 `0.7.0`，并在既有 `runtime/`、`toolkit/` 与 `browser/` carrier stages 之上新增了打包 `desktop/` stage 与第一条 allowlisted packaged plugin descriptor。
+- `pod.runtime.execute` still carries the bounded execution lane, but it no longer stops at runtime-home hydration: once desktop home has been materialized it now replays `profiles/active-profile.json` plus packaged environment/supervisor manifests into replayable state artifacts, leaves explicit health-report plus restart-contract files under desktop-home state, and also exposes the first narrow allowlisted plugin replay through `pod.runtime.execute(taskId=plugin-allowlist-inspect)`. `pod.browser.describe` still reports the first bounded browser-auth lane, and `pod.browser.auth.start` still reuses the app's existing OpenAI Codex OAuth browser flow instead of pretending Android already has a generic browser runtime. / `pod.runtime.execute` 仍然承载这条有边界执行通道，但它已不再止步于 runtime-home 水合：当 desktop home 已 materialize 后，它现在会把 `profiles/active-profile.json` 与打包 environment/supervisor manifests replay 成可复跑状态产物，在 desktop-home state 下留下显式 health-report 与 restart-contract 文件，并通过 `pod.runtime.execute(taskId=plugin-allowlist-inspect)` 暴露第一条窄白名单 plugin replay。`pod.browser.describe` 仍在报告第一条有边界 browser-auth lane，而 `pod.browser.auth.start` 也仍然只是复用 app 现有的 OpenAI Codex OAuth 浏览器流程，并不假装 Android 已经拥有通用浏览器 runtime。
 
 - Build-time packaging, app-private extraction, checksum verification, and read-only pod invocation are already landed. / 构建期打包、app 私有目录解包、checksum 校验和只读 pod 调用已经落地。
 - `pod.runtime.describe` is now the machine-readable status surface for this mainline and reports which desktop-runtime domains are landed, bootstrap-only, or still missing. / `pod.runtime.describe` 现在是这条主线的机器可读状态面，会直接报告哪些桌面 runtime 域已落地、仅是 bootstrap，或仍然缺失。
-- The current pod payload still does not include a generic browser runtime, a full embedded execution engine, an app-private runtime supervisor, or packaged plugin execution. / 当前 pod payload 仍然没有通用浏览器 runtime、完整嵌入执行引擎、app 私有 runtime supervisor，或打包插件执行面。
+- The current pod payload still does not include a generic browser runtime, a full embedded execution engine, a long-lived app-private process supervisor, or open-ended plugin execution parity. / 当前 pod payload 仍然没有通用浏览器 runtime、完整嵌入执行引擎、长生命周期的 app 私有 process supervisor，或开放式插件执行对齐。
 
 ## Mainline Objective / 主线目标
 
@@ -40,9 +40,9 @@ Target capability domains / 目标能力域:
 - `workspace-bridge`: landed bootstrap. Packaged workspace metadata and document reads already work. / `workspace-bridge`：已落地 bootstrap。打包 workspace 元数据和文档读取已经可用。
 - `engine`: partial bootstrap. `runtime-smoke` can now replay one packaged desktop profile and dependency/readiness contract on-device, but there is still no general embedded desktop execution engine. / `engine`：部分 bootstrap。`runtime-smoke` 现在已经能在设备上 replay 一条打包 desktop profile 与 dependency/readiness 契约，但仍然没有通用嵌入桌面执行引擎。
 - `environment`: partial bootstrap. The bounded replay now leaves app-private state, health-report, and restart-contract evidence under desktop-home, but there is still no long-lived supervisor or process model beyond those file-based contracts. / `environment`：部分 bootstrap。有边界 replay 现在已经会在 desktop-home 下留下 app 私有 state、health-report 与 restart-contract 证据，但在这些文件契约之外仍然没有长生命周期 supervisor 或进程模型。
-- `browser`: partial bootstrap. A single allowlisted external-browser auth lane is now packaged, but it still needs replayable on-device proof. / `browser`：部分 bootstrap。现在已经打包了一条单一白名单 external-browser auth lane，但仍需可复跑的真机证据。
-- `tools`: partial bootstrap. One packaged desktop tool lane now exists behind toolkit descriptors and command policy, but it still needs repetitive on-device replay proof. / `tools`：部分 bootstrap。现在已经有一条通过 toolkit descriptor 和 command policy 封装的打包桌面工具通道，但仍需持续补足真机复跑证据。
-- `plugins`: missing. No packaged plugin/runtime lane exists yet. / `plugins`：缺失。还没有打包插件或 runtime lane。
+- `browser`: partial bootstrap. A single allowlisted external-browser auth lane is now packaged and has replayable on-device proof, but it is still far from generic browser runtime parity. / `browser`：部分 bootstrap。现在已经打包了一条单一白名单 external-browser auth lane，且已有可复跑的真机证据，但离通用浏览器 runtime 对齐仍然很远。
+- `tools`: partial bootstrap. One packaged desktop tool lane now exists behind toolkit descriptors and command policy, and it already has repetitive on-device replay proof, but it is still a curated lane rather than general tool parity. / `tools`：部分 bootstrap。现在已经有一条通过 toolkit descriptor 和 command policy 封装的打包桌面工具通道，且已有持续真机复跑证据，但它仍然只是精选能力，不是通用工具对齐。
+- `plugins`: partial bootstrap. One allowlisted packaged plugin lane now exists and replays on-device, but there is still no generic or open-ended plugin runtime. / `plugins`：部分 bootstrap。现在已经有一条 allowlisted packaged plugin lane，并且能在真机上复跑，但仍然没有通用或开放式插件 runtime。
 
 ## Definition Of Done / 完成定义
 
@@ -80,11 +80,13 @@ This mainline is only done when all of the following are true. / 只有以下条
 
 ### Phase 3. Browser Lane / 浏览器通道
 
+- Status on this branch: the browser-lane smoke now auto-runs `pod.desktop.materialize`, replays the bounded browser-auth lane, and leaves replayable device evidence while the runtime/tool/plugin lanes have already been replayed from the same packaged bundle. / 这条分支的现状：browser-lane smoke 现在会自动执行 `pod.desktop.materialize`、复跑这条有边界 browser-auth lane，并在 runtime / tool / plugin lanes 已经从同一份打包 bundle 复跑之后，留下可复查的真机证据。
 - Add only the browser capability that the curated desktop slice truly needs. / 只加入精选桌面切片真正需要的浏览器能力。
 - Keep it bounded and replayable. / 保持有边界且可复跑。
 
 ### Phase 4. Tools And Plugins / 工具与插件
 
+- Status on this branch: one packaged desktop tool lane plus one narrow allowlisted plugin lane are both landed and replayed on-device, so the next gap is no longer "whether to add a plugin lane" but how far to deepen the process model beyond the current file/state contracts. / 这条分支的现状：一条打包桌面工具通道和一条窄白名单 plugin lane 都已落地并在真机复跑，因此下一步缺口已经不再是“要不要加 plugin lane”，而是要把当前文件/状态 contract 之上的 process model 深化到什么程度。
 - Package one curated desktop tool lane first. / 先打包一条精选桌面工具通道。
 - Add plugin/runtime surfaces only when the curated tool lane proves the need. / 只有在精选工具通道证明必要性之后，再补插件或 runtime 面。
 
@@ -93,7 +95,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 - No unrestricted remote shell. / 不做无限制远程 shell。
 - No Play-first promise for a self-mutating desktop runtime. / 不承诺面向 Play 的自演化桌面 runtime。
 - No reopening of the old assumption that the helper quartet is already enough. / 不再回到“helper quartet 已经足够”的旧假设。
-- Do not widen browser, tools, or plugins before the engine carrier and runtime environment exist. / 在引擎载体和 runtime 环境落地前，不要先扩 browser、tools 或 plugins。
+- Do not widen browser, tools, or plugins beyond the current allowlisted lanes before the engine carrier and runtime environment become a real long-lived process model. / 在引擎载体和 runtime 环境深化成真正的长生命周期 process model 之前，不要把 browser、tools 或 plugins 扩到当前 allowlisted lanes 之外。
 
 ## Working Rule / 工作规则
 
@@ -105,6 +107,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 ## Correction Update / 纠偏更新
 
 - The branch objective is now explicitly corrected back to the full packaged desktop environment, not a "selected slice" framing.
-- Payload `0.6.0` adds a packaged `desktop/` stage that groups engine, environment, browser, tools, plugins, supervisor manifests, and one desktop profile descriptor into one cohesive APK bundle.
+- Payload `0.7.0` now carries a packaged `desktop/` stage that groups engine, environment, browser, tools, plugins, supervisor manifests, one desktop profile descriptor, and the first allowlisted plugin descriptor into one cohesive APK bundle.
 - `pod.desktop.materialize` now materializes that packaged bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`, which turns "desktop environment inside the APK" into a real app-private home layout rather than only a status-map claim.
-- `runtime-smoke` now replays the materialized desktop profile and packaged environment/supervisor manifests into device-local artifacts, and also leaves explicit health-report plus restart-contract state, so the next gap is no longer "can the APK carry the bundle?" but "how much of that bundled environment should become a real long-lived supervised process before plugin/runtime widening happens?"
+- `runtime-smoke` now replays the materialized desktop profile and packaged environment/supervisor manifests into device-local artifacts, and also leaves explicit health-report plus restart-contract state.
+- `plugin-allowlist-inspect` now replays the first packaged allowlisted plugin descriptor on-device, so the next gap is no longer "should we attach a plugin lane at all?" but "how much of that bundled environment should become a real long-lived supervised process model beyond the current replay artifacts?"

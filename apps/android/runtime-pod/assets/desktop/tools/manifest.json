@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "tools",
   "componentId": "openclaw-desktop-toolset",
-  "componentVersion": "0.6.0",
+  "componentVersion": "0.7.0",
   "bundleState": "bootstrap_ready",
   "summary": "Curated desktop tools packaged behind explicit contracts.",
   "stageDependencies": [

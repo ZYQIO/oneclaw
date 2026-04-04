@@ -1,4 +1,4 @@
-Embedded Runtime Pod v0.6.0
+Embedded Runtime Pod v0.7.0
 
 This workspace is packaged at build time and extracted into app-private storage.
 It is meant for deterministic offline helper workflows, the first bounded runtime carrier, and the first packaged desktop tool lane, not a general shell.
@@ -8,3 +8,4 @@ Use pod.browser.auth.start to launch the packaged OpenAI Codex browser-auth flow
 Use pod.desktop.materialize to materialize the packaged desktop-environment bundle into app-private storage.
 Use pod.runtime.execute with taskId=runtime-smoke to materialize the packaged runtime home and persist state.
 Use pod.runtime.execute with taskId=tool-brief-inspect to replay the packaged brief-inspector desktop tool contract.
+Use pod.runtime.execute with taskId=plugin-allowlist-inspect to replay the allowlisted plugin descriptor without exposing generic plugin installation.

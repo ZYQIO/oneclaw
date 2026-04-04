@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "taskId": "plugin-allowlist-inspect",
+  "displayName": "Plugin Allowlist Inspect",
+  "kind": "desktop-plugin",
+  "pluginId": "openclaw-plugin-host-placeholder",
+  "summary": "Replay the packaged allowlisted plugin contract and persist structured evidence without exposing generic plugin installation or execution.",
+  "packagedConfigPath": "config/runtime-env.json",
+  "packagedWorkspacePath": "workspace/notes/runtime-brief.txt",
+  "packagedPluginDescriptorPath": "desktop/plugins/openclaw-plugin-host-placeholder.json",
+  "stateFile": "state/plugin-allowlist-inspect.json",
+  "logFile": "logs/runtime-engine.log",
+  "resultFile": "work/plugin-allowlist-inspect-result.json"
+}
