@@ -80,13 +80,32 @@ data class EmbeddedRuntimePodBrowserStartResult(
   val message: String? = null,
 )
 
+private data class EmbeddedRuntimeBrowserAuthSnapshot(
+  val credentialPresent: Boolean = false,
+  val signedInEmail: String? = null,
+  val inProgress: Boolean = false,
+)
+
+private fun readEmbeddedRuntimeBrowserAuthSnapshot(
+  context: Context,
+): EmbeddedRuntimeBrowserAuthSnapshot {
+  val nodeApp = context.applicationContext as? NodeApp ?: return EmbeddedRuntimeBrowserAuthSnapshot()
+  // Robolectric does not always provide AndroidKeyStore-backed crypto. Treat secure-pref
+  // failures as "no credential available" so pod diagnostics stay readable in tests.
+  val credential = runCatching { nodeApp.prefs.loadOpenAICodexCredential() }.getOrNull()
+  val uiState = runCatching { nodeApp.openAICodexAuthManager.uiState.value }.getOrNull()
+  return EmbeddedRuntimeBrowserAuthSnapshot(
+    credentialPresent = credential != null,
+    signedInEmail = credential?.email ?: uiState?.signedInEmail,
+    inProgress = uiState?.inProgress == true,
+  )
+}
+
 fun inspectEmbeddedRuntimeBrowserLane(
   context: Context,
   manifestVersion: String?,
 ): EmbeddedRuntimeBrowserInspection {
-  val nodeApp = context.applicationContext as? NodeApp
-  val currentUiState = nodeApp?.openAICodexAuthManager?.uiState?.value
-  val credential = nodeApp?.prefs?.loadOpenAICodexCredential()
+  val authSnapshot = readEmbeddedRuntimeBrowserAuthSnapshot(context)
   if (manifestVersion.isNullOrBlank()) {
     return EmbeddedRuntimeBrowserInspection(
       browserStageInstalled = false,
@@ -97,9 +116,9 @@ fun inspectEmbeddedRuntimeBrowserLane(
       browserReplayReady = false,
       browserStateFilePresent = false,
       browserLogFilePresent = false,
-      authCredentialPresent = credential != null,
-      authSignedInEmail = credential?.email,
-      authInProgress = currentUiState?.inProgress == true,
+      authCredentialPresent = authSnapshot.credentialPresent,
+      authSignedInEmail = authSnapshot.signedInEmail,
+      authInProgress = authSnapshot.inProgress,
       stateFilePath = null,
       logFilePath = null,
     )
@@ -141,9 +160,9 @@ fun inspectEmbeddedRuntimeBrowserLane(
     browserReplayReady = browserReplayReady,
     browserStateFilePresent = stateFile.isFile,
     browserLogFilePresent = logFile.isFile,
-    authCredentialPresent = credential != null,
-    authSignedInEmail = credential?.email,
-    authInProgress = currentUiState?.inProgress == true,
+    authCredentialPresent = authSnapshot.credentialPresent,
+    authSignedInEmail = authSnapshot.signedInEmail,
+    authInProgress = authSnapshot.inProgress,
     lastLaunchFlowId = browserPrimitiveContent(launchState, "flowId"),
     lastLaunchStatus = browserPrimitiveContent(launchState, "status"),
     lastLaunchRequested = browserPrimitiveBoolean(launchState, "launchRequested"),
@@ -281,8 +300,15 @@ fun startEmbeddedRuntimePodBrowserAuth(
         message = "UNAVAILABLE: node app context unavailable",
       )
 
-  val authManager = nodeApp.openAICodexAuthManager
-  val credentialBefore = nodeApp.prefs.loadOpenAICodexCredential()
+  val authManager =
+    runCatching { nodeApp.openAICodexAuthManager }.getOrElse { err ->
+      return EmbeddedRuntimePodBrowserStartResult(
+        ok = false,
+        code = "UNAVAILABLE",
+        message = "UNAVAILABLE: browser auth manager unavailable (${err.message ?: "unknown error"})",
+      )
+    }
+  val credentialBefore = runCatching { nodeApp.prefs.loadOpenAICodexCredential() }.getOrNull()
   val wasInProgress = authManager.uiState.value.inProgress
   if (!wasInProgress) {
     runCatching {
@@ -296,7 +322,7 @@ fun startEmbeddedRuntimePodBrowserAuth(
     }
   }
   val currentUiState = authManager.uiState.value
-  val credentialAfter = nodeApp.prefs.loadOpenAICodexCredential()
+  val credentialAfter = runCatching { nodeApp.prefs.loadOpenAICodexCredential() }.getOrNull()
   val now = Instant.now().toString()
   val launchStatus =
     when {

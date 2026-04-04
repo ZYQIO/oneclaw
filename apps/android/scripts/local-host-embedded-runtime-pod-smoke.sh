@@ -295,6 +295,8 @@ runtime_describe_tools_domain="$(jq -r '(.payload.domains // []) | map(.id) | in
 runtime_describe_plugins_domain="$(jq -r '(.payload.domains // []) | map(.id) | index("plugins") != null' "$runtime_describe_json")"
 runtime_describe_tool_count="$(jq -r '.payload.toolDescriptorCount // -1' "$runtime_describe_json")"
 runtime_describe_tool_task_count="$(jq -r '.payload.runtimeToolTaskCount // -1' "$runtime_describe_json")"
+runtime_describe_desktop_profile_replay_ready="$(jq -r '.payload.desktopProfileReplayReady // false' "$runtime_describe_json")"
+runtime_describe_recommended_next_slice="$(jq -r '.payload.recommendedNextSlice // ""' "$runtime_describe_json")"
 
 runtime_execute_ok="$(jq -r '.ok // false' "$runtime_execute_json")"
 runtime_execute_command="$(jq -r '.payload.command // ""' "$runtime_execute_json")"
@@ -304,6 +306,10 @@ runtime_execute_engine_id="$(jq -r '.payload.engineId // ""' "$runtime_execute_j
 runtime_execute_execution_count="$(jq -r '.payload.executionCount // -1' "$runtime_execute_json")"
 runtime_execute_state_path="$(jq -r '.payload.stateFilePath // ""' "$runtime_execute_json")"
 runtime_execute_log_path="$(jq -r '.payload.logFilePath // ""' "$runtime_execute_json")"
+runtime_execute_desktop_profile_replay_ready="$(jq -r '.payload.desktopProfileReplayReady // false' "$runtime_execute_json")"
+runtime_execute_desktop_profile_state_path="$(jq -r '.payload.desktopProfileReplayStatePath // ""' "$runtime_execute_json")"
+runtime_execute_desktop_profile_result_path="$(jq -r '.payload.desktopProfileReplayResultFilePath // ""' "$runtime_execute_json")"
+runtime_execute_desktop_profile_id="$(jq -r '.payload.desktopProfileReplay.profileId // ""' "$runtime_execute_json")"
 
 tool_execute_ok="$(jq -r '.ok // false' "$tool_execute_json")"
 tool_execute_command="$(jq -r '.payload.command // ""' "$tool_execute_json")"
@@ -504,6 +510,8 @@ jq -n \
   --arg runtimeDescribePluginsDomain "$runtime_describe_plugins_domain" \
   --arg runtimeDescribeToolCount "$runtime_describe_tool_count" \
   --arg runtimeDescribeToolTaskCount "$runtime_describe_tool_task_count" \
+  --arg runtimeDescribeDesktopProfileReplayReady "$runtime_describe_desktop_profile_replay_ready" \
+  --arg runtimeDescribeRecommendedNextSlice "$runtime_describe_recommended_next_slice" \
   --arg runtimeExecuteOk "$runtime_execute_ok" \
   --arg runtimeExecuteCommand "$runtime_execute_command" \
   --arg runtimeExecuteTaskId "$runtime_execute_task_id" \
@@ -512,6 +520,10 @@ jq -n \
   --arg runtimeExecuteExecutionCount "$runtime_execute_execution_count" \
   --arg runtimeExecuteStatePath "$runtime_execute_state_path" \
   --arg runtimeExecuteLogPath "$runtime_execute_log_path" \
+  --arg runtimeExecuteDesktopProfileReplayReady "$runtime_execute_desktop_profile_replay_ready" \
+  --arg runtimeExecuteDesktopProfileStatePath "$runtime_execute_desktop_profile_state_path" \
+  --arg runtimeExecuteDesktopProfileResultPath "$runtime_execute_desktop_profile_result_path" \
+  --arg runtimeExecuteDesktopProfileId "$runtime_execute_desktop_profile_id" \
   --arg toolExecuteOk "$tool_execute_ok" \
   --arg toolExecuteCommand "$tool_execute_command" \
   --arg toolExecuteTaskId "$tool_execute_task_id" \
@@ -623,7 +635,9 @@ jq -n \
       hasToolsDomain: ($runtimeDescribeToolsDomain == "true"),
       hasPluginsDomain: ($runtimeDescribePluginsDomain == "true"),
       toolDescriptorCount: ($runtimeDescribeToolCount | tonumber),
-      runtimeToolTaskCount: ($runtimeDescribeToolTaskCount | tonumber)
+      runtimeToolTaskCount: ($runtimeDescribeToolTaskCount | tonumber),
+      desktopProfileReplayReady: ($runtimeDescribeDesktopProfileReplayReady == "true"),
+      recommendedNextSlice: (if $runtimeDescribeRecommendedNextSlice == "" then null else $runtimeDescribeRecommendedNextSlice end)
     },
     podRuntimeExecute: {
       ok: ($runtimeExecuteOk == "true"),
@@ -633,7 +647,11 @@ jq -n \
       engineId: (if $runtimeExecuteEngineId == "" then null else $runtimeExecuteEngineId end),
       executionCount: ($runtimeExecuteExecutionCount | tonumber),
       stateFilePath: (if $runtimeExecuteStatePath == "" then null else $runtimeExecuteStatePath end),
-      logFilePath: (if $runtimeExecuteLogPath == "" then null else $runtimeExecuteLogPath end)
+      logFilePath: (if $runtimeExecuteLogPath == "" then null else $runtimeExecuteLogPath end),
+      desktopProfileReplayReady: ($runtimeExecuteDesktopProfileReplayReady == "true"),
+      desktopProfileId: (if $runtimeExecuteDesktopProfileId == "" then null else $runtimeExecuteDesktopProfileId end),
+      desktopProfileStatePath: (if $runtimeExecuteDesktopProfileStatePath == "" then null else $runtimeExecuteDesktopProfileStatePath end),
+      desktopProfileResultFilePath: (if $runtimeExecuteDesktopProfileResultPath == "" then null else $runtimeExecuteDesktopProfileResultPath end)
     },
     podToolExecute: {
       ok: ($toolExecuteOk == "true"),
@@ -681,8 +699,8 @@ printf 'runtime_pod.browser_describe ok=%s status=%s stage=%s flows=%s replay=%s
   "$browser_describe_ok" "$browser_describe_status" "$browser_describe_stage_installed" "$browser_describe_auth_flow_count" "$browser_describe_replay_ready" "$browser_describe_recommended_flow_id" "$browser_describe_last_launch_status"
 printf 'runtime_pod.runtime_describe ok=%s branch=%s status=%s engine=%s browser=%s tools=%s plugins=%s\n' \
   "$runtime_describe_ok" "$runtime_describe_branch" "$runtime_describe_status" "$runtime_describe_engine_domain" "$runtime_describe_browser_domain" "$runtime_describe_tools_domain" "$runtime_describe_plugins_domain"
-printf 'runtime_pod.runtime_execute ok=%s task=%s home=%s engine=%s count=%s\n' \
-  "$runtime_execute_ok" "$runtime_execute_task_id" "$runtime_execute_runtime_home_ready" "$runtime_execute_engine_id" "$runtime_execute_execution_count"
+printf 'runtime_pod.runtime_execute ok=%s task=%s home=%s engine=%s count=%s desktop_replay=%s profile=%s\n' \
+  "$runtime_execute_ok" "$runtime_execute_task_id" "$runtime_execute_runtime_home_ready" "$runtime_execute_engine_id" "$runtime_execute_execution_count" "$runtime_execute_desktop_profile_replay_ready" "$runtime_execute_desktop_profile_id"
 printf 'runtime_pod.tool_execute ok=%s task=%s tool=%s home=%s count=%s\n' \
   "$tool_execute_ok" "$tool_execute_task_id" "$tool_execute_tool_id" "$tool_execute_runtime_home_ready" "$tool_execute_execution_count"
 printf 'runtime_pod.workspace ok=%s stage=%s docs=%s matched=%s returned=%s first=%s\n' \

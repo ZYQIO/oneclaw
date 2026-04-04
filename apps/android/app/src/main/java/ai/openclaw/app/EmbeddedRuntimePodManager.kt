@@ -464,6 +464,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
   val carrier = inspectEmbeddedRuntimeCarrier(context = context, manifestVersion = inspection.manifestVersion)
   val browser = inspectEmbeddedRuntimeBrowserLane(context = context, manifestVersion = inspection.manifestVersion)
   val desktop = inspectEmbeddedRuntimeDesktopEnvironment(context = context, manifestVersion = inspection.manifestVersion)
+  val desktopReplay = inspectEmbeddedRuntimeDesktopProfileReplay(context = context, manifestVersion = inspection.manifestVersion)
   val engineIntegrated =
     carrier.runtimeStageInstalled && carrier.runtimeStageManifestPresent && carrier.runtimeEngineManifestPresent && carrier.runtimeTaskCount > 0
   val environmentIntegrated = carrier.runtimeStageInstalled
@@ -577,6 +578,19 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         put("desktopMaterializeStatePresent", JsonPrimitive(desktop.materializeStatePresent))
         put("desktopMaterializeLogPresent", JsonPrimitive(desktop.materializeLogPresent))
         desktop.activeProfileId?.let { put("desktopActiveProfileId", JsonPrimitive(it)) }
+        put("desktopProfileReplayReady", JsonPrimitive(desktopReplay.replayReady))
+        put("desktopProfileReplayStatePresent", JsonPrimitive(desktopReplay.statePresent))
+        put("desktopProfileReplayResultPresent", JsonPrimitive(desktopReplay.resultPresent))
+        desktopReplay.status?.let { put("desktopProfileReplayStatus", JsonPrimitive(it)) }
+        desktopReplay.profileId?.let { put("desktopReplayProfileId", JsonPrimitive(it)) }
+        desktopReplay.environmentId?.let { put("desktopReplayEnvironmentId", JsonPrimitive(it)) }
+        desktopReplay.supervisorId?.let { put("desktopReplaySupervisorId", JsonPrimitive(it)) }
+        put("desktopRestartSupported", JsonPrimitive(desktopReplay.restartSupported))
+        put("desktopHealthReportSupported", JsonPrimitive(desktopReplay.healthReportSupported))
+        put("desktopReplayDependencyCount", JsonPrimitive(desktopReplay.dependencyCount))
+        put("desktopReplayMissingDependencyCount", JsonPrimitive(desktopReplay.missingDependencyCount))
+        desktopReplay.stateFilePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
+        desktopReplay.resultFilePath?.let { put("desktopProfileReplayResultPath", JsonPrimitive(it)) }
         put("runtimeStageInstalled", JsonPrimitive(carrier.runtimeStageInstalled))
         put("runtimeStageManifestPresent", JsonPrimitive(carrier.runtimeStageManifestPresent))
         put("runtimeEngineManifestPresent", JsonPrimitive(carrier.runtimeEngineManifestPresent))
@@ -737,7 +751,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 id = "engine",
                 status = engineStatus,
                 integrated = engineIntegrated,
-                summary = "A bounded packaged task engine now exists, but it is still a curated carrier rather than full desktop JS or browser parity.",
+                summary =
+                  if (desktopReplay.replayReady) {
+                    "A bounded packaged task engine now also replays the active desktop profile from app-private desktop home state, not just the generic runtime carrier."
+                  } else {
+                    "A bounded packaged task engine now exists, but it is still a curated carrier rather than full desktop JS or browser parity."
+                  },
               ),
             )
             add(
@@ -745,7 +764,12 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 id = "environment",
                 status = environmentStatus,
                 integrated = environmentIntegrated,
-                summary = "The app can now materialize an app-private runtime home with config, state, logs, and work directories for packaged runtime tasks.",
+                summary =
+                  if (desktopReplay.replayReady) {
+                    "The app can now replay the active desktop profile against app-private runtime and desktop homes, including persisted environment and supervisor contract state."
+                  } else {
+                    "The app can now materialize an app-private runtime home with config, state, logs, and work directories for packaged runtime tasks."
+                  },
               ),
             )
             add(
@@ -809,6 +833,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             when {
               !desktop.desktopBundleReady -> "desktop_bundle_packaging"
               !desktop.desktopHomeReady -> "desktop_home_materialize"
+              desktop.desktopHomeReady && !desktopReplay.replayReady -> "desktop_home_replay"
               !carrier.runtimeHomeReady -> "runtime_execute_replay"
               !toolsIntegrated -> "tool_lane_bootstrap"
               carrier.runtimeToolExecutionStateCount < 1 -> "tool_lane_replay"
@@ -827,6 +852,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Package the desktop stage so engine, environment, browser, tools, plugins, and supervisor metadata ship together in the APK."
               !desktop.desktopHomeReady ->
                 "Run pod.desktop.materialize on-device to materialize the packaged desktop environment into app-private storage before widening execution parity."
+              desktop.desktopHomeReady && !desktopReplay.replayReady ->
+                "Re-run pod.runtime.execute with the runtime-smoke task after desktop-home materialization so the embedded engine actually replays the active desktop profile and supervisor/environment contracts."
               !carrier.runtimeHomeReady ->
                 "Run pod.runtime.execute with the runtime-smoke task on-device to verify the packaged carrier end to end before widening browser, tools, or plugins."
               !toolsIntegrated ->

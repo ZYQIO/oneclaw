@@ -2,6 +2,7 @@ package ai.openclaw.app.node
 
 import ai.openclaw.app.ensureEmbeddedRuntimePodInstalled
 import ai.openclaw.app.executeEmbeddedRuntimePodTask
+import ai.openclaw.app.materializeEmbeddedRuntimeDesktopEnvironment
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
@@ -280,6 +281,7 @@ class PodHandlerTest {
     assertEquals("pod.runtime.execute", payload.getValue("command").jsonPrimitive.content)
     assertEquals("runtime-smoke", payload.getValue("taskId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("runtimeHomeReady").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
     assertEquals(1, payload.getValue("executionCount").jsonPrimitive.int)
     assertEquals("embedded-runtime-task-engine-v1", payload.getValue("engineId").jsonPrimitive.content)
     assertTrue(payload.getValue("stateFilePath").jsonPrimitive.content.endsWith("/state/runtime-smoke.json"))
@@ -289,6 +291,34 @@ class PodHandlerTest {
     assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/config/runtime-env.json").isFile)
     assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/state/runtime-smoke.json").isFile)
     assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/logs/runtime-engine.log").isFile)
+  }
+
+  @Test
+  fun handlePodRuntimeExecute_replaysDesktopProfileAfterMaterialize() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodRuntimeExecute("""{"taskId":"runtime-smoke"}""")
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals(true, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
+    val desktopReplay = payload.getValue("desktopProfileReplay").jsonObject
+    assertEquals("openclaw-desktop-host", desktopReplay.getValue("profileId").jsonPrimitive.content)
+    assertTrue(
+      payload.getValue("desktopProfileReplayStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-desktop-profile.json"),
+    )
+    assertTrue(
+      payload.getValue("desktopProfileReplayResultFilePath").jsonPrimitive.content.endsWith("/work/runtime-smoke-desktop-profile.json"),
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-desktop-profile.json").isFile,
+    )
   }
 
   @Test
@@ -344,6 +374,36 @@ class PodHandlerTest {
         item.jsonObject.getValue("id").jsonPrimitive.content == "browser"
       }.jsonObject
     assertEquals("landed_bootstrap", browserDomain.getValue("status").jsonPrimitive.content)
+  }
+
+  @Test
+  fun handlePodRuntimeDescribe_recommendsDesktopHomeReplayAfterMaterialize() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+    executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
+    materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0")
+    runtimeHome.resolve("state").mkdirs()
+    runtimeHome.resolve("logs").mkdirs()
+    runtimeHome
+      .resolve("state/browser-openai-codex-auth.json")
+      .writeText(
+        """{"flowId":"openai-codex-oauth","status":"launch_requested","launchRequested":true,"executedAt":"2026-04-03T12:00:00Z"}""",
+      )
+    runtimeHome.resolve("logs/browser-lane.log").writeText("2026-04-03T12:00:00Z launch_requested\n")
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodRuntimeDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals("desktop_home_ready", payload.getValue("mainlineStatus").jsonPrimitive.content)
+    assertEquals(false, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
+    assertEquals("desktop_home_replay", payload.getValue("recommendedNextSlice").jsonPrimitive.content)
   }
 
   @Test

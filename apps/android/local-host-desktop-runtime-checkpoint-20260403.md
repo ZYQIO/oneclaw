@@ -3,13 +3,14 @@
 Purpose / 用途: give a fresh session one short page that explains the branch objective, current state, and next move without replaying the whole Android history. / 给新会话一页纸快速说明当前分支的目标、现状和下一步，不必重放整段 Android 历史。
 
 Branch / 分支: `android-desktop-runtime-mainline-20260403`
-Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
+Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 
 ## Read This First / 先看这个
 
 - The branch objective is now the full packaged desktop environment on Android, not the earlier "selected slice" framing.
 - The APK already carries a cohesive `desktop/` bundle in payload `0.6.0`.
 - `pod.desktop.materialize` now materializes that bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`.
+- `pod.runtime.execute(taskId=runtime-smoke)` now replays the materialized desktop profile and environment/supervisor manifests into app-private runtime state when desktop home is present.
 - This branch still does **not** have full executable desktop parity yet.
 
 ## What Is Already Landed / 已落地内容
@@ -17,6 +18,7 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 - The embedded pod payload is now `0.6.0` and contains `runtime/`, `toolkit/`, `browser/`, `workspace/`, and `desktop/` stages.
 - The packaged `desktop/` stage now groups engine, environment, browser, tools, plugins, supervisor manifests, plus one desktop profile descriptor into the APK.
 - `pod.runtime.execute(taskId=runtime-smoke)` still provides the first bounded runtime carrier.
+- `pod.runtime.execute(taskId=runtime-smoke)` now also replays the active desktop profile plus packaged environment/supervisor manifests into `runtime-smoke-desktop-profile.json` artifacts under both runtime-home and desktop-home state.
 - `pod.runtime.execute(taskId=tool-brief-inspect)` still provides the first packaged desktop-tool lane.
 - `pod.browser.describe` and `pod.browser.auth.start` still provide the first bounded browser-auth lane.
 - `pod.desktop.materialize` is now the first direct bridge from "desktop bundle in the APK" to "desktop home in app-private storage".
@@ -28,7 +30,8 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 - There is still no unrestricted shell parity.
 - There is still no generic browser tooling/runtime parity.
 - There is still no executable plugin runtime parity.
-- The current desktop bundle is real packaging plus materialization, but not yet a full executable desktop environment.
+- The current desktop bundle now reaches packaging, materialization, and first profile replay, but it is still not a full executable desktop environment.
+- There is still no long-lived environment supervisor or restart/health contract beyond the bounded replay artifacts.
 
 ## Best Reading Order / 最佳阅读顺序
 
@@ -42,15 +45,18 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 ## Current Next Move / 当前下一步
 
 1. Stop widening helper/status-only surfaces.
-2. Make the desktop-home side run a more real embedded engine task instead of only materializing manifests.
-3. Keep the packaged browser lane, desktop-home materialization, and tool/runtime replay boringly stable on-device.
-4. Decide whether the next slice should deepen engine/environment execution or attach one narrowly allowlisted plugin lane now that real-device desktop-home proof exists.
+2. Treat `desktop_home_replay` as landed bootstrap rather than as the next hypothesis.
+3. Keep the packaged browser lane, desktop-home replay, and tool/runtime replay boringly stable on-device.
+4. Decide whether the next slice should deepen environment supervision and restart/health semantics or attach one narrowly allowlisted plugin lane.
 
 ## Verification Status / 验证状态
 
 - Offline repo checks for the desktop bundle landed in this branch are already done.
 - Later on April 3, 2026, the connected OPPO / ColorOS `PFEM10` phone completed the full replay path: after reinstalling the current debug app, `pnpm android:local-host:embedded-runtime-pod:doctor` converged from the stale `0.2.0` build to `classification=desktop_home_configured`, with `manifestVersion=0.6.0`, `verifiedFileCount=24`, `browserReplayReady=true`, and `runtimeDescribeAfter.mainlineStatus=desktop_home_configured`.
 - The same device session also provided direct `pod.desktop.materialize` proof: the command created `filesDir/openclaw/embedded-desktop-home/0.6.0`, returned `desktopHomeReady=true`, and wrote both `profiles/active-profile.json` and `state/desktop-materialize.json` in app-private storage.
+- On April 4, 2026, the same `PFEM10` device reran the updated debug build and proved the first desktop-home-aware replay slice: `podRuntimeDescribe.desktopProfileReplayReady=false` and `recommendedNextSlice=desktop_home_replay` before `runtime-smoke`, then `podRuntimeExecute.desktopProfileReplayReady=true`, `desktopProfileId=openclaw-desktop-host`, `desktopProfileStatePath=filesDir/openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-desktop-profile.json`, and `desktopProfileResultFilePath=filesDir/openclaw/embedded-runtime-home/0.6.0/work/runtime-smoke-desktop-profile.json`.
+- That same April 4 rerun also showed the post-replay branch posture: browser-lane smoke ended with `runtimeDescribeAfter.recommendedNextSlice=plugin_lane`, which means the branch now explicitly distinguishes "desktop home exists" from "desktop home has been replayed by the bounded runtime lane".
+- The targeted Android verification lane is green again after making browser-auth state reads safe under Robolectric when `EncryptedSharedPreferences` cannot reach `AndroidKeyStore`; `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, `InvokeCommandRegistryTest`, `LocalHostNodesToolingTest`, `LocalHostRemoteAccessServerTest`, and `OpenClawProtocolConstantsTest` all pass in the clean targeted rerun.
 - That first materialize rerun also surfaced a real repo bug: remote `/invoke/capabilities` advertised `pod.desktop.materialize`, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` was missing `OpenClawPodCommand.DesktopMaterialize`. The branch now fixes that mismatch.
 - The existing device-facing verification entrypoints remain:
   - `pnpm android:local-host:embedded-runtime-pod:doctor`

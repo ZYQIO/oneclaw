@@ -2,7 +2,7 @@
 
 Purpose / 用途: redefine the Android mainline around integrating the full packaged desktop environment into the app, instead of stopping at the current helper-pod boundary. / 把 Android 主线重新定义为将完整打包的桌面环境整合进 app，而不是停在当前 helper pod 边界。
 Branch / 分支: `android-desktop-runtime-mainline-20260403`
-Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
+Last updated / 最后更新: April 4, 2026 / 2026 年 4 月 4 日
 
 ## Pivot / 主线切换
 
@@ -13,7 +13,7 @@ Last updated / 最后更新: April 3, 2026 / 2026 年 4 月 3 日
 ## Current Baseline / 当前基线
 
 - The packaged pod payload is now `0.6.0` and includes a packaged `desktop/` stage on top of the earlier `runtime/`, `toolkit/`, and `browser/` carrier stages. / 当前打包 pod payload 已更新到 `0.6.0`，并在既有 `runtime/`、`toolkit/` 与 `browser/` carrier stages 之上新增了打包 `desktop/` stage。
-- `pod.runtime.execute` still carries the first bounded execution lane, `pod.browser.describe` now reports the first bounded browser-auth lane, and `pod.browser.auth.start` reuses the app's existing OpenAI Codex OAuth browser flow instead of pretending Android already has a generic browser runtime. / `pod.runtime.execute` 仍然承载第一条有边界执行通道，`pod.browser.describe` 现在开始报告第一条有边界 browser-auth lane，而 `pod.browser.auth.start` 只是复用 app 现有的 OpenAI Codex OAuth 浏览器流程，并不假装 Android 已经拥有通用浏览器 runtime。
+- `pod.runtime.execute` still carries the first bounded execution lane, but `runtime-smoke` no longer stops at runtime-home hydration: once desktop home has been materialized it now replays `profiles/active-profile.json` plus packaged environment/supervisor manifests into replayable state artifacts. `pod.browser.describe` still reports the first bounded browser-auth lane, and `pod.browser.auth.start` still reuses the app's existing OpenAI Codex OAuth browser flow instead of pretending Android already has a generic browser runtime. / `pod.runtime.execute` 仍然承载第一条有边界执行通道，但 `runtime-smoke` 已不再止步于 runtime-home 水合：当 desktop home 已 materialize 后，它现在会把 `profiles/active-profile.json` 与打包 environment/supervisor manifests replay 成可复跑状态产物。`pod.browser.describe` 仍在报告第一条有边界 browser-auth lane，而 `pod.browser.auth.start` 也仍然只是复用 app 现有的 OpenAI Codex OAuth 浏览器流程，并不假装 Android 已经拥有通用浏览器 runtime。
 
 - Build-time packaging, app-private extraction, checksum verification, and read-only pod invocation are already landed. / 构建期打包、app 私有目录解包、checksum 校验和只读 pod 调用已经落地。
 - `pod.runtime.describe` is now the machine-readable status surface for this mainline and reports which desktop-runtime domains are landed, bootstrap-only, or still missing. / `pod.runtime.describe` 现在是这条主线的机器可读状态面，会直接报告哪些桌面 runtime 域已落地、仅是 bootstrap，或仍然缺失。
@@ -38,8 +38,8 @@ Target capability domains / 目标能力域:
 - `packaging`: landed bootstrap. The app can already prepare, ship, extract, and verify the embedded payload. / `packaging`：已落地 bootstrap。App 已经能准备、交付、解包和校验嵌入 payload。
 - `helper-surface`: landed bootstrap. Read-only pod helpers already exist and remain useful as diagnostics and bootstrap plumbing. / `helper-surface`：已落地 bootstrap。只读 pod helper 已存在，并继续作为诊断和引导管线有价值。
 - `workspace-bridge`: landed bootstrap. Packaged workspace metadata and document reads already work. / `workspace-bridge`：已落地 bootstrap。打包 workspace 元数据和文档读取已经可用。
-- `engine`: missing. No real embedded desktop execution engine is wired into Android yet. / `engine`：缺失。Android 里还没有接入真正的嵌入桌面执行引擎。
-- `environment`: missing. No runtime env supervisor, process model, config bundle, or restart contract exists yet. / `environment`：缺失。还没有 runtime env supervisor、进程模型、配置 bundle 或重启契约。
+- `engine`: partial bootstrap. `runtime-smoke` can now replay one packaged desktop profile and dependency/readiness contract on-device, but there is still no general embedded desktop execution engine. / `engine`：部分 bootstrap。`runtime-smoke` 现在已经能在设备上 replay 一条打包 desktop profile 与 dependency/readiness 契约，但仍然没有通用嵌入桌面执行引擎。
+- `environment`: partial bootstrap. The bounded replay now leaves app-private state, logs, and manifest-readiness evidence under runtime-home and desktop-home, but there is still no long-lived supervisor, process model, or restart contract. / `environment`：部分 bootstrap。有边界 replay 现在已经会在 runtime-home 与 desktop-home 下留下 app 私有 state、logs 与 manifest-readiness 证据，但仍然没有长生命周期 supervisor、进程模型或重启契约。
 - `browser`: partial bootstrap. A single allowlisted external-browser auth lane is now packaged, but it still needs replayable on-device proof. / `browser`：部分 bootstrap。现在已经打包了一条单一白名单 external-browser auth lane，但仍需可复跑的真机证据。
 - `tools`: partial bootstrap. One packaged desktop tool lane now exists behind toolkit descriptors and command policy, but it still needs repetitive on-device replay proof. / `tools`：部分 bootstrap。现在已经有一条通过 toolkit descriptor 和 command policy 封装的打包桌面工具通道，但仍需持续补足真机复跑证据。
 - `plugins`: missing. No packaged plugin/runtime lane exists yet. / `plugins`：缺失。还没有打包插件或 runtime lane。
@@ -65,7 +65,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 
 ### Phase 1. Engine Carrier / 引擎载体
 
-- Status on this branch: the packaged `runtime/` stage plus `pod.runtime.execute(taskId=runtime-smoke)` still provide the first bounded execution carrier, and `pod.runtime.execute(taskId=tool-brief-inspect)` now proves the first packaged desktop tool contract on top of it. / 这条分支的现状：打包好的 `runtime/` stage 和 `pod.runtime.execute(taskId=runtime-smoke)` 仍然提供第一条有边界执行载体，而 `pod.runtime.execute(taskId=tool-brief-inspect)` 现在已经在其上证明了第一条打包桌面工具契约。
+- Status on this branch: the packaged `runtime/` stage plus `pod.runtime.execute(taskId=runtime-smoke)` still provide the first bounded execution carrier, and that same task now also replays the active desktop profile plus environment/supervisor manifests into `runtime-smoke-desktop-profile.json` artifacts. `pod.runtime.execute(taskId=tool-brief-inspect)` still proves the first packaged desktop tool contract on top of it. / 这条分支的现状：打包好的 `runtime/` stage 和 `pod.runtime.execute(taskId=runtime-smoke)` 仍然提供第一条有边界执行载体，而且同一任务现在也会把 active desktop profile 与 environment/supervisor manifests replay 成 `runtime-smoke-desktop-profile.json` 产物；`pod.runtime.execute(taskId=tool-brief-inspect)` 则继续在其上证明第一条打包桌面工具契约。
 
 - Choose and package the smallest viable embedded execution engine. / 选出并打包最小可行的嵌入执行引擎。
 - Prove it can run one bounded desktop-side task from app-private storage. / 证明它能从 app 私有目录执行一条有边界的桌面侧任务。
@@ -73,7 +73,7 @@ This mainline is only done when all of the following are true. / 只有以下条
 
 ### Phase 2. Runtime Environment / 运行环境
 
-- Status on this branch: `pod.runtime.execute` now hydrates `filesDir/openclaw/embedded-runtime-home/<version>/` with config, logs, state, and work directories, the first packaged tool lane already writes replayable results under `work/`, and the next gap is sustained on-device replay for the new bounded browser-auth lane. / 这条分支的现状：`pod.runtime.execute` 已经会把 `filesDir/openclaw/embedded-runtime-home/<version>/` 水合成带有 config、logs、state 和 work 目录的 runtime home，第一条打包工具通道也已经会把可复跑结果写入 `work/`，而下一步缺口则变成了给新的 bounded browser-auth lane 补上持续真机复跑。
+- Status on this branch: `pod.runtime.execute` now hydrates `filesDir/openclaw/embedded-runtime-home/<version>/` with config, logs, state, and work directories, the bounded desktop-home replay writes parallel artifacts into both runtime-home and desktop-home state, and the first packaged tool lane already writes replayable results under `work/`. The next gap is no longer "can Android consume the packaged profile at all?" but "how much environment supervision, health reporting, and restart semantics should exist before any plugin lane widens the surface." / 这条分支的现状：`pod.runtime.execute` 已经会把 `filesDir/openclaw/embedded-runtime-home/<version>/` 水合成带有 config、logs、state 和 work 目录的 runtime home，有边界的 desktop-home replay 也会把并行产物分别写进 runtime-home 与 desktop-home state，而第一条打包工具通道已经会把可复跑结果写入 `work/`。因此下一步缺口已经不再是“Android 到底能不能消费这份打包 profile”，而是“在任何 plugin lane 扩面之前，需要先把多少 environment supervision、health reporting 与 restart semantics 补实”。
 
 - Add an app-private runtime environment layout, config bundle, lifecycle supervision, and health/log surfaces. / 加入 app 私有 runtime 环境目录、配置 bundle、生命周期监督和 health/log 面。
 - Make restart and stale-build diagnostics explicit. / 让重启和 stale-build 诊断显式化。
@@ -107,4 +107,4 @@ This mainline is only done when all of the following are true. / 只有以下条
 - The branch objective is now explicitly corrected back to the full packaged desktop environment, not a "selected slice" framing.
 - Payload `0.6.0` adds a packaged `desktop/` stage that groups engine, environment, browser, tools, plugins, supervisor manifests, and one desktop profile descriptor into one cohesive APK bundle.
 - `pod.desktop.materialize` now materializes that packaged bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`, which turns "desktop environment inside the APK" into a real app-private home layout rather than only a status-map claim.
-- The next gap is no longer "can the APK carry the bundle?" but "how much of that bundled environment is executable with boring replay proof on-device?"
+- `runtime-smoke` now replays the materialized desktop profile and packaged environment/supervisor manifests into device-local artifacts, so the next gap is no longer "can the APK carry the bundle?" but "how much of that bundled environment is executable and supervised with boring replay proof on-device?"

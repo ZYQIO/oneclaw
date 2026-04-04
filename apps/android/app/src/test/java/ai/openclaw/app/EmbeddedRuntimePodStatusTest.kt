@@ -94,9 +94,36 @@ class EmbeddedRuntimePodStatusTest {
     val payload = result.payload ?: error("expected payload")
     assertEquals("runtime-smoke", payload.getValue("taskId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("runtimeHomeReady").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
     assertEquals(1, payload.getValue("executionCount").jsonPrimitive.int)
     assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/config/runtime-env.json").isFile)
     assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/state/runtime-smoke.json").isFile)
+  }
+
+  @Test
+  fun executeEmbeddedRuntimePodTask_replaysDesktopProfileAfterMaterialize() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
+
+    val result = executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+
+    assertTrue(result.ok)
+    val payload = result.payload ?: error("expected payload")
+    assertEquals(true, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
+    assertEquals(
+      "openclaw-desktop-host",
+      payload.getValue("desktopProfileReplay").jsonObject.getValue("profileId").jsonPrimitive.content,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-runtime-home/0.6.0/work/runtime-smoke-desktop-profile.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-desktop-profile.json").isFile,
+    )
   }
 
   @Test

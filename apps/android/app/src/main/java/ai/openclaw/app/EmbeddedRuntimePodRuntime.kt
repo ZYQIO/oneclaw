@@ -15,7 +15,11 @@ import kotlinx.serialization.json.buildJsonObject
 private const val embeddedRuntimeStageDirectoryName = "runtime"
 private const val embeddedToolkitStageDirectoryName = "toolkit"
 private const val embeddedRuntimeHomeRootDisplayPath = "filesDir/openclaw/embedded-runtime-home"
+private const val embeddedDesktopHomeRootDisplayPathForRuntime = "filesDir/openclaw/embedded-desktop-home"
 private const val embeddedRuntimeDefaultTaskId = "runtime-smoke"
+private const val embeddedRuntimeDesktopProfileReplayWorkFile = "work/runtime-smoke-desktop-profile.json"
+private const val embeddedRuntimeDesktopProfileReplayStateFile = "state/runtime-smoke-desktop-profile.json"
+private const val embeddedRuntimeDesktopLogFileNameForRuntime = "desktop-home.log"
 
 private val embeddedRuntimeRuntimeJson = Json { ignoreUnknownKeys = true }
 
@@ -110,6 +114,22 @@ data class EmbeddedRuntimePodRuntimeExecuteResult(
   val payload: JsonObject? = null,
   val code: String? = null,
   val message: String? = null,
+)
+
+data class EmbeddedRuntimeDesktopProfileReplayInspection(
+  val replayReady: Boolean = false,
+  val statePresent: Boolean = false,
+  val resultPresent: Boolean = false,
+  val status: String? = null,
+  val profileId: String? = null,
+  val environmentId: String? = null,
+  val supervisorId: String? = null,
+  val restartSupported: Boolean = false,
+  val healthReportSupported: Boolean = false,
+  val dependencyCount: Int = 0,
+  val missingDependencyCount: Int = 0,
+  val stateFilePath: String? = null,
+  val resultFilePath: String? = null,
 )
 
 fun inspectEmbeddedRuntimeCarrier(
@@ -320,6 +340,10 @@ fun executeEmbeddedRuntimePodTask(
   var toolkitStageManifestPresent = false
   var toolkitCommandPolicyPresent = false
   var packagedToolDescriptorPresent = false
+  var desktopProfileReplayPayload: JsonObject? = null
+  var desktopProfileReplayStatePath: String? = null
+  var desktopProfileReplayResultPath: String? = null
+  var desktopProfileReplayReady = false
 
   if (task.kind == "desktop-tool") {
     val toolResult =
@@ -342,6 +366,20 @@ fun executeEmbeddedRuntimePodTask(
     toolkitCommandPolicyPresent = toolResult.toolkitCommandPolicyPresent
     packagedToolDescriptorPresent = toolResult.packagedToolDescriptorPresent
   }
+  if (task.kind == "runtime-smoke") {
+    val desktopReplay =
+      executeEmbeddedRuntimeDesktopProfileReplay(
+        context = context,
+        manifestVersion = manifestVersion,
+        runtimeHome = runtimeHome,
+        executionCount = executionCount,
+        executedAt = now,
+      )
+    desktopProfileReplayPayload = desktopReplay?.payload
+    desktopProfileReplayStatePath = desktopReplay?.stateFilePath
+    desktopProfileReplayResultPath = desktopReplay?.resultFilePath
+    desktopProfileReplayReady = desktopReplay != null
+  }
 
   val statePayload =
     buildJsonObject {
@@ -360,6 +398,10 @@ fun executeEmbeddedRuntimePodTask(
       put("workspaceDocumentSizeBytes", JsonPrimitive(packagedWorkspaceFile.length()))
       put("hydratedConfigPath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "config/runtime-env.json")))
       put("runtimeHomePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion)))
+      put("desktopProfileReplayReady", JsonPrimitive(desktopProfileReplayReady))
+      desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
+      desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultPath", JsonPrimitive(it)) }
+      desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
       toolResultPayload?.let { put("toolResult", it) }
@@ -398,6 +440,10 @@ fun executeEmbeddedRuntimePodTask(
         put("hydratedConfigPath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "config/runtime-env.json")))
         put("stateFilePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, task.stateFile)))
         put("logFilePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, task.logFile)))
+        put("desktopProfileReplayReady", JsonPrimitive(desktopProfileReplayReady))
+        desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
+        desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultFilePath", JsonPrimitive(it)) }
+        desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
         toolId?.let { put("toolId", JsonPrimitive(it)) }
         put("toolkitStageInstalled", JsonPrimitive(toolkitStageInstalled))
         put("toolkitStageManifestPresent", JsonPrimitive(toolkitStageManifestPresent))
@@ -409,6 +455,36 @@ fun executeEmbeddedRuntimePodTask(
         put("state", statePayload)
         put("packagedConfig", hydratedConfig)
       },
+  )
+}
+
+fun inspectEmbeddedRuntimeDesktopProfileReplay(
+  context: Context,
+  manifestVersion: String?,
+): EmbeddedRuntimeDesktopProfileReplayInspection {
+  if (manifestVersion.isNullOrBlank()) return EmbeddedRuntimeDesktopProfileReplayInspection()
+  val runtimeHome = embeddedRuntimeHomeRoot(context).resolve(manifestVersion)
+  val desktopHome = embeddedDesktopHomeRootForRuntime(context).resolve(manifestVersion)
+  val stateFile = desktopHome.resolve(embeddedRuntimeDesktopProfileReplayStateFile)
+  val resultFile = runtimeHome.resolve(embeddedRuntimeDesktopProfileReplayWorkFile)
+  val statePayload = stateFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val dependencyStatus = statePayload?.get("dependencyStatus") as? JsonObject
+  val missingDependencies = statePayload?.get("missingDependencies") as? JsonArray
+  val status = runtimePrimitiveContent(statePayload, "status")
+  return EmbeddedRuntimeDesktopProfileReplayInspection(
+    replayReady = stateFile.isFile && resultFile.isFile && status != null,
+    statePresent = stateFile.isFile,
+    resultPresent = resultFile.isFile,
+    status = status,
+    profileId = runtimePrimitiveContent(statePayload, "profileId"),
+    environmentId = runtimePrimitiveContent(statePayload, "environmentId"),
+    supervisorId = runtimePrimitiveContent(statePayload, "supervisorId"),
+    restartSupported = runtimePrimitiveBoolean(statePayload, "restartSupported") == true,
+    healthReportSupported = runtimePrimitiveBoolean(statePayload, "healthReportSupported") == true,
+    dependencyCount = dependencyStatus?.size ?: 0,
+    missingDependencyCount = missingDependencies?.size ?: 0,
+    stateFilePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProfileReplayStateFile),
+    resultFilePath = runtimeHomeDisplayPath(manifestVersion, embeddedRuntimeDesktopProfileReplayWorkFile),
   )
 }
 
@@ -529,6 +605,147 @@ private fun executePackagedDesktopTool(
   )
 }
 
+private data class EmbeddedRuntimeDesktopProfileReplayExecution(
+  val payload: JsonObject,
+  val stateFilePath: String,
+  val resultFilePath: String,
+)
+
+private fun executeEmbeddedRuntimeDesktopProfileReplay(
+  context: Context,
+  manifestVersion: String,
+  runtimeHome: File,
+  executionCount: Int,
+  executedAt: String,
+): EmbeddedRuntimeDesktopProfileReplayExecution? {
+  val desktopInspection = inspectEmbeddedRuntimeDesktopEnvironment(context, manifestVersion)
+  if (!desktopInspection.desktopHomeReady) return null
+
+  val desktopHome = embeddedDesktopHomeRootForRuntime(context).resolve(manifestVersion)
+  val activeProfileFile = desktopHome.resolve("profiles/active-profile.json").takeIf { it.isFile } ?: return null
+  val environmentManifestFile = desktopHome.resolve("environment/manifest.json").takeIf { it.isFile } ?: return null
+  val supervisorManifestFile = desktopHome.resolve("supervisor/manifest.json").takeIf { it.isFile } ?: return null
+  val browserInspection = inspectEmbeddedRuntimeBrowserLane(context, manifestVersion)
+  val carrierInspection = inspectEmbeddedRuntimeCarrier(context, manifestVersion)
+  val activeProfile = readRuntimeJsonObjectOrNull(activeProfileFile) ?: return null
+  val environmentManifest = readRuntimeJsonObjectOrNull(environmentManifestFile) ?: return null
+  val supervisorManifest = readRuntimeJsonObjectOrNull(supervisorManifestFile) ?: return null
+  val versionDir = embeddedRuntimePodInstallRoot(context).resolve(manifestVersion)
+  val workspaceReady =
+    versionDir.resolve("workspace/manifest.json").isFile &&
+      versionDir.resolve("workspace/content-index.json").isFile
+  val dependencyStatus =
+    linkedMapOf(
+      "runtime" to carrierInspection.runtimeHomeReady,
+      "browser" to browserInspection.browserReplayReady,
+      "toolkit" to (
+        carrierInspection.toolkitStageInstalled &&
+          carrierInspection.toolkitStageManifestPresent &&
+          carrierInspection.toolkitCommandPolicyPresent
+      ),
+      "workspace" to workspaceReady,
+    )
+  val missingDependencies = dependencyStatus.filterValues { !it }.keys.toList()
+  val restartSupported =
+    runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "restart" } ||
+      runtimeJsonArray(environmentManifest, "capabilities").any { it.content == "restart-contract" }
+  val healthReportSupported = runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "health-report" }
+  val resultPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(if (missingDependencies.isEmpty()) "ready" else "degraded"))
+      put("profileId", JsonPrimitive(runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"))
+      runtimePrimitiveContent(activeProfile, "displayName")?.let { put("displayName", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "engineId")?.let { put("engineId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "environmentId")?.let { put("environmentId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "browserId")?.let { put("browserId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "toolsetId")?.let { put("toolsetId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "pluginSetId")?.let { put("pluginSetId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "supervisorId")?.let { put("supervisorId", JsonPrimitive(it)) }
+      put(
+        "requiredDomains",
+        buildJsonArray {
+          runtimeJsonArray(activeProfile, "requiredDomains").forEach { add(it) }
+        },
+      )
+      put(
+        "runtimeHomeDependencies",
+        buildJsonArray {
+          runtimeJsonArray(activeProfile, "runtimeHomeDependencies").forEach { add(it) }
+        },
+      )
+      put(
+        "defaultCommands",
+        buildJsonArray {
+          runtimeJsonArray(activeProfile, "defaultCommands").forEach { add(it) }
+        },
+      )
+      put("environmentComponentId", JsonPrimitive(runtimePrimitiveContent(environmentManifest, "componentId") ?: ""))
+      put("environmentBundleState", JsonPrimitive(runtimePrimitiveContent(environmentManifest, "bundleState") ?: ""))
+      put(
+        "environmentCapabilities",
+        buildJsonArray {
+          runtimeJsonArray(environmentManifest, "capabilities").forEach { add(it) }
+        },
+      )
+      put("supervisorComponentId", JsonPrimitive(runtimePrimitiveContent(supervisorManifest, "componentId") ?: ""))
+      put(
+        "supervisorManagedActions",
+        buildJsonArray {
+          runtimeJsonArray(supervisorManifest, "managedActions").forEach { add(it) }
+        },
+      )
+      put(
+        "supervisorCapabilities",
+        buildJsonArray {
+          runtimeJsonArray(supervisorManifest, "capabilities").forEach { add(it) }
+        },
+      )
+      put("restartSupported", JsonPrimitive(restartSupported))
+      put("healthReportSupported", JsonPrimitive(healthReportSupported))
+      put(
+        "dependencyStatus",
+        buildJsonObject {
+          dependencyStatus.forEach { (dependency, ready) ->
+            put(dependency, JsonPrimitive(ready))
+          }
+        },
+      )
+      put(
+        "missingDependencies",
+        buildJsonArray {
+          missingDependencies.forEach { dependency ->
+            add(JsonPrimitive(dependency))
+          }
+        },
+      )
+      put("browserReplayReady", JsonPrimitive(browserInspection.browserReplayReady))
+      put("runtimeHomeReady", JsonPrimitive(carrierInspection.runtimeHomeReady))
+      put("executedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      put("runtimeHomePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion)))
+      put("desktopHomePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion)))
+      put("activeProfilePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, "profiles/active-profile.json")))
+    }
+
+  val resultFile = resolveRelativePath(runtimeHome, embeddedRuntimeDesktopProfileReplayWorkFile) ?: return null
+  resultFile.parentFile?.mkdirs()
+  resultFile.writeText("${resultPayload}\n", Charsets.UTF_8)
+
+  val desktopStateFile = desktopHome.resolve(embeddedRuntimeDesktopProfileReplayStateFile)
+  desktopStateFile.parentFile?.mkdirs()
+  desktopStateFile.writeText("${resultPayload}\n", Charsets.UTF_8)
+  desktopHome.resolve("logs/$embeddedRuntimeDesktopLogFileNameForRuntime").appendText(
+    "$executedAt runtime-smoke profile=${runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"} status=${runtimePrimitiveContent(resultPayload, "status") ?: "unknown"} missingDependencies=${missingDependencies.joinToString("|").ifEmpty { "none" }}\n",
+    Charsets.UTF_8,
+  )
+
+  return EmbeddedRuntimeDesktopProfileReplayExecution(
+    payload = resultPayload,
+    stateFilePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProfileReplayStateFile),
+    resultFilePath = runtimeHomeDisplayPath(manifestVersion, embeddedRuntimeDesktopProfileReplayWorkFile),
+  )
+}
+
 private fun loadRuntimeStageManifest(file: File): EmbeddedRuntimeStageManifest? =
   runCatching { embeddedRuntimeRuntimeJson.decodeFromString(EmbeddedRuntimeStageManifest.serializer(), file.readText(Charsets.UTF_8)) }.getOrNull()
 
@@ -567,6 +784,24 @@ private fun resolveRelativePath(rootDir: File, relativePath: String): File? {
 private fun readRuntimeJsonObjectOrNull(file: File): JsonObject? =
   runCatching { embeddedRuntimeRuntimeJson.parseToJsonElement(file.readText(Charsets.UTF_8)) as? JsonObject }.getOrNull()
 
+private fun runtimePrimitiveContent(
+  payload: JsonObject?,
+  key: String,
+): String? = (payload?.get(key) as? JsonPrimitive)?.content?.takeUnless { it == "null" }
+
+private fun runtimePrimitiveBoolean(
+  payload: JsonObject?,
+  key: String,
+): Boolean? = (payload?.get(key) as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+
+private fun runtimeJsonArray(
+  payload: JsonObject?,
+  key: String,
+): List<JsonPrimitive> {
+  val array = payload?.get(key) as? JsonArray ?: return emptyList()
+  return array.mapNotNull { it as? JsonPrimitive }
+}
+
 private fun extractHeadingText(line: String): String = line.trimStart().trimStart('#').trim()
 
 private fun countKeywordHits(text: String, keyword: String): Int {
@@ -593,4 +828,19 @@ private fun sha256(file: File): String {
     }
   }
   return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+private fun embeddedDesktopHomeRootForRuntime(context: Context): File =
+  context.filesDir.resolve("openclaw/embedded-desktop-home")
+
+private fun desktopHomeDisplayPathForRuntime(
+  manifestVersion: String,
+  relativePath: String? = null,
+): String {
+  val normalized = relativePath?.trim()?.replace('\\', '/')?.trimStart('/').orEmpty()
+  return if (normalized.isEmpty()) {
+    "$embeddedDesktopHomeRootDisplayPathForRuntime/$manifestVersion"
+  } else {
+    "$embeddedDesktopHomeRootDisplayPathForRuntime/$manifestVersion/$normalized"
+  }
 }
