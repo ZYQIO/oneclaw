@@ -2,17 +2,17 @@
 
 ## Immediate Tasks
 
-1. Re-run the branch on `PFEM10` with payload `0.8.0` until the top-level result reaches `process_model_bootstrapped`.
+1. Re-run the branch on `PFEM10` with payload `0.9.0` until the top-level result reaches `process_runtime_activation_bootstrapped`.
    - Current state: repo-side validation is green, but the latest real-device proof still stops at April 4, 2026 `0.7.0` `plugin_lane_replayed`.
-   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_model_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_activation`.
+   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_activation_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_supervision`.
 
-2. Implement the next bounded slice as `process_runtime_activation`.
-   - The branch no longer needs a decision about whether plugin/process-model bootstrap should exist; both are already settled.
-   - Exit criteria: one longer-lived supervised activation path exists beyond the current descriptor/state bootstrap artifacts.
+2. Implement the next bounded slice as `process_runtime_supervision`.
+   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation bootstrap should exist; those are now settled.
+   - Exit criteria: one longer-lived supervised runtime process exists beyond the current descriptor/state bootstrap artifacts.
 
-3. Keep the targeted pod validation lane stable while the process model deepens.
+3. Keep the targeted pod validation lane stable while runtime supervision deepens.
    - The current green path is `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus targeted Android Gradle reruns for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest`.
-   - Exit criteria: those validations keep passing as the process-runtime activation work lands.
+   - Exit criteria: those validations keep passing as the process-runtime supervision work lands.
 
 ## Short-Term Tasks
 

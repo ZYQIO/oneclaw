@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "plugins",
   "componentId": "openclaw-desktop-plugin-set",
-  "componentVersion": "0.8.0",
+  "componentVersion": "0.9.0",
   "bundleState": "bootstrap_ready",
   "summary": "Allowlisted plugin/runtime surface packaged as part of the desktop-environment bundle.",
   "pluginIds": [

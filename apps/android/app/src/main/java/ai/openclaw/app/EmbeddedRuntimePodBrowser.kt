@@ -145,6 +145,10 @@ fun inspectEmbeddedRuntimeBrowserLane(
   val stateFile = stateDir.resolve(embeddedBrowserStateFileName)
   val logFile = runtimeHome.resolve("logs/$embeddedBrowserLogFileName")
   val launchState = stateFile.takeIf { it.isFile }?.let(::readBrowserJsonObjectOrNull)
+  val authCredentialPresent =
+    authSnapshot.credentialPresent ||
+      browserPrimitiveBoolean(launchState, "credentialPresentAfterLaunch") == true
+  val authSignedInEmail = authSnapshot.signedInEmail ?: browserPrimitiveContent(launchState, "signedInEmail")
   val browserLaunchStateCount =
     stateDir.takeIf { it.isDirectory }?.listFiles()?.count {
       it.isFile && it.name.startsWith("browser-") && it.extension.lowercase() == "json"
@@ -160,8 +164,8 @@ fun inspectEmbeddedRuntimeBrowserLane(
     browserReplayReady = browserReplayReady,
     browserStateFilePresent = stateFile.isFile,
     browserLogFilePresent = logFile.isFile,
-    authCredentialPresent = authSnapshot.credentialPresent,
-    authSignedInEmail = authSnapshot.signedInEmail,
+    authCredentialPresent = authCredentialPresent,
+    authSignedInEmail = authSignedInEmail,
     authInProgress = authSnapshot.inProgress,
     lastLaunchFlowId = browserPrimitiveContent(launchState, "flowId"),
     lastLaunchStatus = browserPrimitiveContent(launchState, "status"),

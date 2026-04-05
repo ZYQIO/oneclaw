@@ -201,6 +201,10 @@ elif [[ "$browser_mainline_status" == "desktop_home_configured" ]]; then
   classification="desktop_home_configured"
   recommended_action="none"
   recommended_command=""
+elif [[ "$browser_mainline_status" == "process_runtime_activation_bootstrapped" ]]; then
+  classification="process_runtime_activation_bootstrapped"
+  recommended_action="advance-process-supervision"
+  recommended_command=""
 elif [[ "$browser_mainline_status" == "process_model_bootstrapped" ]]; then
   classification="process_model_bootstrapped"
   recommended_action="advance-process-runtime"
@@ -238,6 +242,12 @@ else
     recommended_command=""
   elif [[ "$browser_recommended_next_slice" == "process_model_bootstrap" ]]; then
     recommended_action="advance-process-model"
+    recommended_command=""
+  elif [[ "$browser_recommended_next_slice" == "process_runtime_activation_bootstrap" ]]; then
+    recommended_action="advance-process-runtime"
+    recommended_command=""
+  elif [[ "$browser_recommended_next_slice" == "process_runtime_supervision" ]]; then
+    recommended_action="advance-process-supervision"
     recommended_command=""
   elif [[ "$browser_recommended_next_slice" == "process_runtime_activation" ]]; then
     recommended_action="advance-process-runtime"

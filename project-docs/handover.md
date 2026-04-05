@@ -5,19 +5,19 @@
 - Date: 2026-04-05
 - Active branch: `android-desktop-runtime-mainline-20260403`
 - Remote branch: `origin/android-desktop-runtime-mainline-20260403`
-- Current payload baseline: `0.8.0`
+- Current payload baseline: `0.9.0`
 - Latest completed real-device proof: April 4, 2026 `PFEM10` replay reached `classification=plugin_lane_replayed` on payload `0.7.0`
-- Latest repo-side proof: April 5, 2026 targeted validation confirmed the new process-model bootstrap slice on payload `0.8.0`
+- Latest repo-side proof: April 5, 2026 targeted validation confirmed the new process-runtime activation bootstrap slice on payload `0.9.0`
 
 ## What Was Done
 
-1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay and then the first process-model bootstrap slice.
+1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay, then process-model bootstrap, and now the first activation-contract bootstrap slice.
    - Real-device replay on `PFEM10` already converged to `classification=plugin_lane_replayed` on payload `0.7.0`.
-   - Repo-side validation on April 5, 2026 moved the branch one slice further to the new `0.8.0` process-model-bootstrap state.
+   - Repo-side validation on April 5, 2026 moved the branch one slice further again to the new `0.9.0` process-runtime-activation-bootstrap state.
 
-2. `runtime-smoke` now leaves a structured process-model artifact instead of only profile/health/restart evidence.
+2. `runtime-smoke` now leaves both structured process-model and activation-contract artifacts instead of only profile/health/restart evidence.
    - The app still writes `runtime-smoke-desktop-profile.json`, `runtime-smoke-health-report.json`, and `runtime-smoke-restart-contract.json`.
-   - It now also writes `runtime-smoke-process-model.json` and exposes `desktopProcessModelReady`, `desktopProcessStatus`, and `desktopProcessSessionId` through `pod.runtime.describe`.
+   - It now also writes `runtime-smoke-process-model.json` plus `runtime-smoke-activation-contract.json`, and exposes both process-model and activation-contract fields through `pod.runtime.describe`.
 
 3. The direct desktop-home bridge and bounded browser/tool/plugin lanes remain intact.
    - `pod.desktop.materialize` still materializes the packaged desktop home in app-private storage.
@@ -29,7 +29,7 @@
    - The targeted Android Gradle rerun for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest` also passes.
 
 5. The Android and project-level handoff docs were updated to reflect the new split state.
-   - Repo-verified `0.8.0` process-model bootstrap is now documented explicitly.
+   - Repo-verified `0.9.0` process-runtime activation bootstrap is now documented explicitly.
    - The latest real-device state is still called out separately as April 4, 2026 `0.7.0` `plugin_lane_replayed`.
 
 ## Validation Run
@@ -45,11 +45,11 @@
 ## Current Risks
 
 - The branch still does not provide full executable desktop parity. Generic browser tooling, unrestricted shell parity, generic plugin/runtime parity, and long-lived process activation are still missing.
-- The new process-model bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.8.0`.
-- In the repo-side targeted lane, the new process-model artifact currently reports `desktopProcessStatus=blocked`; that is expected until the broader activation path exists, but it means we should not overstate readiness.
+- The new process-runtime activation bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.9.0`.
+- In the repo-side targeted lane, the new bootstrap currently reports `desktopProcessStatus=blocked` plus `desktopProcessActivationStatus=blocked` until browser replay is present; that is expected, but it means we should not overstate readiness.
 
 ## Recommended Next Move
 
-- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_model_bootstrapped`.
-- Once that device proof exists, take the next implementation slice directly into `process_runtime_activation` rather than reopening the earlier plugin-lane decision.
+- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_runtime_activation_bootstrapped`.
+- Once that device proof exists, take the next implementation slice directly into `process_runtime_supervision` rather than reopening the earlier plugin-lane decision.
 - Keep the current `doctor` + `smoke` + `browser-lane:smoke` path boringly replayable before widening the branch surface again.

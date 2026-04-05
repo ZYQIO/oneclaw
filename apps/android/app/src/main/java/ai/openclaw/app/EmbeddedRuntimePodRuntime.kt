@@ -24,6 +24,7 @@ private const val embeddedRuntimeDesktopProfileReplayStateFile = "state/runtime-
 private const val embeddedRuntimeDesktopHealthReportStateFile = "state/runtime-smoke-health-report.json"
 private const val embeddedRuntimeDesktopRestartContractStateFile = "state/runtime-smoke-restart-contract.json"
 private const val embeddedRuntimeDesktopProcessModelStateFile = "state/runtime-smoke-process-model.json"
+private const val embeddedRuntimeDesktopProcessActivationStateFile = "state/runtime-smoke-activation-contract.json"
 private const val embeddedRuntimeDesktopLogFileNameForRuntime = "desktop-home.log"
 
 private val embeddedRuntimeRuntimeJson = Json { ignoreUnknownKeys = true }
@@ -144,6 +145,14 @@ data class EmbeddedRuntimeDesktopProfileReplayInspection(
   val processStatePath: String? = null,
   val processSessionId: String? = null,
   val processBootstrapOnly: Boolean = false,
+  val processActivationReady: Boolean = false,
+  val processActivationStatePresent: Boolean = false,
+  val processActivationStatus: String? = null,
+  val processActivationState: String? = null,
+  val processActivationStatePath: String? = null,
+  val processActivationGeneration: Int = 0,
+  val processActivationBlockedReason: String? = null,
+  val processActivationBootstrapOnly: Boolean = false,
   val longLivedProcessReady: Boolean = false,
   val profileId: String? = null,
   val environmentId: String? = null,
@@ -385,6 +394,12 @@ fun executeEmbeddedRuntimePodTask(
   var desktopProcessStatePath: String? = null
   var desktopProcessStatus: String? = null
   var desktopProcessSessionId: String? = null
+  var desktopProcessActivationReady = false
+  var desktopProcessActivationStatePath: String? = null
+  var desktopProcessActivationStatus: String? = null
+  var desktopProcessActivationState: String? = null
+  var desktopProcessActivationGeneration = 0
+  var desktopProcessActivationBlockedReason: String? = null
 
   if (task.kind == "desktop-tool") {
     val toolResult =
@@ -448,6 +463,12 @@ fun executeEmbeddedRuntimePodTask(
     desktopProcessStatePath = desktopReplay?.processStatePath
     desktopProcessStatus = desktopReplay?.processStatus
     desktopProcessSessionId = desktopReplay?.processSessionId
+    desktopProcessActivationReady = desktopReplay?.processActivationReady == true
+    desktopProcessActivationStatePath = desktopReplay?.processActivationStatePath
+    desktopProcessActivationStatus = desktopReplay?.processActivationStatus
+    desktopProcessActivationState = desktopReplay?.processActivationState
+    desktopProcessActivationGeneration = desktopReplay?.processActivationGeneration ?: 0
+    desktopProcessActivationBlockedReason = desktopReplay?.processActivationBlockedReason
   }
 
   val statePayload =
@@ -470,6 +491,7 @@ fun executeEmbeddedRuntimePodTask(
       put("desktopProfileReplayReady", JsonPrimitive(desktopProfileReplayReady))
       put("desktopEnvironmentSupervisionReady", JsonPrimitive(desktopEnvironmentSupervisionReady))
       put("desktopProcessModelReady", JsonPrimitive(desktopProcessModelReady))
+      put("desktopProcessActivationReady", JsonPrimitive(desktopProcessActivationReady))
       desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
       desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultPath", JsonPrimitive(it)) }
       desktopHealthReportPath?.let { put("desktopHealthReportPath", JsonPrimitive(it)) }
@@ -477,6 +499,13 @@ fun executeEmbeddedRuntimePodTask(
       desktopProcessStatePath?.let { put("desktopProcessStatePath", JsonPrimitive(it)) }
       desktopProcessStatus?.let { put("desktopProcessStatus", JsonPrimitive(it)) }
       desktopProcessSessionId?.let { put("desktopProcessSessionId", JsonPrimitive(it)) }
+      desktopProcessActivationStatePath?.let { put("desktopProcessActivationStatePath", JsonPrimitive(it)) }
+      desktopProcessActivationStatus?.let { put("desktopProcessActivationStatus", JsonPrimitive(it)) }
+      desktopProcessActivationState?.let { put("desktopProcessActivationState", JsonPrimitive(it)) }
+      put("desktopProcessActivationGeneration", JsonPrimitive(desktopProcessActivationGeneration))
+      desktopProcessActivationBlockedReason?.let {
+        put("desktopProcessActivationBlockedReason", JsonPrimitive(it))
+      }
       desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
@@ -522,6 +551,7 @@ fun executeEmbeddedRuntimePodTask(
         put("desktopProfileReplayReady", JsonPrimitive(desktopProfileReplayReady))
         put("desktopEnvironmentSupervisionReady", JsonPrimitive(desktopEnvironmentSupervisionReady))
         put("desktopProcessModelReady", JsonPrimitive(desktopProcessModelReady))
+        put("desktopProcessActivationReady", JsonPrimitive(desktopProcessActivationReady))
         desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
         desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultFilePath", JsonPrimitive(it)) }
         desktopHealthReportPath?.let { put("desktopHealthReportPath", JsonPrimitive(it)) }
@@ -529,6 +559,13 @@ fun executeEmbeddedRuntimePodTask(
         desktopProcessStatePath?.let { put("desktopProcessStatePath", JsonPrimitive(it)) }
         desktopProcessStatus?.let { put("desktopProcessStatus", JsonPrimitive(it)) }
         desktopProcessSessionId?.let { put("desktopProcessSessionId", JsonPrimitive(it)) }
+        desktopProcessActivationStatePath?.let { put("desktopProcessActivationStatePath", JsonPrimitive(it)) }
+        desktopProcessActivationStatus?.let { put("desktopProcessActivationStatus", JsonPrimitive(it)) }
+        desktopProcessActivationState?.let { put("desktopProcessActivationState", JsonPrimitive(it)) }
+        put("desktopProcessActivationGeneration", JsonPrimitive(desktopProcessActivationGeneration))
+        desktopProcessActivationBlockedReason?.let {
+          put("desktopProcessActivationBlockedReason", JsonPrimitive(it))
+        }
         desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
         toolId?.let { put("toolId", JsonPrimitive(it)) }
         put("toolkitStageInstalled", JsonPrimitive(toolkitStageInstalled))
@@ -562,10 +599,12 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val healthReportFile = desktopHome.resolve(embeddedRuntimeDesktopHealthReportStateFile)
   val restartContractFile = desktopHome.resolve(embeddedRuntimeDesktopRestartContractStateFile)
   val processModelFile = desktopHome.resolve(embeddedRuntimeDesktopProcessModelStateFile)
+  val processActivationFile = desktopHome.resolve(embeddedRuntimeDesktopProcessActivationStateFile)
   val statePayload = stateFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val healthPayload = healthReportFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val restartPayload = restartContractFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val processPayload = processModelFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val activationPayload = processActivationFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val dependencyStatus = statePayload?.get("dependencyStatus") as? JsonObject
   val missingDependencies = statePayload?.get("missingDependencies") as? JsonArray
   val status = runtimePrimitiveContent(statePayload, "status")
@@ -573,6 +612,8 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val restartStatus = runtimePrimitiveContent(restartPayload, "status")
   val processStatus = runtimePrimitiveContent(processPayload, "status")
   val processSessionId = runtimePrimitiveContent(processPayload, "sessionId")
+  val activationStatus = runtimePrimitiveContent(activationPayload, "status")
+  val activationState = runtimePrimitiveContent(activationPayload, "activationState")
   val environmentSupervisionReady =
     stateFile.isFile &&
       resultFile.isFile &&
@@ -584,6 +625,11 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
     processModelFile.isFile &&
       processStatus != null &&
       processSessionId != null
+  val processActivationReady =
+    processActivationFile.isFile &&
+      activationStatus != null &&
+      activationState != null &&
+      activationStatus != "unsupported"
   return EmbeddedRuntimeDesktopProfileReplayInspection(
     replayReady = stateFile.isFile && resultFile.isFile && status != null,
     statePresent = stateFile.isFile,
@@ -603,6 +649,14 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
     processStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessModelStateFile),
     processSessionId = processSessionId,
     processBootstrapOnly = runtimePrimitiveBoolean(processPayload, "bootstrapOnly") == true,
+    processActivationReady = processActivationReady,
+    processActivationStatePresent = processActivationFile.isFile,
+    processActivationStatus = activationStatus,
+    processActivationState = activationState,
+    processActivationStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessActivationStateFile),
+    processActivationGeneration = runtimePrimitiveInt(activationPayload, "generation") ?: 0,
+    processActivationBlockedReason = runtimePrimitiveContent(activationPayload, "blockedReason"),
+    processActivationBootstrapOnly = runtimePrimitiveBoolean(activationPayload, "bootstrapOnly") == true,
     longLivedProcessReady = runtimePrimitiveBoolean(processPayload, "longLivedProcessReady") == true,
     profileId = runtimePrimitiveContent(statePayload, "profileId"),
     environmentId = runtimePrimitiveContent(statePayload, "environmentId"),
@@ -913,6 +967,12 @@ private data class EmbeddedRuntimeDesktopProfileReplayExecution(
   val processStatePath: String,
   val processStatus: String,
   val processSessionId: String,
+  val processActivationReady: Boolean,
+  val processActivationStatePath: String,
+  val processActivationStatus: String,
+  val processActivationState: String,
+  val processActivationGeneration: Int,
+  val processActivationBlockedReason: String?,
 )
 
 private fun executeEmbeddedRuntimeDesktopProfileReplay(
@@ -1021,6 +1081,37 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   val profileId = runtimePrimitiveContent(activeProfile, "profileId") ?: "unknown"
   val processSessionId = "$profileId-runtime-smoke-$executionCount"
   val processStatus = if (missingDependencies.isEmpty()) "standby" else "blocked"
+  val activationSupported =
+    runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "activate-process" } ||
+      runtimeJsonArray(supervisorManifest, "capabilities").any {
+        it.content == "process-runtime-activation-bootstrap"
+      } ||
+      runtimeJsonArray(environmentManifest, "capabilities").any {
+        it.content == "process-runtime-activation-bootstrap"
+      }
+  val processActivationFile = desktopHome.resolve(embeddedRuntimeDesktopProcessActivationStateFile)
+  processActivationFile.parentFile?.mkdirs()
+  val previousActivationPayload = processActivationFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val previousActivationGeneration = runtimePrimitiveInt(previousActivationPayload, "generation") ?: 0
+  val processActivationGeneration = previousActivationGeneration + 1
+  val processActivationStatus =
+    when {
+      !activationSupported -> "unsupported"
+      missingDependencies.isNotEmpty() -> "blocked"
+      else -> "ready"
+    }
+  val processActivationState =
+    when (processActivationStatus) {
+      "ready" -> "pending_supervisor"
+      "blocked" -> "blocked"
+      else -> "unsupported"
+    }
+  val processActivationBlockedReason =
+    when {
+      !activationSupported -> "activation_not_supported"
+      missingDependencies.isNotEmpty() -> "missing_dependencies:${missingDependencies.joinToString("|")}"
+      else -> null
+    }
   val processModelPayload =
     buildJsonObject {
       put("status", JsonPrimitive(processStatus))
@@ -1033,7 +1124,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("longLivedProcessReady", JsonPrimitive(false))
       put("desiredState", JsonPrimitive("running"))
       put("observedState", JsonPrimitive(processStatus))
-      put("activationState", JsonPrimitive("replayed"))
+      put("activationState", JsonPrimitive(processActivationState))
       put("entryCommand", JsonPrimitive("pod.runtime.execute"))
       put("entryTaskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
       put("runtimeHomeReady", JsonPrimitive(carrierInspection.runtimeHomeReady))
@@ -1067,6 +1158,56 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     }
   processModelFile.writeText("${processModelPayload}\n", Charsets.UTF_8)
   val processModelReady = processModelFile.isFile
+  val processActivationPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(processActivationStatus))
+      put("activationState", JsonPrimitive(processActivationState))
+      put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("profileId", JsonPrimitive(profileId))
+      runtimePrimitiveContent(activeProfile, "environmentId")?.let { put("environmentId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "supervisorId")?.let { put("supervisorId", JsonPrimitive(it)) }
+      put("sessionId", JsonPrimitive(processSessionId))
+      put("generation", JsonPrimitive(processActivationGeneration))
+      put("previousGeneration", JsonPrimitive(previousActivationGeneration))
+      put("activationSupported", JsonPrimitive(activationSupported))
+      put("activationRequested", JsonPrimitive(processActivationStatus == "ready"))
+      put("bootstrapOnly", JsonPrimitive(true))
+      put("longLivedProcessReady", JsonPrimitive(false))
+      put("desiredProcessState", JsonPrimitive("running"))
+      put("observedProcessStatus", JsonPrimitive(processStatus))
+      put("entryCommand", JsonPrimitive("pod.runtime.execute"))
+      put("entryTaskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("supervisorAction", JsonPrimitive("activate-process"))
+      put("supervisorCommand", JsonPrimitive("openclaw-desktop-runtime-supervisor"))
+      put("processModelPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessModelStateFile)))
+      put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
+      put("restartContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopRestartContractStateFile)))
+      put("runtimeStatePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "state/runtime-smoke.json")))
+      put("runtimeHomePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion)))
+      put("desktopHomePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion)))
+      put("observedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      processActivationBlockedReason?.let { put("blockedReason", JsonPrimitive(it)) }
+      put(
+        "dependencyStatus",
+        buildJsonObject {
+          dependencyStatus.forEach { (dependency, ready) ->
+            put(dependency, JsonPrimitive(ready))
+          }
+        },
+      )
+      put(
+        "missingDependencies",
+        buildJsonArray {
+          missingDependencies.forEach { dependency ->
+            add(JsonPrimitive(dependency))
+          }
+        },
+      )
+    }
+  processActivationFile.writeText("${processActivationPayload}\n", Charsets.UTF_8)
+  val processActivationReady =
+    processActivationFile.isFile && activationSupported && processActivationStatus != "unsupported"
   val resultPayload =
     buildJsonObject {
       put("status", JsonPrimitive(if (missingDependencies.isEmpty()) "ready" else "degraded"))
@@ -1125,6 +1266,13 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("processStatePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessModelStateFile)))
       put("processSessionId", JsonPrimitive(processSessionId))
       put("processBootstrapOnly", JsonPrimitive(true))
+      put("processActivationReady", JsonPrimitive(processActivationReady))
+      put("processActivationStatus", JsonPrimitive(processActivationStatus))
+      put("processActivationState", JsonPrimitive(processActivationState))
+      put("processActivationStatePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessActivationStateFile)))
+      put("processActivationGeneration", JsonPrimitive(processActivationGeneration))
+      processActivationBlockedReason?.let { put("processActivationBlockedReason", JsonPrimitive(it)) }
+      put("processActivationBootstrapOnly", JsonPrimitive(true))
       put("longLivedProcessReady", JsonPrimitive(false))
       put("healthStatus", JsonPrimitive(healthReportStatus))
       put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
@@ -1179,6 +1327,12 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessModelStateFile),
     processStatus = processStatus,
     processSessionId = processSessionId,
+    processActivationReady = processActivationReady,
+    processActivationStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessActivationStateFile),
+    processActivationStatus = processActivationStatus,
+    processActivationState = processActivationState,
+    processActivationGeneration = processActivationGeneration,
+    processActivationBlockedReason = processActivationBlockedReason,
   )
 }
 
