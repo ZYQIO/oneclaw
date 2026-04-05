@@ -1,6 +1,6 @@
 {
   "engineId": "embedded-runtime-task-engine-v1",
-  "engineVersion": "0.3.0",
+  "engineVersion": "0.4.0",
   "kind": "descriptor",
   "supportedTaskKinds": [
     "runtime-smoke",
@@ -18,10 +18,11 @@
     "packaged-tool-descriptor",
     "packaged-plugin-descriptor",
     "structured-state-write",
-    "structured-log-write"
+    "structured-log-write",
+    "process-model-bootstrap"
   ],
   "limitations": [
     "No packaged browser lane yet",
-    "No long-lived desktop process supervisor yet"
+    "No long-lived desktop process activation yet"
   ]
 }

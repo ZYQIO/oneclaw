@@ -4,5 +4,6 @@
   "workspaceBridgeEnabled": true,
   "browserLaneEnabled": false,
   "toolLaneEnabled": true,
-  "pluginLaneEnabled": true
+  "pluginLaneEnabled": true,
+  "processModelEnabled": true
 }

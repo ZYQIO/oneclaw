@@ -2,65 +2,54 @@
 
 ## Snapshot
 
-- Date: 2026-04-03
+- Date: 2026-04-05
 - Active branch: `android-desktop-runtime-mainline-20260403`
 - Remote branch: `origin/android-desktop-runtime-mainline-20260403`
-- Recent verified commits:
-  - `b74e3d1b87` `Android: fix desktop materialize invoke wiring`
-  - `ed3b0e8f27` `docs(android): record desktop home device replay`
+- Current payload baseline: `0.8.0`
+- Latest completed real-device proof: April 4, 2026 `PFEM10` replay reached `classification=plugin_lane_replayed` on payload `0.7.0`
+- Latest repo-side proof: April 5, 2026 targeted validation confirmed the new process-model bootstrap slice on payload `0.8.0`
 
 ## What Was Done
 
-1. Real-device desktop-runtime replay was completed on the connected OPPO / ColorOS `PFEM10` phone.
-   - The first `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` run correctly detected a stale `0.2.0` device build.
-   - After reinstalling the current debug app, the same flow converged to `manifestVersion=0.6.0`, `verifiedFileCount=24`, and `classification=desktop_home_configured`.
+1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay and then the first process-model bootstrap slice.
+   - Real-device replay on `PFEM10` already converged to `classification=plugin_lane_replayed` on payload `0.7.0`.
+   - Repo-side validation on April 5, 2026 moved the branch one slice further to the new `0.8.0` process-model-bootstrap state.
 
-2. The packaged browser lane and runtime/tool carrier were reconfirmed on-device.
-   - `pod.browser.describe` now shows replayable state on disk plus a stored credential.
-   - `pod.runtime.execute(taskId=runtime-smoke)` and `pod.runtime.execute(taskId=tool-brief-inspect)` both replay cleanly against the packaged `0.6.0` payload.
+2. `runtime-smoke` now leaves a structured process-model artifact instead of only profile/health/restart evidence.
+   - The app still writes `runtime-smoke-desktop-profile.json`, `runtime-smoke-health-report.json`, and `runtime-smoke-restart-contract.json`.
+   - It now also writes `runtime-smoke-process-model.json` and exposes `desktopProcessModelReady`, `desktopProcessStatus`, and `desktopProcessSessionId` through `pod.runtime.describe`.
 
-3. A real repo bug was exposed and fixed during direct `pod.desktop.materialize` replay.
-   - Remote `/invoke/capabilities` advertised `pod.desktop.materialize`.
-   - Actual `/invoke` returned `INVALID_REQUEST: unknown command`.
-   - Root cause: `InvokeCommandRegistry` was missing `OpenClawPodCommand.DesktopMaterialize`.
-   - Fix landed in `b74e3d1b87`.
+3. The direct desktop-home bridge and bounded browser/tool/plugin lanes remain intact.
+   - `pod.desktop.materialize` still materializes the packaged desktop home in app-private storage.
+   - The browser-lane smoke still auto-runs `pod.desktop.materialize`, `runtime-smoke`, `tool-brief-inspect`, and `plugin-allowlist-inspect`.
+   - The first allowlisted plugin replay still has real-device proof from April 4, 2026.
 
-4. The direct desktop-home bridge now has real-device proof.
-   - `pod.desktop.materialize` returns `desktopHomeReady=true`.
-   - The app writes `filesDir/openclaw/embedded-desktop-home/0.6.0/profiles/active-profile.json`.
-   - The app writes `filesDir/openclaw/embedded-desktop-home/0.6.0/state/desktop-materialize.json`.
+4. The latest targeted repo validation is green again on the current machine.
+   - `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` passes.
+   - The targeted Android Gradle rerun for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest` also passes.
 
-5. The Android handoff/progress/checkpoint docs were updated to reflect the new verified state.
-   - The verification queue now records both the stale-build failure and the successful replay.
-   - The checkpoint now treats `pod.desktop.materialize` as proven on-device, not pending.
+5. The Android and project-level handoff docs were updated to reflect the new split state.
+   - Repo-verified `0.8.0` process-model bootstrap is now documented explicitly.
+   - The latest real-device state is still called out separately as April 4, 2026 `0.7.0` `plugin_lane_replayed`.
 
 ## Validation Run
 
-- `cd apps/android && env ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:installDebug`
-  - Passed and installed on the connected `PFEM10` device.
-- `pnpm android:local-host:token -- --json`
-  - Passed and exported the current local-host bearer token from the debug app.
+- `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts`
+  - Passed on April 5, 2026.
+- `cd apps/android && env ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:testDebugUnitTest --tests ai.openclaw.app.EmbeddedRuntimePodStatusTest --tests ai.openclaw.app.node.PodHandlerTest --tests ai.openclaw.app.node.InvokeCommandRegistryTest`
+  - Passed on April 5, 2026.
 - `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`
-  - Passed.
-  - Final verified outcome: `classification=desktop_home_configured`.
-- Direct remote `pod.desktop.materialize` invoke over the phone's guarded local-host API
-  - Passed after the registry fix.
-  - Returned `desktopHomeReady=true`.
-- `cd apps/android && env ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:testDebugUnitTest --tests ai.openclaw.app.node.InvokeCommandRegistryTest`
-  - Passed.
-- `cd apps/android && env ANDROID_HOME="$HOME/Library/Android/sdk" ANDROID_SDK_ROOT="$HOME/Library/Android/sdk" ./gradlew --no-daemon --console=plain :app:compileDebugKotlin`
-  - Passed.
+  - Latest completed real-device proof remains the April 4, 2026 run on `PFEM10`.
+  - Final verified real-device outcome from that run: `classification=plugin_lane_replayed`.
 
 ## Current Risks
 
-- The branch still does not provide full executable desktop parity. Generic browser tooling, unrestricted shell parity, and executable plugin/runtime parity are still missing.
-- The broad `PodHandlerTest` lane is not yet a clean validation gate in this environment; several tests currently fail with `KeyStoreException` / `NoSuchAlgorithmException`, which looks environmental rather than caused by the desktop-home fix.
-- `pnpm android:local-host:embedded-runtime-pod:doctor` now reports the correct top-level `desktop_home_configured` classification, but the next slice itself is still a product/engineering decision rather than an automatic continuation.
+- The branch still does not provide full executable desktop parity. Generic browser tooling, unrestricted shell parity, generic plugin/runtime parity, and long-lived process activation are still missing.
+- The new process-model bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.8.0`.
+- In the repo-side targeted lane, the new process-model artifact currently reports `desktopProcessStatus=blocked`; that is expected until the broader activation path exists, but it means we should not overstate readiness.
 
 ## Recommended Next Move
 
-- Decide the next Android desktop-runtime slice explicitly:
-  - Option A: deepen the engine/environment path so the materialized desktop home runs a more substantial packaged task.
-  - Option B: add one narrowly allowlisted plugin/runtime slice now that `desktop_home_configured` is proven.
-- Add one dedicated repo entrypoint that verifies `pod.desktop.materialize` directly and captures the desktop-home state artifacts in one place, instead of relying on an ad hoc curl sequence.
-- Keep the current `doctor` + pod smoke + direct materialize path boringly replayable on the same device before widening the branch surface again.
+- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_model_bootstrapped`.
+- Once that device proof exists, take the next implementation slice directly into `process_runtime_activation` rather than reopening the earlier plugin-lane decision.
+- Keep the current `doctor` + `smoke` + `browser-lane:smoke` path boringly replayable before widening the branch surface again.

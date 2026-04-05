@@ -537,6 +537,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         browserIntegrated &&
         browser.browserReplayReady &&
         browser.authCredentialPresent &&
+        carrier.runtimePluginExecutionStateCount > 0 &&
+        desktopReplay.processModelReady -> "process_model_bootstrapped"
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent &&
         carrier.runtimePluginExecutionStateCount > 0 -> "plugin_lane_replayed"
       inspection.ready &&
         desktop.desktopHomeReady &&
@@ -609,6 +618,13 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         desktopReplay.restartStatus?.let { put("desktopRestartStatus", JsonPrimitive(it)) }
         put("desktopRestartGeneration", JsonPrimitive(desktopReplay.restartGeneration))
         desktopReplay.restartContractPath?.let { put("desktopRestartContractPath", JsonPrimitive(it)) }
+        put("desktopProcessModelReady", JsonPrimitive(desktopReplay.processModelReady))
+        put("desktopProcessStatePresent", JsonPrimitive(desktopReplay.processStatePresent))
+        desktopReplay.processStatus?.let { put("desktopProcessStatus", JsonPrimitive(it)) }
+        desktopReplay.processStatePath?.let { put("desktopProcessStatePath", JsonPrimitive(it)) }
+        desktopReplay.processSessionId?.let { put("desktopProcessSessionId", JsonPrimitive(it)) }
+        put("desktopProcessBootstrapOnly", JsonPrimitive(desktopReplay.processBootstrapOnly))
+        put("desktopLongLivedProcessReady", JsonPrimitive(desktopReplay.longLivedProcessReady))
         desktopReplay.profileId?.let { put("desktopReplayProfileId", JsonPrimitive(it)) }
         desktopReplay.environmentId?.let { put("desktopReplayEnvironmentId", JsonPrimitive(it)) }
         desktopReplay.supervisorId?.let { put("desktopReplaySupervisorId", JsonPrimitive(it)) }
@@ -802,7 +818,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 status = environmentStatus,
                 integrated = environmentIntegrated,
                 summary =
-                  if (desktopReplay.environmentSupervisionReady) {
+                  if (desktopReplay.processModelReady) {
+                    "The app now leaves a structured process-model bootstrap artifact alongside health-report and restart-contract state, so the next slice can deepen into real supervised activation rather than more status-only proof."
+                  } else if (desktopReplay.environmentSupervisionReady) {
                     "The app now leaves explicit desktop-home health-report and restart-contract artifacts alongside the bounded profile replay."
                   } else if (desktopReplay.replayReady) {
                     "The app can now replay the active desktop profile against app-private runtime and desktop homes, including persisted environment and supervisor contract state."
@@ -887,7 +905,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !browser.authCredentialPresent -> "browser_lane_complete"
               !pluginsIntegrated -> "plugin_lane_bootstrap"
               carrier.runtimePluginExecutionStateCount < 1 -> "plugin_lane_replay"
-              else -> "process_model"
+              !desktopReplay.processModelReady -> "process_model_bootstrap"
+              else -> "process_runtime_activation"
             },
           ),
         )
@@ -919,8 +938,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Attach one narrow allowlisted plugin slice behind pod.runtime.execute instead of widening into generic plugin install or process execution."
               carrier.runtimePluginExecutionStateCount < 1 ->
                 "Run pod.runtime.execute with the packaged allowlisted plugin task on-device to prove the plugin lane leaves replayable evidence on disk."
+              !desktopReplay.processModelReady ->
+                "Deepen runtime-smoke so the desktop-home replay also leaves a structured process-model bootstrap artifact that ties together health, restart, desired state, and session semantics."
               else ->
-                "Keep the bounded plugin lane stable, then deepen the next process-model slice beyond file-level supervision artifacts."
+                "Keep the process-model bootstrap stable, then deepen it into a real supervised runtime activation path beyond descriptor and state-file writes."
             },
           ),
         )
