@@ -27,6 +27,7 @@ private const val embeddedRuntimeDesktopProcessModelStateFile = "state/runtime-s
 private const val embeddedRuntimeDesktopProcessActivationStateFile = "state/runtime-smoke-activation-contract.json"
 private const val embeddedRuntimeDesktopProcessSupervisionStateFile = "state/runtime-smoke-supervision-contract.json"
 private const val embeddedRuntimeDesktopProcessObservationStateFile = "state/runtime-smoke-observation-contract.json"
+private const val embeddedRuntimeDesktopProcessRecoveryStateFile = "state/runtime-smoke-recovery-contract.json"
 private const val embeddedRuntimeDesktopLogFileNameForRuntime = "desktop-home.log"
 
 private val embeddedRuntimeRuntimeJson = Json { ignoreUnknownKeys = true }
@@ -177,6 +178,16 @@ data class EmbeddedRuntimeDesktopProfileReplayInspection(
   val processObservationLeaseHealth: String? = null,
   val processObservationRecoveryHint: String? = null,
   val processObservationBootstrapOnly: Boolean = false,
+  val processRecoveryReady: Boolean = false,
+  val processRecoveryStatePresent: Boolean = false,
+  val processRecoveryStatus: String? = null,
+  val processRecoveryState: String? = null,
+  val processRecoveryStatePath: String? = null,
+  val processRecoveryGeneration: Int = 0,
+  val processRecoveryActionCount: Int = 0,
+  val processRecoveryPrimaryAction: String? = null,
+  val processRecoveryReason: String? = null,
+  val processRecoveryBootstrapOnly: Boolean = false,
   val longLivedProcessReady: Boolean = false,
   val profileId: String? = null,
   val environmentId: String? = null,
@@ -442,6 +453,14 @@ fun executeEmbeddedRuntimePodTask(
   var desktopProcessObservationLeaseRemainingSeconds = 0
   var desktopProcessObservationLeaseHealth: String? = null
   var desktopProcessObservationRecoveryHint: String? = null
+  var desktopProcessRecoveryReady = false
+  var desktopProcessRecoveryStatePath: String? = null
+  var desktopProcessRecoveryStatus: String? = null
+  var desktopProcessRecoveryState: String? = null
+  var desktopProcessRecoveryGeneration = 0
+  var desktopProcessRecoveryActionCount = 0
+  var desktopProcessRecoveryPrimaryAction: String? = null
+  var desktopProcessRecoveryReason: String? = null
   var desktopLongLivedProcessReady = false
 
   if (task.kind == "desktop-tool") {
@@ -530,6 +549,14 @@ fun executeEmbeddedRuntimePodTask(
     desktopProcessObservationLeaseRemainingSeconds = desktopReplay?.processObservationLeaseRemainingSeconds ?: 0
     desktopProcessObservationLeaseHealth = desktopReplay?.processObservationLeaseHealth
     desktopProcessObservationRecoveryHint = desktopReplay?.processObservationRecoveryHint
+    desktopProcessRecoveryReady = desktopReplay?.processRecoveryReady == true
+    desktopProcessRecoveryStatePath = desktopReplay?.processRecoveryStatePath
+    desktopProcessRecoveryStatus = desktopReplay?.processRecoveryStatus
+    desktopProcessRecoveryState = desktopReplay?.processRecoveryState
+    desktopProcessRecoveryGeneration = desktopReplay?.processRecoveryGeneration ?: 0
+    desktopProcessRecoveryActionCount = desktopReplay?.processRecoveryActionCount ?: 0
+    desktopProcessRecoveryPrimaryAction = desktopReplay?.processRecoveryPrimaryAction
+    desktopProcessRecoveryReason = desktopReplay?.processRecoveryReason
     desktopLongLivedProcessReady = desktopReplay?.longLivedProcessReady == true
   }
 
@@ -556,6 +583,7 @@ fun executeEmbeddedRuntimePodTask(
       put("desktopProcessActivationReady", JsonPrimitive(desktopProcessActivationReady))
       put("desktopProcessSupervisionReady", JsonPrimitive(desktopProcessSupervisionReady))
       put("desktopProcessObservationReady", JsonPrimitive(desktopProcessObservationReady))
+      put("desktopProcessRecoveryReady", JsonPrimitive(desktopProcessRecoveryReady))
       put("desktopLongLivedProcessReady", JsonPrimitive(desktopLongLivedProcessReady))
       desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
       desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultPath", JsonPrimitive(it)) }
@@ -589,6 +617,13 @@ fun executeEmbeddedRuntimePodTask(
       put("desktopProcessObservationLeaseRemainingSeconds", JsonPrimitive(desktopProcessObservationLeaseRemainingSeconds))
       desktopProcessObservationLeaseHealth?.let { put("desktopProcessObservationLeaseHealth", JsonPrimitive(it)) }
       desktopProcessObservationRecoveryHint?.let { put("desktopProcessObservationRecoveryHint", JsonPrimitive(it)) }
+      desktopProcessRecoveryStatePath?.let { put("desktopProcessRecoveryStatePath", JsonPrimitive(it)) }
+      desktopProcessRecoveryStatus?.let { put("desktopProcessRecoveryStatus", JsonPrimitive(it)) }
+      desktopProcessRecoveryState?.let { put("desktopProcessRecoveryState", JsonPrimitive(it)) }
+      put("desktopProcessRecoveryGeneration", JsonPrimitive(desktopProcessRecoveryGeneration))
+      put("desktopProcessRecoveryActionCount", JsonPrimitive(desktopProcessRecoveryActionCount))
+      desktopProcessRecoveryPrimaryAction?.let { put("desktopProcessRecoveryPrimaryAction", JsonPrimitive(it)) }
+      desktopProcessRecoveryReason?.let { put("desktopProcessRecoveryReason", JsonPrimitive(it)) }
       desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
@@ -637,6 +672,7 @@ fun executeEmbeddedRuntimePodTask(
         put("desktopProcessActivationReady", JsonPrimitive(desktopProcessActivationReady))
         put("desktopProcessSupervisionReady", JsonPrimitive(desktopProcessSupervisionReady))
         put("desktopProcessObservationReady", JsonPrimitive(desktopProcessObservationReady))
+        put("desktopProcessRecoveryReady", JsonPrimitive(desktopProcessRecoveryReady))
         put("desktopLongLivedProcessReady", JsonPrimitive(desktopLongLivedProcessReady))
         desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
         desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultFilePath", JsonPrimitive(it)) }
@@ -674,6 +710,15 @@ fun executeEmbeddedRuntimePodTask(
         desktopProcessObservationRecoveryHint?.let {
           put("desktopProcessObservationRecoveryHint", JsonPrimitive(it))
         }
+        desktopProcessRecoveryStatePath?.let { put("desktopProcessRecoveryStatePath", JsonPrimitive(it)) }
+        desktopProcessRecoveryStatus?.let { put("desktopProcessRecoveryStatus", JsonPrimitive(it)) }
+        desktopProcessRecoveryState?.let { put("desktopProcessRecoveryState", JsonPrimitive(it)) }
+        put("desktopProcessRecoveryGeneration", JsonPrimitive(desktopProcessRecoveryGeneration))
+        put("desktopProcessRecoveryActionCount", JsonPrimitive(desktopProcessRecoveryActionCount))
+        desktopProcessRecoveryPrimaryAction?.let {
+          put("desktopProcessRecoveryPrimaryAction", JsonPrimitive(it))
+        }
+        desktopProcessRecoveryReason?.let { put("desktopProcessRecoveryReason", JsonPrimitive(it)) }
         desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
         toolId?.let { put("toolId", JsonPrimitive(it)) }
         put("toolkitStageInstalled", JsonPrimitive(toolkitStageInstalled))
@@ -710,6 +755,7 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val processActivationFile = desktopHome.resolve(embeddedRuntimeDesktopProcessActivationStateFile)
   val processSupervisionFile = desktopHome.resolve(embeddedRuntimeDesktopProcessSupervisionStateFile)
   val processObservationFile = desktopHome.resolve(embeddedRuntimeDesktopProcessObservationStateFile)
+  val processRecoveryFile = desktopHome.resolve(embeddedRuntimeDesktopProcessRecoveryStateFile)
   val statePayload = stateFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val healthPayload = healthReportFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val restartPayload = restartContractFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
@@ -717,6 +763,7 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val activationPayload = processActivationFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val supervisionPayload = processSupervisionFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val observationPayload = processObservationFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val recoveryPayload = processRecoveryFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val dependencyStatus = statePayload?.get("dependencyStatus") as? JsonObject
   val missingDependencies = statePayload?.get("missingDependencies") as? JsonArray
   val status = runtimePrimitiveContent(statePayload, "status")
@@ -730,6 +777,8 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val supervisionState = runtimePrimitiveContent(supervisionPayload, "supervisionState")
   val observationStatus = runtimePrimitiveContent(observationPayload, "status")
   val observationState = runtimePrimitiveContent(observationPayload, "observationState")
+  val recoveryStatus = runtimePrimitiveContent(recoveryPayload, "status")
+  val recoveryState = runtimePrimitiveContent(recoveryPayload, "recoveryState")
   val environmentSupervisionReady =
     stateFile.isFile &&
       resultFile.isFile &&
@@ -756,6 +805,11 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
       observationStatus != null &&
       observationState != null &&
       observationStatus != "unsupported"
+  val processRecoveryReady =
+    processRecoveryFile.isFile &&
+      recoveryStatus != null &&
+      recoveryState != null &&
+      recoveryStatus != "unsupported"
   return EmbeddedRuntimeDesktopProfileReplayInspection(
     replayReady = stateFile.isFile && resultFile.isFile && status != null,
     statePresent = stateFile.isFile,
@@ -805,6 +859,16 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
     processObservationLeaseHealth = runtimePrimitiveContent(observationPayload, "leaseHealth"),
     processObservationRecoveryHint = runtimePrimitiveContent(observationPayload, "recoveryHint"),
     processObservationBootstrapOnly = runtimePrimitiveBoolean(observationPayload, "bootstrapOnly") == true,
+    processRecoveryReady = processRecoveryReady,
+    processRecoveryStatePresent = processRecoveryFile.isFile,
+    processRecoveryStatus = recoveryStatus,
+    processRecoveryState = recoveryState,
+    processRecoveryStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessRecoveryStateFile),
+    processRecoveryGeneration = runtimePrimitiveInt(recoveryPayload, "generation") ?: 0,
+    processRecoveryActionCount = runtimePrimitiveInt(recoveryPayload, "actionCount") ?: 0,
+    processRecoveryPrimaryAction = runtimePrimitiveContent(recoveryPayload, "primaryAction"),
+    processRecoveryReason = runtimePrimitiveContent(recoveryPayload, "recoveryReason"),
+    processRecoveryBootstrapOnly = runtimePrimitiveBoolean(recoveryPayload, "bootstrapOnly") == true,
     longLivedProcessReady =
       runtimePrimitiveBoolean(observationPayload, "longLivedProcessReady") == true ||
         runtimePrimitiveBoolean(supervisionPayload, "longLivedProcessReady") == true,
@@ -1141,6 +1205,14 @@ private data class EmbeddedRuntimeDesktopProfileReplayExecution(
   val processObservationLeaseRemainingSeconds: Int,
   val processObservationLeaseHealth: String,
   val processObservationRecoveryHint: String,
+  val processRecoveryReady: Boolean,
+  val processRecoveryStatePath: String,
+  val processRecoveryStatus: String,
+  val processRecoveryState: String,
+  val processRecoveryGeneration: Int,
+  val processRecoveryActionCount: Int,
+  val processRecoveryPrimaryAction: String,
+  val processRecoveryReason: String,
   val longLivedProcessReady: Boolean,
 )
 
@@ -1359,6 +1431,121 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       processSupervisionStatus == "active" -> "keep_lease_fresh"
       else -> "rerun_runtime_smoke"
     }
+  val recoverySupported =
+    runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "recover-process" } ||
+      runtimeJsonArray(supervisorManifest, "capabilities").any {
+        it.content == "process-runtime-recovery-bootstrap"
+      } ||
+      runtimeJsonArray(environmentManifest, "capabilities").any {
+        it.content == "process-runtime-recovery-bootstrap"
+      }
+  val processRecoveryFile = desktopHome.resolve(embeddedRuntimeDesktopProcessRecoveryStateFile)
+  processRecoveryFile.parentFile?.mkdirs()
+  val previousRecoveryPayload = processRecoveryFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val previousRecoveryGeneration = runtimePrimitiveInt(previousRecoveryPayload, "generation") ?: 0
+  val processRecoveryGeneration = previousRecoveryGeneration + 1
+  val processRecoveryStatus =
+    when {
+      !recoverySupported -> "unsupported"
+      processObservationStatus == "healthy" -> "ready"
+      else -> "planned"
+    }
+  val processRecoveryState =
+    when {
+      !recoverySupported -> "unsupported"
+      missingDependencies.isNotEmpty() -> "restore_dependencies"
+      processSupervisionBlockedReason != null -> "clear_blocker"
+      processObservationStatus == "healthy" -> "monitoring"
+      else -> "rerun_required"
+    }
+  val processRecoveryReason =
+    when {
+      !recoverySupported -> "recovery_not_supported"
+      missingDependencies.isNotEmpty() -> "missing_dependencies:${missingDependencies.joinToString("|")}"
+      processSupervisionBlockedReason != null -> processSupervisionBlockedReason
+      processObservationStatus == "healthy" -> "lease_fresh"
+      else -> processObservationRecoveryHint
+    }
+  val processRecoveryActions =
+    buildList<JsonObject> {
+      when {
+        !recoverySupported -> Unit
+        missingDependencies.isNotEmpty() -> {
+          missingDependencies.forEach { dependency ->
+            add(
+              buildJsonObject {
+                put("actionId", JsonPrimitive("restore_dependency:$dependency"))
+                put("kind", JsonPrimitive("restore_dependency"))
+                put("target", JsonPrimitive(dependency))
+                put("reason", JsonPrimitive("dependency_missing:$dependency"))
+                put("command", JsonPrimitive("pod.runtime.execute"))
+                put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+                put("blocking", JsonPrimitive(true))
+              },
+            )
+          }
+          add(
+            buildJsonObject {
+              put("actionId", JsonPrimitive("rerun_runtime_smoke"))
+              put("kind", JsonPrimitive("rerun_runtime_smoke"))
+              put("reason", JsonPrimitive("refresh_runtime_recovery_contract"))
+              put("command", JsonPrimitive("pod.runtime.execute"))
+              put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+              put("blocking", JsonPrimitive(false))
+            },
+          )
+        }
+        processSupervisionBlockedReason != null -> {
+          add(
+            buildJsonObject {
+              put("actionId", JsonPrimitive("clear_blocker"))
+              put("kind", JsonPrimitive("clear_blocker"))
+              put("reason", JsonPrimitive(processSupervisionBlockedReason))
+              put("command", JsonPrimitive("pod.runtime.execute"))
+              put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+              put("blocking", JsonPrimitive(true))
+            },
+          )
+          add(
+            buildJsonObject {
+              put("actionId", JsonPrimitive("rerun_runtime_smoke"))
+              put("kind", JsonPrimitive("rerun_runtime_smoke"))
+              put("reason", JsonPrimitive("refresh_runtime_recovery_contract"))
+              put("command", JsonPrimitive("pod.runtime.execute"))
+              put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+              put("blocking", JsonPrimitive(false))
+            },
+          )
+        }
+        processObservationStatus == "healthy" -> {
+          add(
+            buildJsonObject {
+              put("actionId", JsonPrimitive("keep_lease_fresh"))
+              put("kind", JsonPrimitive("keep_lease_fresh"))
+              put("reason", JsonPrimitive("observation_healthy"))
+              put("command", JsonPrimitive("pod.runtime.execute"))
+              put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+              put("leaseCadenceSeconds", JsonPrimitive(300))
+              put("blocking", JsonPrimitive(false))
+            },
+          )
+        }
+        else -> {
+          add(
+            buildJsonObject {
+              put("actionId", JsonPrimitive("rerun_runtime_smoke"))
+              put("kind", JsonPrimitive("rerun_runtime_smoke"))
+              put("reason", JsonPrimitive(processObservationRecoveryHint))
+              put("command", JsonPrimitive("pod.runtime.execute"))
+              put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+              put("blocking", JsonPrimitive(false))
+            },
+          )
+        }
+      }
+    }
+  val processRecoveryPrimaryAction =
+    (processRecoveryActions.firstOrNull()?.get("actionId") as? JsonPrimitive)?.content ?: "none"
   val processModelPayload =
     buildJsonObject {
       put("status", JsonPrimitive(processStatus))
@@ -1568,6 +1755,75 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   processObservationFile.writeText("${processObservationPayload}\n", Charsets.UTF_8)
   val processObservationReady =
     processObservationFile.isFile && observationSupported && processObservationStatus != "unsupported"
+  val processRecoveryPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(processRecoveryStatus))
+      put("recoveryState", JsonPrimitive(processRecoveryState))
+      put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("profileId", JsonPrimitive(profileId))
+      runtimePrimitiveContent(activeProfile, "environmentId")?.let { put("environmentId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "supervisorId")?.let { put("supervisorId", JsonPrimitive(it)) }
+      put("sessionId", JsonPrimitive(processSessionId))
+      put("generation", JsonPrimitive(processRecoveryGeneration))
+      put("previousGeneration", JsonPrimitive(previousRecoveryGeneration))
+      put("recoverySupported", JsonPrimitive(recoverySupported))
+      put("bootstrapOnly", JsonPrimitive(true))
+      put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
+      put("desiredProcessState", JsonPrimitive("running"))
+      put("observedProcessStatus", JsonPrimitive(processStatus))
+      put("activationState", JsonPrimitive(processActivationState))
+      put("supervisionState", JsonPrimitive(processSupervisionState))
+      put("observationState", JsonPrimitive(processObservationState))
+      put("observationRecoveryHint", JsonPrimitive(processObservationRecoveryHint))
+      put("supervisionContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessSupervisionStateFile)))
+      put("observationContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessObservationStateFile)))
+      put("activationContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessActivationStateFile)))
+      put("processModelPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessModelStateFile)))
+      put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
+      put("restartContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopRestartContractStateFile)))
+      put("restartGeneration", JsonPrimitive(restartGeneration))
+      put("restartSupported", JsonPrimitive(restartSupported))
+      put("restartCommand", JsonPrimitive("pod.runtime.execute"))
+      put("entryCommand", JsonPrimitive("pod.runtime.execute"))
+      put("entryTaskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("supervisorAction", JsonPrimitive("recover-process"))
+      put("supervisorCommand", JsonPrimitive("openclaw-desktop-runtime-supervisor"))
+      put("runtimeStatePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "state/runtime-smoke.json")))
+      put("runtimeHomePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion)))
+      put("desktopHomePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion)))
+      put("observedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      put("primaryAction", JsonPrimitive(processRecoveryPrimaryAction))
+      put("recoveryReason", JsonPrimitive(processRecoveryReason))
+      put("actionCount", JsonPrimitive(processRecoveryActions.size))
+      put(
+        "actions",
+        buildJsonArray {
+          processRecoveryActions.forEach { action ->
+            add(action)
+          }
+        },
+      )
+      put(
+        "dependencyStatus",
+        buildJsonObject {
+          dependencyStatus.forEach { (dependency, ready) ->
+            put(dependency, JsonPrimitive(ready))
+          }
+        },
+      )
+      put(
+        "missingDependencies",
+        buildJsonArray {
+          missingDependencies.forEach { dependency ->
+            add(JsonPrimitive(dependency))
+          }
+        },
+      )
+    }
+  processRecoveryFile.writeText("${processRecoveryPayload}\n", Charsets.UTF_8)
+  val processRecoveryReady =
+    processRecoveryFile.isFile && recoverySupported && processRecoveryStatus != "unsupported"
   val resultPayload =
     buildJsonObject {
       put("status", JsonPrimitive(if (missingDependencies.isEmpty()) "ready" else "degraded"))
@@ -1653,6 +1909,15 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("processObservationLeaseHealth", JsonPrimitive(processObservationLeaseHealth))
       put("processObservationRecoveryHint", JsonPrimitive(processObservationRecoveryHint))
       put("processObservationBootstrapOnly", JsonPrimitive(true))
+      put("processRecoveryReady", JsonPrimitive(processRecoveryReady))
+      put("processRecoveryStatus", JsonPrimitive(processRecoveryStatus))
+      put("processRecoveryState", JsonPrimitive(processRecoveryState))
+      put("processRecoveryStatePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessRecoveryStateFile)))
+      put("processRecoveryGeneration", JsonPrimitive(processRecoveryGeneration))
+      put("processRecoveryActionCount", JsonPrimitive(processRecoveryActions.size))
+      put("processRecoveryPrimaryAction", JsonPrimitive(processRecoveryPrimaryAction))
+      put("processRecoveryReason", JsonPrimitive(processRecoveryReason))
+      put("processRecoveryBootstrapOnly", JsonPrimitive(true))
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
       put("healthStatus", JsonPrimitive(healthReportStatus))
       put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
@@ -1731,6 +1996,14 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processObservationLeaseRemainingSeconds = processObservationLeaseRemainingSeconds,
     processObservationLeaseHealth = processObservationLeaseHealth,
     processObservationRecoveryHint = processObservationRecoveryHint,
+    processRecoveryReady = processRecoveryReady,
+    processRecoveryStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessRecoveryStateFile),
+    processRecoveryStatus = processRecoveryStatus,
+    processRecoveryState = processRecoveryState,
+    processRecoveryGeneration = processRecoveryGeneration,
+    processRecoveryActionCount = processRecoveryActions.size,
+    processRecoveryPrimaryAction = processRecoveryPrimaryAction,
+    processRecoveryReason = processRecoveryReason,
     longLivedProcessReady = longLivedProcessReady,
   )
 }

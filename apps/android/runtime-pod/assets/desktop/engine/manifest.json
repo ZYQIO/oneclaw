@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "engine",
   "componentId": "openclaw-desktop-engine-carrier",
-  "componentVersion": "0.11.0",
+  "componentVersion": "0.12.0",
   "bundleState": "bootstrap_ready",
   "summary": "Packaged engine carrier for Android-hosted desktop-runtime bootstrap.",
   "runtimeDependencies": [

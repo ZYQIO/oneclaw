@@ -538,6 +538,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         browser.browserReplayReady &&
         browser.authCredentialPresent &&
         carrier.runtimePluginExecutionStateCount > 0 &&
+        desktopReplay.processRecoveryReady -> "process_runtime_recovery_bootstrapped"
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent &&
+        carrier.runtimePluginExecutionStateCount > 0 &&
         desktopReplay.processObservationReady -> "process_runtime_observation_bootstrapped"
       inspection.ready &&
         desktop.desktopHomeReady &&
@@ -713,6 +722,26 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           put("desktopProcessObservationRecoveryHint", JsonPrimitive(it))
         }
         put("desktopProcessObservationBootstrapOnly", JsonPrimitive(desktopReplay.processObservationBootstrapOnly))
+        put("desktopProcessRecoveryReady", JsonPrimitive(desktopReplay.processRecoveryReady))
+        put("desktopProcessRecoveryStatePresent", JsonPrimitive(desktopReplay.processRecoveryStatePresent))
+        desktopReplay.processRecoveryStatus?.let {
+          put("desktopProcessRecoveryStatus", JsonPrimitive(it))
+        }
+        desktopReplay.processRecoveryState?.let {
+          put("desktopProcessRecoveryState", JsonPrimitive(it))
+        }
+        desktopReplay.processRecoveryStatePath?.let {
+          put("desktopProcessRecoveryStatePath", JsonPrimitive(it))
+        }
+        put("desktopProcessRecoveryGeneration", JsonPrimitive(desktopReplay.processRecoveryGeneration))
+        put("desktopProcessRecoveryActionCount", JsonPrimitive(desktopReplay.processRecoveryActionCount))
+        desktopReplay.processRecoveryPrimaryAction?.let {
+          put("desktopProcessRecoveryPrimaryAction", JsonPrimitive(it))
+        }
+        desktopReplay.processRecoveryReason?.let {
+          put("desktopProcessRecoveryReason", JsonPrimitive(it))
+        }
+        put("desktopProcessRecoveryBootstrapOnly", JsonPrimitive(desktopReplay.processRecoveryBootstrapOnly))
         put("desktopLongLivedProcessReady", JsonPrimitive(desktopReplay.longLivedProcessReady))
         desktopReplay.profileId?.let { put("desktopReplayProfileId", JsonPrimitive(it)) }
         desktopReplay.environmentId?.let { put("desktopReplayEnvironmentId", JsonPrimitive(it)) }
@@ -907,7 +936,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 status = environmentStatus,
                 integrated = environmentIntegrated,
                 summary =
-                  if (desktopReplay.processObservationReady) {
+                  if (desktopReplay.processRecoveryReady) {
+                    "The app now leaves process-model, activation-contract, supervision-contract, observation-contract, and recovery-contract artifacts under desktop-home state, including explicit recovery actions, restart semantics, and the primary next step for the bounded runtime session."
+                  } else if (desktopReplay.processObservationReady) {
                     "The app now leaves process-model, activation-contract, supervision-contract, and observation-contract artifacts under desktop-home state, including lease freshness, observation timing, and bounded recovery hints for the runtime session."
                   } else if (desktopReplay.processSupervisionReady) {
                     "The app now leaves process-model, activation-contract, and supervision-contract artifacts under desktop-home state, including lease and heartbeat semantics for the bounded runtime session."
@@ -1004,7 +1035,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !desktopReplay.processActivationReady -> "process_runtime_activation_bootstrap"
               !desktopReplay.processSupervisionReady -> "process_runtime_supervision"
               !desktopReplay.processObservationReady -> "process_runtime_observation"
-              else -> "process_runtime_recovery"
+              !desktopReplay.processRecoveryReady -> "process_runtime_recovery"
+              else -> "process_runtime_detached_launch"
             },
           ),
         )
@@ -1044,8 +1076,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Deepen runtime-smoke again so the desktop-home replay also leaves a supervision contract artifact with lease, heartbeat, and long-lived session semantics."
               !desktopReplay.processObservationReady ->
                 "Deepen runtime-smoke again so the desktop-home replay also leaves an observation contract artifact with lease freshness, timing, and bounded recovery guidance for the supervised session."
+              !desktopReplay.processRecoveryReady ->
+                "Deepen runtime-smoke again so the desktop-home replay also leaves an explicit recovery contract artifact with primary actions, restart semantics, and replay guidance for the bounded session."
               else ->
-                "Keep the observation contract stable, then deepen it into explicit recovery actions and restart semantics for the bounded long-lived runtime session."
+                "Keep the recovery contract stable, then deepen it into a detached process launch and real supervisor loop for the bounded long-lived runtime session."
             },
           ),
         )

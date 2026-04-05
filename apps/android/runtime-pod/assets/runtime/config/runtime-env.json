@@ -8,5 +8,6 @@
   "processModelEnabled": true,
   "processRuntimeActivationEnabled": true,
   "processRuntimeSupervisionEnabled": true,
-  "processRuntimeObservationEnabled": true
+  "processRuntimeObservationEnabled": true,
+  "processRuntimeRecoveryEnabled": true
 }
