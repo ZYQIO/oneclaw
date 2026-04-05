@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "supervisor",
   "componentId": "openclaw-desktop-runtime-supervisor",
-  "componentVersion": "0.9.0",
+  "componentVersion": "0.10.0",
   "bundleState": "bootstrap_ready",
   "summary": "Lifecycle contract for the packaged Android desktop-runtime environment.",
   "managedActions": [
@@ -10,12 +10,14 @@
     "restart",
     "health-report",
     "process-model",
-    "activate-process"
+    "activate-process",
+    "supervise-process"
   ],
   "capabilities": [
     "lifecycle-contract",
     "stale-build-diagnostics",
     "process-model-bootstrap",
-    "process-runtime-activation-bootstrap"
+    "process-runtime-activation-bootstrap",
+    "process-runtime-supervision-bootstrap"
   ]
 }

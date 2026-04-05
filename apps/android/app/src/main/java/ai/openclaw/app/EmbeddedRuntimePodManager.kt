@@ -538,6 +538,15 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         browser.browserReplayReady &&
         browser.authCredentialPresent &&
         carrier.runtimePluginExecutionStateCount > 0 &&
+        desktopReplay.processSupervisionReady -> "process_runtime_supervision_bootstrapped"
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent &&
+        carrier.runtimePluginExecutionStateCount > 0 &&
         desktopReplay.processActivationReady -> "process_runtime_activation_bootstrapped"
       inspection.ready &&
         desktop.desktopHomeReady &&
@@ -649,6 +658,28 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           put("desktopProcessActivationBlockedReason", JsonPrimitive(it))
         }
         put("desktopProcessActivationBootstrapOnly", JsonPrimitive(desktopReplay.processActivationBootstrapOnly))
+        put("desktopProcessSupervisionReady", JsonPrimitive(desktopReplay.processSupervisionReady))
+        put("desktopProcessSupervisionStatePresent", JsonPrimitive(desktopReplay.processSupervisionStatePresent))
+        desktopReplay.processSupervisionStatus?.let {
+          put("desktopProcessSupervisionStatus", JsonPrimitive(it))
+        }
+        desktopReplay.processSupervisionState?.let {
+          put("desktopProcessSupervisionState", JsonPrimitive(it))
+        }
+        desktopReplay.processSupervisionStatePath?.let {
+          put("desktopProcessSupervisionStatePath", JsonPrimitive(it))
+        }
+        put("desktopProcessSupervisionGeneration", JsonPrimitive(desktopReplay.processSupervisionGeneration))
+        desktopReplay.processSupervisionHeartbeatAt?.let {
+          put("desktopProcessSupervisionHeartbeatAt", JsonPrimitive(it))
+        }
+        desktopReplay.processSupervisionLeaseExpiresAt?.let {
+          put("desktopProcessSupervisionLeaseExpiresAt", JsonPrimitive(it))
+        }
+        desktopReplay.processSupervisionBlockedReason?.let {
+          put("desktopProcessSupervisionBlockedReason", JsonPrimitive(it))
+        }
+        put("desktopProcessSupervisionBootstrapOnly", JsonPrimitive(desktopReplay.processSupervisionBootstrapOnly))
         put("desktopLongLivedProcessReady", JsonPrimitive(desktopReplay.longLivedProcessReady))
         desktopReplay.profileId?.let { put("desktopReplayProfileId", JsonPrimitive(it)) }
         desktopReplay.environmentId?.let { put("desktopReplayEnvironmentId", JsonPrimitive(it)) }
@@ -843,7 +874,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 status = environmentStatus,
                 integrated = environmentIntegrated,
                 summary =
-                  if (desktopReplay.processActivationReady) {
+                  if (desktopReplay.processSupervisionReady) {
+                    "The app now leaves process-model, activation-contract, and supervision-contract artifacts under desktop-home state, including lease and heartbeat semantics for the bounded runtime session."
+                  } else if (desktopReplay.processActivationReady) {
                     "The app now leaves both process-model and activation-contract bootstrap artifacts under desktop-home state, so the next slice can deepen into a real long-lived supervised process instead of more descriptor-only proof."
                   } else if (desktopReplay.processModelReady) {
                     "The app now leaves a structured process-model bootstrap artifact alongside health-report and restart-contract state, so the next slice can deepen into real supervised activation rather than more status-only proof."
@@ -934,7 +967,8 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               carrier.runtimePluginExecutionStateCount < 1 -> "plugin_lane_replay"
               !desktopReplay.processModelReady -> "process_model_bootstrap"
               !desktopReplay.processActivationReady -> "process_runtime_activation_bootstrap"
-              else -> "process_runtime_supervision"
+              !desktopReplay.processSupervisionReady -> "process_runtime_supervision"
+              else -> "process_runtime_observation"
             },
           ),
         )
@@ -970,8 +1004,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Deepen runtime-smoke so the desktop-home replay also leaves a structured process-model bootstrap artifact that ties together health, restart, desired state, and session semantics."
               !desktopReplay.processActivationReady ->
                 "Deepen runtime-smoke again so the desktop-home replay also leaves a structured activation contract artifact that ties process state to supervisor action, blocked reason, and generation semantics."
+              !desktopReplay.processSupervisionReady ->
+                "Deepen runtime-smoke again so the desktop-home replay also leaves a supervision contract artifact with lease, heartbeat, and long-lived session semantics."
               else ->
-                "Keep the activation contract stable, then deepen it into a real long-lived supervised runtime process beyond bootstrap state-file writes."
+                "Keep the supervision contract stable, then deepen it into stronger observation and recovery semantics for the bounded long-lived runtime session."
             },
           ),
         )

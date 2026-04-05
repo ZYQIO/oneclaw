@@ -1,4 +1,4 @@
-Embedded Runtime Pod v0.9.0
+Embedded Runtime Pod v0.10.0
 
 This workspace is packaged at build time and extracted into app-private storage.
 It is meant for deterministic offline helper workflows, the first bounded runtime carrier, and the first packaged desktop tool lane, not a general shell.
@@ -9,4 +9,4 @@ Use pod.desktop.materialize to materialize the packaged desktop-environment bund
 Use pod.runtime.execute with taskId=runtime-smoke to materialize the packaged runtime home and persist state.
 Use pod.runtime.execute with taskId=tool-brief-inspect to replay the packaged brief-inspector desktop tool contract.
 Use pod.runtime.execute with taskId=plugin-allowlist-inspect to replay the allowlisted plugin descriptor without exposing generic plugin installation.
-The current bootstrap also leaves both process-model and activation-contract artifacts under desktop-home so the next slice can deepen into real long-lived supervision.
+The current bootstrap also leaves process-model, activation-contract, and supervision-contract artifacts under desktop-home so the next slice can deepen into stronger observation and recovery semantics.

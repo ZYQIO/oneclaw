@@ -6,5 +6,6 @@
   "toolLaneEnabled": true,
   "pluginLaneEnabled": true,
   "processModelEnabled": true,
-  "processRuntimeActivationEnabled": true
+  "processRuntimeActivationEnabled": true,
+  "processRuntimeSupervisionEnabled": true
 }
