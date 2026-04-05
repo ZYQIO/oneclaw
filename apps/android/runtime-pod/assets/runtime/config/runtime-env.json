@@ -9,5 +9,6 @@
   "processRuntimeActivationEnabled": true,
   "processRuntimeSupervisionEnabled": true,
   "processRuntimeObservationEnabled": true,
-  "processRuntimeRecoveryEnabled": true
+  "processRuntimeRecoveryEnabled": true,
+  "processRuntimeDetachedLaunchEnabled": true
 }

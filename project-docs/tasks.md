@@ -2,17 +2,17 @@
 
 ## Immediate Tasks
 
-1. Re-run the branch on `PFEM10` with payload `0.12.0` until the top-level result reaches `process_runtime_recovery_bootstrapped`.
+1. Re-run the branch on `PFEM10` with payload `0.13.0` until the top-level result reaches `process_runtime_detached_launch_bootstrapped`.
    - Current state: repo-side validation is green, but the latest real-device proof still stops at April 4, 2026 `0.7.0` `plugin_lane_replayed`.
-   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_recovery_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_detached_launch`.
+   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_detached_launch_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_supervisor_loop`.
 
-2. Implement the next bounded slice as `process_runtime_detached_launch`.
-   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery bootstrap should exist; those are now settled.
-   - Exit criteria: the bounded long-lived runtime session starts executing the recovery contract through a real detached launch/supervisor loop.
+2. Implement the next bounded slice as `process_runtime_supervisor_loop`.
+   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery/process-runtime-detached-launch bootstrap should exist; those are now settled.
+   - Exit criteria: the bounded long-lived runtime session starts executing the detached-launch contract through a real detached launch/supervisor loop.
 
-3. Keep the targeted pod validation lane stable while runtime recovery and detached-launch work deepen.
+3. Keep the targeted pod validation lane stable while detached-launch and supervisor-loop work deepen.
    - The current green path is `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus targeted Android Gradle reruns for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest`.
-   - Exit criteria: those validations keep passing as the process-runtime recovery/detached-launch work lands.
+   - Exit criteria: those validations keep passing as the process-runtime detached-launch/supervisor-loop work lands.
 
 ## Short-Term Tasks
 

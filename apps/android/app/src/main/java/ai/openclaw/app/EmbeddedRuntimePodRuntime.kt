@@ -28,6 +28,9 @@ private const val embeddedRuntimeDesktopProcessActivationStateFile = "state/runt
 private const val embeddedRuntimeDesktopProcessSupervisionStateFile = "state/runtime-smoke-supervision-contract.json"
 private const val embeddedRuntimeDesktopProcessObservationStateFile = "state/runtime-smoke-observation-contract.json"
 private const val embeddedRuntimeDesktopProcessRecoveryStateFile = "state/runtime-smoke-recovery-contract.json"
+private const val embeddedRuntimeDesktopProcessDetachedLaunchStateFile = "state/runtime-smoke-detached-launch-contract.json"
+private const val embeddedRuntimeDesktopProcessDetachedLaunchLogFile = "logs/runtime-smoke-detached-launch.log"
+private const val embeddedRuntimeDesktopProcessDetachedLaunchSentinelFile = "state/runtime-smoke-detached-launch-sentinel.json"
 private const val embeddedRuntimeDesktopLogFileNameForRuntime = "desktop-home.log"
 
 private val embeddedRuntimeRuntimeJson = Json { ignoreUnknownKeys = true }
@@ -188,6 +191,16 @@ data class EmbeddedRuntimeDesktopProfileReplayInspection(
   val processRecoveryPrimaryAction: String? = null,
   val processRecoveryReason: String? = null,
   val processRecoveryBootstrapOnly: Boolean = false,
+  val processDetachedLaunchReady: Boolean = false,
+  val processDetachedLaunchStatePresent: Boolean = false,
+  val processDetachedLaunchStatus: String? = null,
+  val processDetachedLaunchState: String? = null,
+  val processDetachedLaunchStatePath: String? = null,
+  val processDetachedLaunchGeneration: Int = 0,
+  val processDetachedLaunchSessionId: String? = null,
+  val processDetachedLaunchCommand: String? = null,
+  val processDetachedLaunchBlockedReason: String? = null,
+  val processDetachedLaunchBootstrapOnly: Boolean = false,
   val longLivedProcessReady: Boolean = false,
   val profileId: String? = null,
   val environmentId: String? = null,
@@ -461,6 +474,14 @@ fun executeEmbeddedRuntimePodTask(
   var desktopProcessRecoveryActionCount = 0
   var desktopProcessRecoveryPrimaryAction: String? = null
   var desktopProcessRecoveryReason: String? = null
+  var desktopProcessDetachedLaunchReady = false
+  var desktopProcessDetachedLaunchStatePath: String? = null
+  var desktopProcessDetachedLaunchStatus: String? = null
+  var desktopProcessDetachedLaunchState: String? = null
+  var desktopProcessDetachedLaunchGeneration = 0
+  var desktopProcessDetachedLaunchSessionId: String? = null
+  var desktopProcessDetachedLaunchCommand: String? = null
+  var desktopProcessDetachedLaunchBlockedReason: String? = null
   var desktopLongLivedProcessReady = false
 
   if (task.kind == "desktop-tool") {
@@ -557,6 +578,14 @@ fun executeEmbeddedRuntimePodTask(
     desktopProcessRecoveryActionCount = desktopReplay?.processRecoveryActionCount ?: 0
     desktopProcessRecoveryPrimaryAction = desktopReplay?.processRecoveryPrimaryAction
     desktopProcessRecoveryReason = desktopReplay?.processRecoveryReason
+    desktopProcessDetachedLaunchReady = desktopReplay?.processDetachedLaunchReady == true
+    desktopProcessDetachedLaunchStatePath = desktopReplay?.processDetachedLaunchStatePath
+    desktopProcessDetachedLaunchStatus = desktopReplay?.processDetachedLaunchStatus
+    desktopProcessDetachedLaunchState = desktopReplay?.processDetachedLaunchState
+    desktopProcessDetachedLaunchGeneration = desktopReplay?.processDetachedLaunchGeneration ?: 0
+    desktopProcessDetachedLaunchSessionId = desktopReplay?.processDetachedLaunchSessionId
+    desktopProcessDetachedLaunchCommand = desktopReplay?.processDetachedLaunchCommand
+    desktopProcessDetachedLaunchBlockedReason = desktopReplay?.processDetachedLaunchBlockedReason
     desktopLongLivedProcessReady = desktopReplay?.longLivedProcessReady == true
   }
 
@@ -584,6 +613,7 @@ fun executeEmbeddedRuntimePodTask(
       put("desktopProcessSupervisionReady", JsonPrimitive(desktopProcessSupervisionReady))
       put("desktopProcessObservationReady", JsonPrimitive(desktopProcessObservationReady))
       put("desktopProcessRecoveryReady", JsonPrimitive(desktopProcessRecoveryReady))
+      put("desktopProcessDetachedLaunchReady", JsonPrimitive(desktopProcessDetachedLaunchReady))
       put("desktopLongLivedProcessReady", JsonPrimitive(desktopLongLivedProcessReady))
       desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
       desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultPath", JsonPrimitive(it)) }
@@ -624,6 +654,19 @@ fun executeEmbeddedRuntimePodTask(
       put("desktopProcessRecoveryActionCount", JsonPrimitive(desktopProcessRecoveryActionCount))
       desktopProcessRecoveryPrimaryAction?.let { put("desktopProcessRecoveryPrimaryAction", JsonPrimitive(it)) }
       desktopProcessRecoveryReason?.let { put("desktopProcessRecoveryReason", JsonPrimitive(it)) }
+      desktopProcessDetachedLaunchStatePath?.let { put("desktopProcessDetachedLaunchStatePath", JsonPrimitive(it)) }
+      desktopProcessDetachedLaunchStatus?.let { put("desktopProcessDetachedLaunchStatus", JsonPrimitive(it)) }
+      desktopProcessDetachedLaunchState?.let { put("desktopProcessDetachedLaunchState", JsonPrimitive(it)) }
+      put("desktopProcessDetachedLaunchGeneration", JsonPrimitive(desktopProcessDetachedLaunchGeneration))
+      desktopProcessDetachedLaunchSessionId?.let {
+        put("desktopProcessDetachedLaunchSessionId", JsonPrimitive(it))
+      }
+      desktopProcessDetachedLaunchCommand?.let {
+        put("desktopProcessDetachedLaunchCommand", JsonPrimitive(it))
+      }
+      desktopProcessDetachedLaunchBlockedReason?.let {
+        put("desktopProcessDetachedLaunchBlockedReason", JsonPrimitive(it))
+      }
       desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
@@ -673,6 +716,7 @@ fun executeEmbeddedRuntimePodTask(
         put("desktopProcessSupervisionReady", JsonPrimitive(desktopProcessSupervisionReady))
         put("desktopProcessObservationReady", JsonPrimitive(desktopProcessObservationReady))
         put("desktopProcessRecoveryReady", JsonPrimitive(desktopProcessRecoveryReady))
+        put("desktopProcessDetachedLaunchReady", JsonPrimitive(desktopProcessDetachedLaunchReady))
         put("desktopLongLivedProcessReady", JsonPrimitive(desktopLongLivedProcessReady))
         desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
         desktopProfileReplayResultPath?.let { put("desktopProfileReplayResultFilePath", JsonPrimitive(it)) }
@@ -719,6 +763,25 @@ fun executeEmbeddedRuntimePodTask(
           put("desktopProcessRecoveryPrimaryAction", JsonPrimitive(it))
         }
         desktopProcessRecoveryReason?.let { put("desktopProcessRecoveryReason", JsonPrimitive(it)) }
+        desktopProcessDetachedLaunchStatePath?.let {
+          put("desktopProcessDetachedLaunchStatePath", JsonPrimitive(it))
+        }
+        desktopProcessDetachedLaunchStatus?.let {
+          put("desktopProcessDetachedLaunchStatus", JsonPrimitive(it))
+        }
+        desktopProcessDetachedLaunchState?.let {
+          put("desktopProcessDetachedLaunchState", JsonPrimitive(it))
+        }
+        put("desktopProcessDetachedLaunchGeneration", JsonPrimitive(desktopProcessDetachedLaunchGeneration))
+        desktopProcessDetachedLaunchSessionId?.let {
+          put("desktopProcessDetachedLaunchSessionId", JsonPrimitive(it))
+        }
+        desktopProcessDetachedLaunchCommand?.let {
+          put("desktopProcessDetachedLaunchCommand", JsonPrimitive(it))
+        }
+        desktopProcessDetachedLaunchBlockedReason?.let {
+          put("desktopProcessDetachedLaunchBlockedReason", JsonPrimitive(it))
+        }
         desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
         toolId?.let { put("toolId", JsonPrimitive(it)) }
         put("toolkitStageInstalled", JsonPrimitive(toolkitStageInstalled))
@@ -756,6 +819,7 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val processSupervisionFile = desktopHome.resolve(embeddedRuntimeDesktopProcessSupervisionStateFile)
   val processObservationFile = desktopHome.resolve(embeddedRuntimeDesktopProcessObservationStateFile)
   val processRecoveryFile = desktopHome.resolve(embeddedRuntimeDesktopProcessRecoveryStateFile)
+  val processDetachedLaunchFile = desktopHome.resolve(embeddedRuntimeDesktopProcessDetachedLaunchStateFile)
   val statePayload = stateFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val healthPayload = healthReportFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val restartPayload = restartContractFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
@@ -764,6 +828,7 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val supervisionPayload = processSupervisionFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val observationPayload = processObservationFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val recoveryPayload = processRecoveryFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val detachedLaunchPayload = processDetachedLaunchFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val dependencyStatus = statePayload?.get("dependencyStatus") as? JsonObject
   val missingDependencies = statePayload?.get("missingDependencies") as? JsonArray
   val status = runtimePrimitiveContent(statePayload, "status")
@@ -779,6 +844,8 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val observationState = runtimePrimitiveContent(observationPayload, "observationState")
   val recoveryStatus = runtimePrimitiveContent(recoveryPayload, "status")
   val recoveryState = runtimePrimitiveContent(recoveryPayload, "recoveryState")
+  val detachedLaunchStatus = runtimePrimitiveContent(detachedLaunchPayload, "status")
+  val detachedLaunchState = runtimePrimitiveContent(detachedLaunchPayload, "launchState")
   val environmentSupervisionReady =
     stateFile.isFile &&
       resultFile.isFile &&
@@ -810,6 +877,11 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
       recoveryStatus != null &&
       recoveryState != null &&
       recoveryStatus != "unsupported"
+  val processDetachedLaunchReady =
+    processDetachedLaunchFile.isFile &&
+      detachedLaunchStatus != null &&
+      detachedLaunchState != null &&
+      detachedLaunchStatus != "unsupported"
   return EmbeddedRuntimeDesktopProfileReplayInspection(
     replayReady = stateFile.isFile && resultFile.isFile && status != null,
     statePresent = stateFile.isFile,
@@ -869,7 +941,18 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
     processRecoveryPrimaryAction = runtimePrimitiveContent(recoveryPayload, "primaryAction"),
     processRecoveryReason = runtimePrimitiveContent(recoveryPayload, "recoveryReason"),
     processRecoveryBootstrapOnly = runtimePrimitiveBoolean(recoveryPayload, "bootstrapOnly") == true,
+    processDetachedLaunchReady = processDetachedLaunchReady,
+    processDetachedLaunchStatePresent = processDetachedLaunchFile.isFile,
+    processDetachedLaunchStatus = detachedLaunchStatus,
+    processDetachedLaunchState = detachedLaunchState,
+    processDetachedLaunchStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessDetachedLaunchStateFile),
+    processDetachedLaunchGeneration = runtimePrimitiveInt(detachedLaunchPayload, "generation") ?: 0,
+    processDetachedLaunchSessionId = runtimePrimitiveContent(detachedLaunchPayload, "launchSessionId"),
+    processDetachedLaunchCommand = runtimePrimitiveContent(detachedLaunchPayload, "launchCommand"),
+    processDetachedLaunchBlockedReason = runtimePrimitiveContent(detachedLaunchPayload, "blockedReason"),
+    processDetachedLaunchBootstrapOnly = runtimePrimitiveBoolean(detachedLaunchPayload, "bootstrapOnly") == true,
     longLivedProcessReady =
+      runtimePrimitiveBoolean(detachedLaunchPayload, "longLivedProcessReady") == true ||
       runtimePrimitiveBoolean(observationPayload, "longLivedProcessReady") == true ||
         runtimePrimitiveBoolean(supervisionPayload, "longLivedProcessReady") == true,
     profileId = runtimePrimitiveContent(statePayload, "profileId"),
@@ -1213,6 +1296,14 @@ private data class EmbeddedRuntimeDesktopProfileReplayExecution(
   val processRecoveryActionCount: Int,
   val processRecoveryPrimaryAction: String,
   val processRecoveryReason: String,
+  val processDetachedLaunchReady: Boolean,
+  val processDetachedLaunchStatePath: String,
+  val processDetachedLaunchStatus: String,
+  val processDetachedLaunchState: String,
+  val processDetachedLaunchGeneration: Int,
+  val processDetachedLaunchSessionId: String,
+  val processDetachedLaunchCommand: String,
+  val processDetachedLaunchBlockedReason: String?,
   val longLivedProcessReady: Boolean,
 )
 
@@ -1824,6 +1915,104 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   processRecoveryFile.writeText("${processRecoveryPayload}\n", Charsets.UTF_8)
   val processRecoveryReady =
     processRecoveryFile.isFile && recoverySupported && processRecoveryStatus != "unsupported"
+  val detachedLaunchSupported =
+    runtimeJsonArray(supervisorManifest, "managedActions").any { it.content == "launch-detached-process" } ||
+      runtimeJsonArray(supervisorManifest, "capabilities").any {
+        it.content == "process-runtime-detached-launch-bootstrap"
+      } ||
+      runtimeJsonArray(environmentManifest, "capabilities").any {
+        it.content == "process-runtime-detached-launch-bootstrap"
+      }
+  val processDetachedLaunchFile = desktopHome.resolve(embeddedRuntimeDesktopProcessDetachedLaunchStateFile)
+  processDetachedLaunchFile.parentFile?.mkdirs()
+  val previousDetachedLaunchPayload = processDetachedLaunchFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val previousDetachedLaunchGeneration = runtimePrimitiveInt(previousDetachedLaunchPayload, "generation") ?: 0
+  val processDetachedLaunchGeneration = previousDetachedLaunchGeneration + 1
+  val processDetachedLaunchSessionId = "$processSessionId-detached-launch-$processDetachedLaunchGeneration"
+  val processDetachedLaunchStatus =
+    when {
+      !detachedLaunchSupported -> "unsupported"
+      processRecoveryStatus == "ready" && longLivedProcessReady -> "ready"
+      else -> "blocked"
+    }
+  val processDetachedLaunchState =
+    when {
+      !detachedLaunchSupported -> "unsupported"
+      processRecoveryStatus == "ready" && longLivedProcessReady -> "launch_contract_ready"
+      else -> "awaiting_recovery"
+    }
+  val processDetachedLaunchBlockedReason =
+    when {
+      !detachedLaunchSupported -> "detached_launch_not_supported"
+      processRecoveryStatus != "ready" -> "recovery_not_ready:$processRecoveryStatus"
+      !longLivedProcessReady -> "long_lived_process_not_ready"
+      else -> null
+    }
+  val processDetachedLaunchCommand =
+    "openclaw-desktop-runtime-supervisor --launch-detached --session-id " +
+      "$processDetachedLaunchSessionId --runtime-home ${runtimeHomeDisplayPath(manifestVersion)} " +
+      "--desktop-home ${desktopHomeDisplayPathForRuntime(manifestVersion)} --task-id $embeddedRuntimeDefaultTaskId"
+  val processDetachedLaunchPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(processDetachedLaunchStatus))
+      put("launchState", JsonPrimitive(processDetachedLaunchState))
+      put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("profileId", JsonPrimitive(profileId))
+      runtimePrimitiveContent(activeProfile, "environmentId")?.let { put("environmentId", JsonPrimitive(it)) }
+      runtimePrimitiveContent(activeProfile, "supervisorId")?.let { put("supervisorId", JsonPrimitive(it)) }
+      put("sessionId", JsonPrimitive(processSessionId))
+      put("launchSessionId", JsonPrimitive(processDetachedLaunchSessionId))
+      put("generation", JsonPrimitive(processDetachedLaunchGeneration))
+      put("previousGeneration", JsonPrimitive(previousDetachedLaunchGeneration))
+      put("detachedLaunchSupported", JsonPrimitive(detachedLaunchSupported))
+      put("bootstrapOnly", JsonPrimitive(true))
+      put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
+      put("desiredProcessState", JsonPrimitive("running"))
+      put("observedProcessStatus", JsonPrimitive(processStatus))
+      put("recoveryState", JsonPrimitive(processRecoveryState))
+      put("recoveryStatus", JsonPrimitive(processRecoveryStatus))
+      put("recoveryContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessRecoveryStateFile)))
+      put("observationContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessObservationStateFile)))
+      put("supervisionContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessSupervisionStateFile)))
+      put("activationContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessActivationStateFile)))
+      put("processModelPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessModelStateFile)))
+      put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
+      put("restartContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopRestartContractStateFile)))
+      put("launchCommand", JsonPrimitive(processDetachedLaunchCommand))
+      put("launchLogPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessDetachedLaunchLogFile)))
+      put("launchSentinelPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessDetachedLaunchSentinelFile)))
+      put("entryCommand", JsonPrimitive("pod.runtime.execute"))
+      put("entryTaskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("supervisorAction", JsonPrimitive("launch-detached-process"))
+      put("supervisorCommand", JsonPrimitive("openclaw-desktop-runtime-supervisor"))
+      put("runtimeStatePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion, "state/runtime-smoke.json")))
+      put("runtimeHomePath", JsonPrimitive(runtimeHomeDisplayPath(manifestVersion)))
+      put("desktopHomePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion)))
+      put("observedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      processDetachedLaunchBlockedReason?.let { put("blockedReason", JsonPrimitive(it)) }
+      put(
+        "dependencyStatus",
+        buildJsonObject {
+          dependencyStatus.forEach { (dependency, ready) ->
+            put(dependency, JsonPrimitive(ready))
+          }
+        },
+      )
+      put(
+        "missingDependencies",
+        buildJsonArray {
+          missingDependencies.forEach { dependency ->
+            add(JsonPrimitive(dependency))
+          }
+        },
+      )
+    }
+  processDetachedLaunchFile.writeText("${processDetachedLaunchPayload}\n", Charsets.UTF_8)
+  val processDetachedLaunchReady =
+    processDetachedLaunchFile.isFile &&
+      detachedLaunchSupported &&
+      processDetachedLaunchStatus != "unsupported"
   val resultPayload =
     buildJsonObject {
       put("status", JsonPrimitive(if (missingDependencies.isEmpty()) "ready" else "degraded"))
@@ -1918,6 +2107,15 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("processRecoveryPrimaryAction", JsonPrimitive(processRecoveryPrimaryAction))
       put("processRecoveryReason", JsonPrimitive(processRecoveryReason))
       put("processRecoveryBootstrapOnly", JsonPrimitive(true))
+      put("processDetachedLaunchReady", JsonPrimitive(processDetachedLaunchReady))
+      put("processDetachedLaunchStatus", JsonPrimitive(processDetachedLaunchStatus))
+      put("processDetachedLaunchState", JsonPrimitive(processDetachedLaunchState))
+      put("processDetachedLaunchStatePath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessDetachedLaunchStateFile)))
+      put("processDetachedLaunchGeneration", JsonPrimitive(processDetachedLaunchGeneration))
+      put("processDetachedLaunchSessionId", JsonPrimitive(processDetachedLaunchSessionId))
+      put("processDetachedLaunchCommand", JsonPrimitive(processDetachedLaunchCommand))
+      processDetachedLaunchBlockedReason?.let { put("processDetachedLaunchBlockedReason", JsonPrimitive(it)) }
+      put("processDetachedLaunchBootstrapOnly", JsonPrimitive(true))
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
       put("healthStatus", JsonPrimitive(healthReportStatus))
       put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
@@ -2004,6 +2202,14 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processRecoveryActionCount = processRecoveryActions.size,
     processRecoveryPrimaryAction = processRecoveryPrimaryAction,
     processRecoveryReason = processRecoveryReason,
+    processDetachedLaunchReady = processDetachedLaunchReady,
+    processDetachedLaunchStatePath = desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessDetachedLaunchStateFile),
+    processDetachedLaunchStatus = processDetachedLaunchStatus,
+    processDetachedLaunchState = processDetachedLaunchState,
+    processDetachedLaunchGeneration = processDetachedLaunchGeneration,
+    processDetachedLaunchSessionId = processDetachedLaunchSessionId,
+    processDetachedLaunchCommand = processDetachedLaunchCommand,
+    processDetachedLaunchBlockedReason = processDetachedLaunchBlockedReason,
     longLivedProcessReady = longLivedProcessReady,
   )
 }

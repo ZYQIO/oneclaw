@@ -8,20 +8,20 @@ Last updated / 最后更新: April 5, 2026 / 2026 年 4 月 5 日
 ## Read This First / 先看这个
 
 - The branch objective is now the full packaged desktop environment on Android, not the earlier "selected slice" framing.
-- The APK now carries a cohesive `desktop/` bundle plus the first allowlisted packaged plugin descriptor in payload `0.12.0`.
+- The APK now carries a cohesive `desktop/` bundle plus the first allowlisted packaged plugin descriptor in payload `0.13.0`.
 - `pod.desktop.materialize` now materializes that bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`.
-- `pod.runtime.execute(taskId=runtime-smoke)` now replays the materialized desktop profile and environment/supervisor manifests into app-private runtime state, and also leaves health-report, restart-contract, process-model, activation-contract, supervision-contract, observation-contract, and recovery-contract bootstrap artifacts when desktop home is present.
-- The new process-runtime recovery bootstrap is repo-verified on this branch, but the latest completed real-device replay is still the April 4, 2026 `0.7.0` `plugin_lane_replayed` proof.
+- `pod.runtime.execute(taskId=runtime-smoke)` now replays the materialized desktop profile and environment/supervisor manifests into app-private runtime state, and also leaves health-report, restart-contract, process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, and detached-launch-contract bootstrap artifacts when desktop home is present.
+- The new process-runtime detached-launch bootstrap is repo-verified on this branch, but the latest completed real-device replay is still the April 4, 2026 `0.7.0` `plugin_lane_replayed` proof.
 - This branch still does **not** have full executable desktop parity yet.
 
 ## What Is Already Landed / 已落地内容
 
-- The embedded pod payload is now `0.12.0` and contains `runtime/`, `toolkit/`, `browser/`, `workspace/`, and `desktop/` stages.
+- The embedded pod payload is now `0.13.0` and contains `runtime/`, `toolkit/`, `browser/`, `workspace/`, and `desktop/` stages.
 - The packaged `desktop/` stage now groups engine, environment, browser, tools, plugins, supervisor manifests, plus one desktop profile descriptor into the APK.
 - `pod.runtime.execute(taskId=runtime-smoke)` still provides the first bounded runtime carrier.
 - `pod.runtime.execute(taskId=runtime-smoke)` now also replays the active desktop profile plus packaged environment/supervisor manifests into `runtime-smoke-desktop-profile.json` artifacts under both runtime-home and desktop-home state.
 - That same runtime-smoke path now also writes `runtime-smoke-health-report.json` and `runtime-smoke-restart-contract.json` under desktop-home state so restart/health semantics are no longer only implied by manifest fields.
-- That same runtime-smoke path now also writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, `runtime-smoke-observation-contract.json`, and `runtime-smoke-recovery-contract.json` under desktop-home state, which together form the branch's current process-runtime bootstrap stack.
+- That same runtime-smoke path now also writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, `runtime-smoke-observation-contract.json`, `runtime-smoke-recovery-contract.json`, and `runtime-smoke-detached-launch-contract.json` under desktop-home state, which together form the branch's current process-runtime bootstrap stack.
 - `pod.runtime.execute(taskId=tool-brief-inspect)` still provides the first packaged desktop-tool lane.
 - `pod.runtime.execute(taskId=plugin-allowlist-inspect)` now provides the first narrow allowlisted packaged plugin lane and writes a replayable plugin result under runtime-home `work/`.
 - `pod.browser.describe` and `pod.browser.auth.start` still provide the first bounded browser-auth lane.
@@ -35,7 +35,7 @@ Last updated / 最后更新: April 5, 2026 / 2026 年 4 月 5 日
 - There is still no generic browser tooling/runtime parity.
 - There is still no generic or open-ended plugin runtime parity.
 - The current desktop bundle now reaches packaging, materialization, and first profile replay, but it is still not a full executable desktop environment.
-- There is still no detached subprocess or executed recovery loop beyond the current health/restart/process-model/activation/supervision/observation/recovery bootstrap artifacts.
+- There is still no executed detached subprocess or live supervisor loop beyond the current health/restart/process-model/activation/supervision/observation/recovery/detached-launch bootstrap artifacts.
 
 ## Best Reading Order / 最佳阅读顺序
 
@@ -51,7 +51,7 @@ Last updated / 最后更新: April 5, 2026 / 2026 年 4 月 5 日
 1. Stop widening helper/status-only surfaces.
 2. Treat `desktop_home_replay`, `environment_supervision`, and the first allowlisted plugin lane as landed bootstrap rather than open hypotheses.
 3. Keep the packaged browser lane, desktop-home supervision artifacts, tool replay, and plugin replay boringly stable on-device.
-4. Reinstall the current debug app on `PFEM10`, rerun the doctor path until it reaches `process_runtime_recovery_bootstrapped`, and only then deepen the next slice into `process_runtime_detached_launch`.
+4. Reinstall the current debug app on `PFEM10`, rerun the doctor path until it reaches `process_runtime_detached_launch_bootstrapped`, and only then deepen the next slice into `process_runtime_supervisor_loop`.
 
 ## Verification Status / 验证状态
 
@@ -61,7 +61,7 @@ Last updated / 最后更新: April 5, 2026 / 2026 年 4 月 5 日
 - On April 4, 2026, the same `PFEM10` device reran the updated debug build and exposed the next environment gap explicitly: before `runtime-smoke`, `podRuntimeDescribe.desktopProfileReplayReady=true` but `desktopEnvironmentSupervisionReady=false`, `desktopHealthStatus=null`, `desktopRestartGeneration=0`, and `recommendedNextSlice=environment_supervision`.
 - The follow-up `pod.runtime.execute(taskId=runtime-smoke)` on that same device then wrote `runtime-smoke-health-report.json` and `runtime-smoke-restart-contract.json`, returned `desktopEnvironmentSupervisionReady=true`, `desktopHealthStatus=healthy`, `desktopRestartGeneration=1`, `desktopProfileId=openclaw-desktop-host`, `desktopHealthReportPath=filesDir/openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-health-report.json`, and `desktopRestartContractPath=filesDir/openclaw/embedded-desktop-home/0.6.0/state/runtime-smoke-restart-contract.json`.
 - Later on April 4, 2026, after reinstalling the newest debug app, the same `PFEM10` device also replayed the new packaged plugin slice: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` now converges to `classification=plugin_lane_replayed`, with `manifestVersion=0.7.0`, `verifiedFileCount=26`, `browserLaneSmoke.summary.desktopMaterialize.ok=true`, `browserLaneSmoke.summary.pluginExecute.ok=true`, `browserLaneSmoke.summary.pluginExecute.pluginId=openclaw-plugin-host-placeholder`, and `browserLaneSmoke.summary.runtimeDescribeAfter.recommendedNextSlice=process_model`.
-- On April 5, 2026, the branch advanced one repo-side slice further again: payload `0.12.0` now passes `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus the targeted Android Gradle suite, `runtime-smoke` writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, `runtime-smoke-observation-contract.json`, and `runtime-smoke-recovery-contract.json`, `pod.runtime.describe` now exposes process-model plus activation-contract plus supervision-contract plus observation-contract plus recovery-contract fields, and the expected next on-device convergence after reinstall is `classification=process_runtime_recovery_bootstrapped` with `runtimeDescribeAfter.recommendedNextSlice=process_runtime_detached_launch`.
+- On April 5, 2026, the branch advanced one repo-side slice further again: payload `0.13.0` now passes `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus the targeted Android Gradle suite, `runtime-smoke` writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, `runtime-smoke-observation-contract.json`, `runtime-smoke-recovery-contract.json`, and `runtime-smoke-detached-launch-contract.json`, `pod.runtime.describe` now exposes process-model plus activation-contract plus supervision-contract plus observation-contract plus recovery-contract plus detached-launch fields, and the expected next on-device convergence after reinstall is `classification=process_runtime_detached_launch_bootstrapped` with `runtimeDescribeAfter.recommendedNextSlice=process_runtime_supervisor_loop`.
 - The clean targeted Android verification lane is green again after making browser-auth state reads safe under Robolectric when `EncryptedSharedPreferences` cannot reach `AndroidKeyStore`; `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, `InvokeCommandRegistryTest`, `LocalHostNodesToolingTest`, `LocalHostRemoteAccessServerTest`, and `OpenClawProtocolConstantsTest` all pass in the clean rerun.
 - That first materialize rerun also surfaced a real repo bug: remote `/invoke/capabilities` advertised `pod.desktop.materialize`, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` was missing `OpenClawPodCommand.DesktopMaterialize`. The branch now fixes that mismatch.
 - The existing device-facing verification entrypoints remain:
@@ -76,4 +76,4 @@ Last updated / 最后更新: April 5, 2026 / 2026 年 4 月 5 日
 - Do not collapse "desktop bundle exists in the APK" into "desktop execution parity is complete".
 - Do not reopen the old assumption that helper metadata alone answers the desktop-runtime question.
 - Do not treat the older Android MVP narrative as the active finish line for this branch.
-- Do not treat the new process-model, activation-contract, supervision-contract, or observation-contract bootstrap artifacts as proof that a detached desktop process with full recovery semantics is already running inside Android.
+- Do not treat the new process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, or detached-launch-contract bootstrap artifacts as proof that a detached desktop process with a live supervisor loop is already running inside Android.

@@ -201,6 +201,10 @@ elif [[ "$browser_mainline_status" == "desktop_home_configured" ]]; then
   classification="desktop_home_configured"
   recommended_action="none"
   recommended_command=""
+elif [[ "$browser_mainline_status" == "process_runtime_detached_launch_bootstrapped" ]]; then
+  classification="process_runtime_detached_launch_bootstrapped"
+  recommended_action="advance-supervisor-loop"
+  recommended_command=""
 elif [[ "$browser_mainline_status" == "process_runtime_recovery_bootstrapped" ]]; then
   classification="process_runtime_recovery_bootstrapped"
   recommended_action="advance-detached-launch"
@@ -269,6 +273,9 @@ else
     recommended_command=""
   elif [[ "$browser_recommended_next_slice" == "process_runtime_detached_launch" ]]; then
     recommended_action="advance-detached-launch"
+    recommended_command=""
+  elif [[ "$browser_recommended_next_slice" == "process_runtime_supervisor_loop" ]]; then
+    recommended_action="advance-supervisor-loop"
     recommended_command=""
   elif [[ "$browser_recommended_next_slice" == "process_runtime_activation" ]]; then
     recommended_action="advance-process-runtime"
