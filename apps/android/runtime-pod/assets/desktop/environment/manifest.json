@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "environment",
   "componentId": "openclaw-desktop-runtime-home",
-  "componentVersion": "0.10.0",
+  "componentVersion": "0.11.0",
   "bundleState": "bootstrap_ready",
   "summary": "App-private desktop home layout with config, logs, state, work, browser, tools, plugins, and supervisor metadata.",
   "directoryLayout": [
@@ -26,6 +26,7 @@
     "restart-contract",
     "process-model-bootstrap",
     "process-runtime-activation-bootstrap",
-    "process-runtime-supervision-bootstrap"
+    "process-runtime-supervision-bootstrap",
+    "process-runtime-observation-bootstrap"
   ]
 }

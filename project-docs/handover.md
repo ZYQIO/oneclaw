@@ -5,19 +5,19 @@
 - Date: 2026-04-05
 - Active branch: `android-desktop-runtime-mainline-20260403`
 - Remote branch: `origin/android-desktop-runtime-mainline-20260403`
-- Current payload baseline: `0.10.0`
+- Current payload baseline: `0.11.0`
 - Latest completed real-device proof: April 4, 2026 `PFEM10` replay reached `classification=plugin_lane_replayed` on payload `0.7.0`
-- Latest repo-side proof: April 5, 2026 targeted validation confirmed the new process-runtime supervision bootstrap slice on payload `0.10.0`
+- Latest repo-side proof: April 5, 2026 targeted validation confirmed the new process-runtime observation bootstrap slice on payload `0.11.0`
 
 ## What Was Done
 
-1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay, then process-model bootstrap, activation-contract bootstrap, and now the first supervision-contract bootstrap slice.
+1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay, then process-model bootstrap, activation-contract bootstrap, supervision-contract bootstrap, and now the first observation-contract bootstrap slice.
    - Real-device replay on `PFEM10` already converged to `classification=plugin_lane_replayed` on payload `0.7.0`.
-   - Repo-side validation on April 5, 2026 moved the branch one slice further again to the new `0.10.0` process-runtime-supervision-bootstrap state.
+   - Repo-side validation on April 5, 2026 moved the branch one slice further again to the new `0.11.0` process-runtime-observation-bootstrap state.
 
-2. `runtime-smoke` now leaves structured process-model, activation-contract, and supervision-contract artifacts instead of only profile/health/restart evidence.
+2. `runtime-smoke` now leaves structured process-model, activation-contract, supervision-contract, and observation-contract artifacts instead of only profile/health/restart evidence.
    - The app still writes `runtime-smoke-desktop-profile.json`, `runtime-smoke-health-report.json`, and `runtime-smoke-restart-contract.json`.
-   - It now also writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, and `runtime-smoke-supervision-contract.json`, and exposes all three field groups through `pod.runtime.describe`.
+   - It now also writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, and `runtime-smoke-observation-contract.json`, and exposes all four field groups through `pod.runtime.describe`.
 
 3. The direct desktop-home bridge and bounded browser/tool/plugin lanes remain intact.
    - `pod.desktop.materialize` still materializes the packaged desktop home in app-private storage.
@@ -29,7 +29,7 @@
    - The targeted Android Gradle rerun for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest` also passes.
 
 5. The Android and project-level handoff docs were updated to reflect the new split state.
-   - Repo-verified `0.10.0` process-runtime supervision bootstrap is now documented explicitly.
+   - Repo-verified `0.11.0` process-runtime observation bootstrap is now documented explicitly.
    - The latest real-device state is still called out separately as April 4, 2026 `0.7.0` `plugin_lane_replayed`.
 
 ## Validation Run
@@ -45,11 +45,11 @@
 ## Current Risks
 
 - The branch still does not provide full executable desktop parity. Generic browser tooling, unrestricted shell parity, generic plugin/runtime parity, and stronger detached-process observation/recovery semantics are still missing.
-- The new process-runtime supervision bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.10.0`.
-- In the repo-side targeted lane, the new bootstrap currently reports `desktopProcessStatus=blocked`, `desktopProcessActivationStatus=blocked`, and `desktopProcessSupervisionStatus=blocked` until browser replay is present; that is expected, but it means we should not overstate readiness.
+- The new process-runtime observation bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.11.0`.
+- In the repo-side targeted lane, the new bootstrap currently reports `desktopProcessStatus=blocked`, `desktopProcessActivationStatus=blocked`, `desktopProcessSupervisionStatus=blocked`, and `desktopProcessObservationStatus=blocked` until browser replay is present; that is expected, but it means we should not overstate readiness.
 
 ## Recommended Next Move
 
-- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_runtime_supervision_bootstrapped`.
-- Once that device proof exists, take the next implementation slice directly into `process_runtime_observation` rather than reopening the earlier plugin-lane decision.
+- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_runtime_observation_bootstrapped`.
+- Once that device proof exists, take the next implementation slice directly into `process_runtime_recovery` rather than reopening the earlier plugin-lane decision.
 - Keep the current `doctor` + `smoke` + `browser-lane:smoke` path boringly replayable before widening the branch surface again.

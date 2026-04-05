@@ -2,17 +2,17 @@
 
 ## Immediate Tasks
 
-1. Re-run the branch on `PFEM10` with payload `0.10.0` until the top-level result reaches `process_runtime_supervision_bootstrapped`.
+1. Re-run the branch on `PFEM10` with payload `0.11.0` until the top-level result reaches `process_runtime_observation_bootstrapped`.
    - Current state: repo-side validation is green, but the latest real-device proof still stops at April 4, 2026 `0.7.0` `plugin_lane_replayed`.
-   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_supervision_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_observation`.
+   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_observation_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_recovery`.
 
-2. Implement the next bounded slice as `process_runtime_observation`.
-   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision bootstrap should exist; those are now settled.
-   - Exit criteria: the bounded long-lived runtime session gains stronger observation and recovery semantics beyond the current descriptor/state bootstrap artifacts.
+2. Implement the next bounded slice as `process_runtime_recovery`.
+   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation bootstrap should exist; those are now settled.
+   - Exit criteria: the bounded long-lived runtime session gains explicit recovery actions beyond the current descriptor/state bootstrap artifacts.
 
-3. Keep the targeted pod validation lane stable while runtime supervision deepens.
+3. Keep the targeted pod validation lane stable while runtime observation and recovery deepen.
    - The current green path is `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus targeted Android Gradle reruns for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest`.
-   - Exit criteria: those validations keep passing as the process-runtime supervision work lands.
+   - Exit criteria: those validations keep passing as the process-runtime observation/recovery work lands.
 
 ## Short-Term Tasks
 

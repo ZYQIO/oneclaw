@@ -1,6 +1,6 @@
 {
   "engineId": "embedded-runtime-task-engine-v1",
-  "engineVersion": "0.6.0",
+  "engineVersion": "0.7.0",
   "kind": "descriptor",
   "supportedTaskKinds": [
     "runtime-smoke",
@@ -21,10 +21,11 @@
     "structured-log-write",
     "process-model-bootstrap",
     "process-runtime-activation-bootstrap",
-    "process-runtime-supervision-bootstrap"
+    "process-runtime-supervision-bootstrap",
+    "process-runtime-observation-bootstrap"
   ],
   "limitations": [
     "No packaged browser lane yet",
-    "No detached desktop subprocess or recovery loop yet"
+    "No detached desktop subprocess or explicit recovery action loop yet"
   ]
 }
