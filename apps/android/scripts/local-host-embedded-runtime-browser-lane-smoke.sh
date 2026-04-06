@@ -39,7 +39,8 @@ What it does:
   5. Reads pod.browser.describe before the browser lane starts
   6. Optionally calls pod.browser.auth.start for the allowlisted auth flow
   7. Polls pod.browser.describe until replay state appears on disk
-  8. Reads pod.runtime.describe again and writes a focused summary.json
+  8. Replays runtime-smoke one more time after browser replay is ready so the runtime contracts see the browser dependency as present
+  9. Reads pod.runtime.describe again and writes a focused summary.json
 
 Notes:
   - OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1 is the default and requires write access
@@ -135,6 +136,7 @@ mkdir -p "$ARTIFACT_DIR"
 status_json="$ARTIFACT_DIR/status.json"
 capabilities_json="$ARTIFACT_DIR/capabilities.json"
 runtime_execute_json="$ARTIFACT_DIR/pod-runtime-execute.json"
+runtime_execute_after_browser_json="$ARTIFACT_DIR/pod-runtime-execute-after-browser.json"
 tool_execute_json="$ARTIFACT_DIR/pod-tool-execute.json"
 plugin_execute_json="$ARTIFACT_DIR/pod-plugin-execute.json"
 desktop_materialize_json="$ARTIFACT_DIR/pod-desktop-materialize.json"
@@ -146,6 +148,7 @@ summary_json="$ARTIFACT_DIR/summary.json"
 
 for artifact in \
   "$runtime_execute_json" \
+  "$runtime_execute_after_browser_json" \
   "$tool_execute_json" \
   "$plugin_execute_json" \
   "$desktop_materialize_json" \
@@ -231,6 +234,11 @@ else
     attempt=$((attempt + 1))
   done
 
+  browser_after_replay_ready_post_poll="$(jq -r '.payload.browserReplayReady // false' "$browser_after_json")"
+  if [[ "$browser_after_replay_ready_post_poll" == "true" ]]; then
+    post_json "$BASE_URL/api/local-host/v1/invoke" "$runtime_execute_body" | tee "$runtime_execute_after_browser_json" >/dev/null
+  fi
+
   post_json "$BASE_URL/api/local-host/v1/invoke" '{"command":"pod.runtime.describe"}' | tee "$runtime_after_json" >/dev/null
 fi
 
@@ -244,6 +252,21 @@ runtime_execute_ok="$(jq -r '.ok // false' "$runtime_execute_json")"
 runtime_execute_command="$(jq -r '.payload.command // ""' "$runtime_execute_json")"
 runtime_execute_task_id="$(jq -r '.payload.taskId // ""' "$runtime_execute_json")"
 runtime_execute_runtime_home_ready="$(jq -r '.payload.runtimeHomeReady // false' "$runtime_execute_json")"
+
+runtime_execute_after_browser_ok="$(jq -r '.ok // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_command="$(jq -r '.payload.command // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_task_id="$(jq -r '.payload.taskId // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_runtime_home_ready="$(jq -r '.payload.runtimeHomeReady // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_long_lived_process_ready="$(jq -r '.payload.desktopLongLivedProcessReady // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_process_status="$(jq -r '.payload.desktopProcessStatus // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_supervision_status="$(jq -r '.payload.desktopProcessSupervisionStatus // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_status="$(jq -r '.payload.desktopProcessActiveSessionStatus // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_observed="$(jq -r '.payload.desktopProcessActiveSessionObserved // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_recovery_reentry_ready="$(jq -r '.payload.desktopProcessActiveSessionRecoveryReentryReady // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_restart_continuity_ready="$(jq -r '.payload.desktopProcessActiveSessionRestartContinuityReady // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_validation_status="$(jq -r '.payload.desktopProcessActiveSessionValidationStatus // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_device_proof_status="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofStatus // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_device_proof_observed="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofObserved // false' "$runtime_execute_after_browser_json")"
 
 tool_execute_ok="$(jq -r '.ok // false' "$tool_execute_json")"
 tool_execute_command="$(jq -r '.payload.command // ""' "$tool_execute_json")"
@@ -343,6 +366,23 @@ if [[ "$failure_hint" == "" ]]; then
     [[ "$browser_after_last_launch_status" != "" ]] || record_failure "pod_browser_describe_after_missing_last_launch_status"
   fi
 
+  if [[ "$browser_after_replay_ready" == "true" ]]; then
+    [[ "$runtime_execute_after_browser_ok" == "true" ]] || record_failure "pod_runtime_execute_after_browser_not_ok"
+    [[ "$runtime_execute_after_browser_command" == "pod.runtime.execute" ]] || record_failure "pod_runtime_execute_after_browser_command_mismatch"
+    [[ "$runtime_execute_after_browser_task_id" == "$RUNTIME_TASK_ID" ]] || record_failure "pod_runtime_execute_after_browser_task_mismatch"
+    [[ "$runtime_execute_after_browser_runtime_home_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_runtime_home_not_ready"
+    [[ "$runtime_execute_after_browser_long_lived_process_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_long_lived_process_not_ready"
+    [[ "$runtime_execute_after_browser_process_status" == "standby" ]] || record_failure "pod_runtime_execute_after_browser_process_status_unexpected"
+    [[ "$runtime_execute_after_browser_supervision_status" == "active" ]] || record_failure "pod_runtime_execute_after_browser_supervision_status_unexpected"
+    [[ "$runtime_execute_after_browser_active_session_status" == "ready" ]] || record_failure "pod_runtime_execute_after_browser_active_session_status_unexpected"
+    [[ "$runtime_execute_after_browser_active_session_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_active_session_observed_unexpected"
+    [[ "$runtime_execute_after_browser_active_session_recovery_reentry_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_recovery_reentry_not_ready"
+    [[ "$runtime_execute_after_browser_active_session_restart_continuity_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_restart_continuity_not_ready"
+    [[ "$runtime_execute_after_browser_active_session_validation_status" == "pending_device_proof" ]] || record_failure "pod_runtime_execute_after_browser_validation_status_unexpected"
+    [[ "$runtime_execute_after_browser_active_session_device_proof_status" == "pending_live_proof" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_status_unexpected"
+    [[ "$runtime_execute_after_browser_active_session_device_proof_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_observed_unexpected"
+  fi
+
   [[ "$runtime_after_ok" == "true" ]] || record_failure "pod_runtime_describe_after_not_ok"
   [[ "$runtime_after_command" == "pod.runtime.describe" ]] || record_failure "pod_runtime_describe_after_command_mismatch"
   [[ "$runtime_after_mainline_status" != "" ]] || record_failure "pod_runtime_describe_after_missing_status"
@@ -381,6 +421,19 @@ jq -n \
   --arg runtimeExecuteOk "$runtime_execute_ok" \
   --arg runtimeExecuteTaskId "$runtime_execute_task_id" \
   --arg runtimeExecuteRuntimeHomeReady "$runtime_execute_runtime_home_ready" \
+  --arg runtimeExecuteAfterBrowserOk "$runtime_execute_after_browser_ok" \
+  --arg runtimeExecuteAfterBrowserTaskId "$runtime_execute_after_browser_task_id" \
+  --arg runtimeExecuteAfterBrowserRuntimeHomeReady "$runtime_execute_after_browser_runtime_home_ready" \
+  --arg runtimeExecuteAfterBrowserLongLivedProcessReady "$runtime_execute_after_browser_long_lived_process_ready" \
+  --arg runtimeExecuteAfterBrowserProcessStatus "$runtime_execute_after_browser_process_status" \
+  --arg runtimeExecuteAfterBrowserSupervisionStatus "$runtime_execute_after_browser_supervision_status" \
+  --arg runtimeExecuteAfterBrowserActiveSessionStatus "$runtime_execute_after_browser_active_session_status" \
+  --arg runtimeExecuteAfterBrowserActiveSessionObserved "$runtime_execute_after_browser_active_session_observed" \
+  --arg runtimeExecuteAfterBrowserActiveSessionRecoveryReentryReady "$runtime_execute_after_browser_active_session_recovery_reentry_ready" \
+  --arg runtimeExecuteAfterBrowserActiveSessionRestartContinuityReady "$runtime_execute_after_browser_active_session_restart_continuity_ready" \
+  --arg runtimeExecuteAfterBrowserActiveSessionValidationStatus "$runtime_execute_after_browser_active_session_validation_status" \
+  --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofStatus "$runtime_execute_after_browser_active_session_device_proof_status" \
+  --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofObserved "$runtime_execute_after_browser_active_session_device_proof_observed" \
   --arg toolExecuteOk "$tool_execute_ok" \
   --arg toolExecuteTaskId "$tool_execute_task_id" \
   --arg toolExecuteToolId "$tool_execute_tool_id" \
@@ -458,6 +511,21 @@ jq -n \
       taskId: (if $runtimeExecuteTaskId == "" then null else $runtimeExecuteTaskId end),
       runtimeHomeReady: ($runtimeExecuteRuntimeHomeReady == "true")
     },
+    runtimeExecuteAfterBrowser: {
+      ok: ($runtimeExecuteAfterBrowserOk == "true"),
+      taskId: (if $runtimeExecuteAfterBrowserTaskId == "" then null else $runtimeExecuteAfterBrowserTaskId end),
+      runtimeHomeReady: ($runtimeExecuteAfterBrowserRuntimeHomeReady == "true"),
+      longLivedProcessReady: ($runtimeExecuteAfterBrowserLongLivedProcessReady == "true"),
+      processStatus: (if $runtimeExecuteAfterBrowserProcessStatus == "" then null else $runtimeExecuteAfterBrowserProcessStatus end),
+      supervisionStatus: (if $runtimeExecuteAfterBrowserSupervisionStatus == "" then null else $runtimeExecuteAfterBrowserSupervisionStatus end),
+      activeSessionStatus: (if $runtimeExecuteAfterBrowserActiveSessionStatus == "" then null else $runtimeExecuteAfterBrowserActiveSessionStatus end),
+      activeSessionObserved: ($runtimeExecuteAfterBrowserActiveSessionObserved == "true"),
+      activeSessionRecoveryReentryReady: ($runtimeExecuteAfterBrowserActiveSessionRecoveryReentryReady == "true"),
+      activeSessionRestartContinuityReady: ($runtimeExecuteAfterBrowserActiveSessionRestartContinuityReady == "true"),
+      activeSessionValidationStatus: (if $runtimeExecuteAfterBrowserActiveSessionValidationStatus == "" then null else $runtimeExecuteAfterBrowserActiveSessionValidationStatus end),
+      activeSessionDeviceProofStatus: (if $runtimeExecuteAfterBrowserActiveSessionDeviceProofStatus == "" then null else $runtimeExecuteAfterBrowserActiveSessionDeviceProofStatus end),
+      activeSessionDeviceProofObserved: ($runtimeExecuteAfterBrowserActiveSessionDeviceProofObserved == "true")
+    },
     toolExecute: {
       ok: ($toolExecuteOk == "true"),
       taskId: (if $toolExecuteTaskId == "" then null else $toolExecuteTaskId end),
@@ -515,6 +583,8 @@ printf 'browser_lane.desktop_materialize ok=%s profile=%s ready=%s count=%s\n' \
   "$desktop_materialize_ok" "$desktop_materialize_profile_id" "$desktop_materialize_home_ready" "$desktop_materialize_execution_count"
 printf 'browser_lane.runtime_execute ok=%s task=%s home=%s\n' \
   "$runtime_execute_ok" "$runtime_execute_task_id" "$runtime_execute_runtime_home_ready"
+printf 'browser_lane.runtime_execute_after_browser ok=%s task=%s long_lived=%s process=%s supervision=%s active_session=%s validation=%s device_proof=%s\n' \
+  "$runtime_execute_after_browser_ok" "$runtime_execute_after_browser_task_id" "$runtime_execute_after_browser_long_lived_process_ready" "$runtime_execute_after_browser_process_status" "$runtime_execute_after_browser_supervision_status" "$runtime_execute_after_browser_active_session_status" "$runtime_execute_after_browser_active_session_validation_status" "$runtime_execute_after_browser_active_session_device_proof_status"
 printf 'browser_lane.tool_execute ok=%s task=%s tool=%s\n' \
   "$tool_execute_ok" "$tool_execute_task_id" "$tool_execute_tool_id"
 printf 'browser_lane.plugin_execute ok=%s task=%s plugin=%s home=%s count=%s profile_source=%s\n' \
@@ -544,6 +614,7 @@ echo "artifacts.dir=$ARTIFACT_DIR"
 echo "artifacts.status=$status_json"
 echo "artifacts.capabilities=$capabilities_json"
 echo "artifacts.runtime_execute=$runtime_execute_json"
+echo "artifacts.runtime_execute_after_browser=$runtime_execute_after_browser_json"
 echo "artifacts.tool_execute=$tool_execute_json"
 echo "artifacts.plugin_execute=$plugin_execute_json"
 echo "artifacts.desktop_materialize=$desktop_materialize_json"
