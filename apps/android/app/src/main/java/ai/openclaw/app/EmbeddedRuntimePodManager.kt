@@ -538,6 +538,16 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         browser.browserReplayReady &&
         browser.authCredentialPresent &&
         carrier.runtimePluginExecutionStateCount > 0 &&
+        desktopReplay.processActiveSessionDeviceProofObserved ->
+        "process_runtime_active_session_live_proof_captured"
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent &&
+        carrier.runtimePluginExecutionStateCount > 0 &&
         desktopReplay.processActiveSessionDeviceProofReady ->
         "process_runtime_active_session_device_proof_bootstrapped"
       inspection.ready &&
@@ -1285,7 +1295,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !desktopReplay.processActiveSessionValidationReady -> "process_runtime_active_session_validation"
               !desktopReplay.processActiveSessionDeviceProofReady ->
                 "process_runtime_active_session_device_proof"
-              else -> "process_runtime_active_session_live_proof"
+              !desktopReplay.processActiveSessionDeviceProofObserved ->
+                "process_runtime_active_session_live_proof"
+              else -> "process_runtime_lane_hardening"
             },
           ),
         )
@@ -1337,8 +1349,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Deepen runtime-smoke again so the desktop-home replay also leaves an active-session-validation artifact that turns the bounded contract into an explicit device-proof checklist for lease renewal, recovery re-entry, and restart continuity."
               !desktopReplay.processActiveSessionDeviceProofReady ->
                 "Deepen runtime-smoke again so the desktop-home replay also leaves an active-session-device-proof artifact that binds the checklist to the exact doctor, smoke, and browser-lane evidence bundle needed for one live detached-session proof."
-              else ->
+              !desktopReplay.processActiveSessionDeviceProofObserved ->
                 "Reinstall the current debug app on-device, rerun doctor plus the bounded smoke scripts, and capture one live detached session proof bundle with observed lease renewal, recovery re-entry, and restart continuity."
+              else ->
+                "Keep doctor plus the bounded smoke scripts boringly green so the captured live detached-session proof becomes the new baseline before widening browser, tools, or plugins again."
             },
           ),
         )

@@ -529,6 +529,49 @@ class EmbeddedRuntimePodStatusTest {
   }
 
   @Test
+  fun executeEmbeddedRuntimePodTask_capturesLiveActiveSessionProofAfterRepeatReplay() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
+    seedBrowserReplayAndCredential(context, "0.17.0")
+
+    val firstResult = executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+    val secondResult = executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+
+    assertTrue(firstResult.ok)
+    assertTrue(secondResult.ok)
+    val firstPayload = firstResult.payload ?: error("expected first payload")
+    val payload = secondResult.payload ?: error("expected payload")
+    assertEquals(
+      firstPayload.getValue("desktopProcessDetachedLaunchSessionId").jsonPrimitive.content,
+      payload.getValue("desktopProcessDetachedLaunchSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      firstPayload.getValue("desktopProcessSupervisorLoopSessionId").jsonPrimitive.content,
+      payload.getValue("desktopProcessSupervisorLoopSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      firstPayload.getValue("desktopProcessActiveSessionSessionId").jsonPrimitive.content,
+      payload.getValue("desktopProcessActiveSessionSessionId").jsonPrimitive.content,
+    )
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionBootstrapOnly").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionObserved").jsonPrimitive.boolean)
+    assertEquals("validated", payload.getValue("desktopProcessActiveSessionValidationStatus").jsonPrimitive.content)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationBootstrapOnly").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationLeaseRenewalObserved").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationRecoveryReentryObserved").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationRestartContinuityObserved").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationDeviceProofRequired").jsonPrimitive.boolean)
+    assertEquals("verified", payload.getValue("desktopProcessActiveSessionDeviceProofStatus").jsonPrimitive.content)
+    assertEquals("verified", payload.getValue("desktopProcessActiveSessionDeviceProofState").jsonPrimitive.content)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionDeviceProofBootstrapOnly").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionDeviceProofObserved").jsonPrimitive.boolean)
+  }
+
+  @Test
   fun materializeEmbeddedRuntimeDesktopEnvironment_materializesDesktopHome() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
@@ -547,5 +590,20 @@ class EmbeddedRuntimePodStatusTest {
     assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/tools/manifest.json").isFile)
     assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/plugins/manifest.json").isFile)
     assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/profiles/active-profile.json").isFile)
+  }
+
+  private fun seedBrowserReplayAndCredential(
+    context: android.content.Context,
+    manifestVersion: String,
+  ) {
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/$manifestVersion")
+    runtimeHome.resolve("state").mkdirs()
+    runtimeHome.resolve("logs").mkdirs()
+    runtimeHome
+      .resolve("state/browser-openai-codex-auth.json")
+      .writeText(
+        """{"flowId":"openai-codex-oauth","status":"launch_requested","launchRequested":true,"executedAt":"2026-04-05T12:00:00Z","statusText":"Browser opened","credentialPresentAfterLaunch":true,"signedInEmail":"desktop-runtime@example.com"}""",
+      )
+    runtimeHome.resolve("logs/browser-lane.log").writeText("2026-04-05T12:00:00Z launch_requested\n")
   }
 }

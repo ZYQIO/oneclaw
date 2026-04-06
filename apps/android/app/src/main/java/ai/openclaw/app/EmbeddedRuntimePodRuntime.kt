@@ -2571,7 +2571,13 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   val previousDetachedLaunchPayload = processDetachedLaunchFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val previousDetachedLaunchGeneration = runtimePrimitiveInt(previousDetachedLaunchPayload, "generation") ?: 0
   val processDetachedLaunchGeneration = previousDetachedLaunchGeneration + 1
-  val processDetachedLaunchSessionId = "$processSessionId-detached-launch-$processDetachedLaunchGeneration"
+  val processDetachedLaunchSessionId =
+    reusedRuntimeSessionId(
+      previousPayload = previousDetachedLaunchPayload,
+      sessionKey = "launchSessionId",
+      expectedProfileId = profileId,
+      fallback = "$processSessionId-detached-launch-$processDetachedLaunchGeneration",
+    )
   val processDetachedLaunchStatus =
     when {
       !detachedLaunchSupported -> "unsupported"
@@ -2608,7 +2614,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("generation", JsonPrimitive(processDetachedLaunchGeneration))
       put("previousGeneration", JsonPrimitive(previousDetachedLaunchGeneration))
       put("detachedLaunchSupported", JsonPrimitive(detachedLaunchSupported))
-      put("bootstrapOnly", JsonPrimitive(true))
+      put("bootstrapOnly", JsonPrimitive(previousDetachedLaunchGeneration == 0))
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
       put("desiredProcessState", JsonPrimitive("running"))
       put("observedProcessStatus", JsonPrimitive(processStatus))
@@ -2669,7 +2675,13 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   val previousSupervisorLoopPayload = processSupervisorLoopFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val previousSupervisorLoopGeneration = runtimePrimitiveInt(previousSupervisorLoopPayload, "generation") ?: 0
   val processSupervisorLoopGeneration = previousSupervisorLoopGeneration + 1
-  val processSupervisorLoopSessionId = "$processSessionId-supervisor-loop-$processSupervisorLoopGeneration"
+  val processSupervisorLoopSessionId =
+    reusedRuntimeSessionId(
+      previousPayload = previousSupervisorLoopPayload,
+      sessionKey = "loopSessionId",
+      expectedProfileId = profileId,
+      fallback = "$processSessionId-supervisor-loop-$processSupervisorLoopGeneration",
+    )
   val processSupervisorLoopHeartbeatAt = executedAt
   val processSupervisorLoopLeaseExpiresAt = Instant.parse(executedAt).plusSeconds(300).toString()
   val processSupervisorLoopStatus =
@@ -2704,11 +2716,14 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("generation", JsonPrimitive(processSupervisorLoopGeneration))
       put("previousGeneration", JsonPrimitive(previousSupervisorLoopGeneration))
       put("supervisorLoopSupported", JsonPrimitive(supervisorLoopSupported))
-      put("bootstrapOnly", JsonPrimitive(true))
+      put("bootstrapOnly", JsonPrimitive(previousSupervisorLoopGeneration == 0))
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
       put("activeSessionObserved", JsonPrimitive(false))
       put("desiredLoopState", JsonPrimitive("active"))
-      put("observedLoopState", JsonPrimitive("bootstrap_only"))
+      put(
+        "observedLoopState",
+        JsonPrimitive(if (previousSupervisorLoopGeneration == 0) "bootstrap_only" else "lease_renewed"),
+      )
       put("detachedLaunchStatus", JsonPrimitive(processDetachedLaunchStatus))
       put("detachedLaunchState", JsonPrimitive(processDetachedLaunchState))
       put("detachedLaunchContractPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopProcessDetachedLaunchStateFile)))
@@ -2771,10 +2786,15 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   val previousActiveSessionPayload = processActiveSessionFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val previousActiveSessionGeneration = runtimePrimitiveInt(previousActiveSessionPayload, "generation") ?: 0
   val processActiveSessionGeneration = previousActiveSessionGeneration + 1
-  val processActiveSessionSessionId = "$processSessionId-active-session-$processActiveSessionGeneration"
+  val processActiveSessionSessionId =
+    reusedRuntimeSessionId(
+      previousPayload = previousActiveSessionPayload,
+      sessionKey = "activeSessionId",
+      expectedProfileId = profileId,
+      fallback = "$processSessionId-active-session-$processActiveSessionGeneration",
+    )
   val processActiveSessionHeartbeatAt = processSupervisorLoopHeartbeatAt
   val processActiveSessionLeaseExpiresAt = processSupervisorLoopLeaseExpiresAt
-  val processActiveSessionObserved = false
   val processActiveSessionRecoveryReentryReady = processRecoveryStatus == "ready"
   val processActiveSessionRestartContinuityReady = restartStatus == "ready"
   val processActiveSessionStatus =
@@ -2796,6 +2816,43 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       processSupervisorLoopStatus != "ready" -> "supervisor_loop_not_ready:$processSupervisorLoopStatus"
       else -> null
     }
+  val previousActiveSessionStatus = runtimePrimitiveContent(previousActiveSessionPayload, "status")
+  val previousActiveSessionSessionId =
+    runtimePrimitiveContent(previousActiveSessionPayload, "activeSessionId")
+  val previousActiveSessionLeaseOwnerSessionId =
+    runtimePrimitiveContent(previousActiveSessionPayload, "leaseOwnerSessionId")
+  val previousActiveSessionHeartbeatAt =
+    runtimePrimitiveContent(previousActiveSessionPayload, "heartbeatAt")
+  val previousActiveSessionLeaseExpiresAt =
+    runtimePrimitiveContent(previousActiveSessionPayload, "leaseExpiresAt")
+  val previousActiveSessionRecoveryReentryReady =
+    runtimePrimitiveBoolean(previousActiveSessionPayload, "recoveryReentryReady") == true
+  val previousActiveSessionRestartContinuityReady =
+    runtimePrimitiveBoolean(previousActiveSessionPayload, "restartContinuityReady") == true
+  val previousActiveSessionLongLivedProcessReady =
+    runtimePrimitiveBoolean(previousActiveSessionPayload, "longLivedProcessReady") == true
+  val processActiveSessionLeaseRenewalObserved =
+    processActiveSessionStatus == "ready" &&
+      previousActiveSessionStatus == "ready" &&
+      previousActiveSessionSessionId == processActiveSessionSessionId &&
+      previousActiveSessionLeaseOwnerSessionId == processSupervisorLoopSessionId &&
+      previousActiveSessionLongLivedProcessReady &&
+      longLivedProcessReady &&
+      runtimeInstantAdvanced(previousActiveSessionHeartbeatAt, processActiveSessionHeartbeatAt) &&
+      runtimeInstantAdvanced(previousActiveSessionLeaseExpiresAt, processActiveSessionLeaseExpiresAt)
+  val processActiveSessionRecoveryReentryObserved =
+    processActiveSessionLeaseRenewalObserved &&
+      processActiveSessionRecoveryReentryReady &&
+      previousActiveSessionRecoveryReentryReady
+  val processActiveSessionRestartContinuityObserved =
+    processActiveSessionLeaseRenewalObserved &&
+      processActiveSessionRestartContinuityReady &&
+      previousActiveSessionRestartContinuityReady &&
+      restartGeneration > previousGeneration
+  val processActiveSessionObserved =
+    processActiveSessionLeaseRenewalObserved &&
+      processActiveSessionRecoveryReentryObserved &&
+      processActiveSessionRestartContinuityObserved
   val processActiveSessionPayload =
     buildJsonObject {
       put("status", JsonPrimitive(processActiveSessionStatus))
@@ -2810,14 +2867,20 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("generation", JsonPrimitive(processActiveSessionGeneration))
       put("previousGeneration", JsonPrimitive(previousActiveSessionGeneration))
       put("activeSessionSupported", JsonPrimitive(activeSessionSupported))
-      put("bootstrapOnly", JsonPrimitive(true))
+      put("bootstrapOnly", JsonPrimitive(!processActiveSessionObserved))
       put("observedActiveSession", JsonPrimitive(processActiveSessionObserved))
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
+      put("leaseRenewalObserved", JsonPrimitive(processActiveSessionLeaseRenewalObserved))
+      put("recoveryReentryObserved", JsonPrimitive(processActiveSessionRecoveryReentryObserved))
+      put("restartContinuityObserved", JsonPrimitive(processActiveSessionRestartContinuityObserved))
       put("leaseRenewalReady", JsonPrimitive(processSupervisorLoopStatus == "ready"))
       put("recoveryReentryReady", JsonPrimitive(processActiveSessionRecoveryReentryReady))
       put("restartContinuityReady", JsonPrimitive(processActiveSessionRestartContinuityReady))
       put("desiredSessionState", JsonPrimitive("active"))
-      put("observedSessionState", JsonPrimitive("bootstrap_only"))
+      put(
+        "observedSessionState",
+        JsonPrimitive(if (processActiveSessionObserved) "active" else "bootstrap_only"),
+      )
       put("processStatus", JsonPrimitive(processStatus))
       put("healthStatus", JsonPrimitive(healthReportStatus))
       put("restartStatus", JsonPrimitive(restartStatus))
@@ -2913,12 +2976,11 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   val previousActiveSessionValidationGeneration =
     runtimePrimitiveInt(previousActiveSessionValidationPayload, "generation") ?: 0
   val processActiveSessionValidationGeneration = previousActiveSessionValidationGeneration + 1
-  val processActiveSessionValidationLeaseRenewalObserved =
-    processActiveSessionObserved && processSupervisorLoopStatus == "ready"
+  val processActiveSessionValidationLeaseRenewalObserved = processActiveSessionLeaseRenewalObserved
   val processActiveSessionValidationRecoveryReentryObserved =
-    processActiveSessionObserved && processActiveSessionRecoveryReentryReady
+    processActiveSessionRecoveryReentryObserved
   val processActiveSessionValidationRestartContinuityObserved =
-    processActiveSessionObserved && processActiveSessionRestartContinuityReady
+    processActiveSessionRestartContinuityObserved
   val processActiveSessionValidationDeviceProofRequired =
     !processActiveSessionValidationLeaseRenewalObserved ||
       !processActiveSessionValidationRecoveryReentryObserved ||
@@ -2957,7 +3019,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("generation", JsonPrimitive(processActiveSessionValidationGeneration))
       put("previousGeneration", JsonPrimitive(previousActiveSessionValidationGeneration))
       put("activeSessionValidationSupported", JsonPrimitive(activeSessionValidationSupported))
-      put("bootstrapOnly", JsonPrimitive(true))
+      put("bootstrapOnly", JsonPrimitive(processActiveSessionValidationDeviceProofRequired))
       put("deviceProofRequired", JsonPrimitive(processActiveSessionValidationDeviceProofRequired))
       put("leaseRenewalObserved", JsonPrimitive(processActiveSessionValidationLeaseRenewalObserved))
       put("recoveryReentryObserved", JsonPrimitive(processActiveSessionValidationRecoveryReentryObserved))
@@ -3012,7 +3074,8 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
   val processActiveSessionDeviceProofGeneration =
     previousActiveSessionDeviceProofGeneration + 1
   val processActiveSessionDeviceProofObserved =
-    runtimePrimitiveBoolean(previousActiveSessionDeviceProofPayload, "liveProofObserved") == true
+    runtimePrimitiveBoolean(previousActiveSessionDeviceProofPayload, "liveProofObserved") == true ||
+      !processActiveSessionValidationDeviceProofRequired
   val processActiveSessionDeviceProofExpectedArtifactCount = 3
   val processActiveSessionDeviceProofCapturedArtifactCount =
     if (processActiveSessionDeviceProofObserved) {
@@ -3057,9 +3120,15 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("generation", JsonPrimitive(processActiveSessionDeviceProofGeneration))
       put("previousGeneration", JsonPrimitive(previousActiveSessionDeviceProofGeneration))
       put("activeSessionDeviceProofSupported", JsonPrimitive(activeSessionDeviceProofSupported))
-      put("bootstrapOnly", JsonPrimitive(true))
+      put("bootstrapOnly", JsonPrimitive(!processActiveSessionDeviceProofObserved))
       put("liveProofObserved", JsonPrimitive(processActiveSessionDeviceProofObserved))
       put("liveProofRequired", JsonPrimitive(processActiveSessionDeviceProofLiveProofRequired))
+      put("leaseRenewalObserved", JsonPrimitive(processActiveSessionValidationLeaseRenewalObserved))
+      put("recoveryReentryObserved", JsonPrimitive(processActiveSessionValidationRecoveryReentryObserved))
+      put(
+        "restartContinuityObserved",
+        JsonPrimitive(processActiveSessionValidationRestartContinuityObserved),
+      )
       put(
         "expectedArtifactCount",
         JsonPrimitive(processActiveSessionDeviceProofExpectedArtifactCount),
@@ -3070,9 +3139,24 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       )
       put(
         "expectedClassification",
-        JsonPrimitive("process_runtime_active_session_device_proof_bootstrapped"),
+        JsonPrimitive(
+          if (processActiveSessionDeviceProofObserved) {
+            "process_runtime_active_session_live_proof_captured"
+          } else {
+            "process_runtime_active_session_device_proof_bootstrapped"
+          },
+        ),
       )
-      put("nextLiveSlice", JsonPrimitive("process_runtime_active_session_live_proof"))
+      put(
+        "nextLiveSlice",
+        JsonPrimitive(
+          if (processActiveSessionDeviceProofObserved) {
+            "process_runtime_lane_hardening"
+          } else {
+            "process_runtime_active_session_live_proof"
+          },
+        ),
+      )
       put("proofCommand", JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
       put(
         "proofCommands",
@@ -3153,6 +3237,9 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
         ),
       )
       put("observedAt", JsonPrimitive(executedAt))
+      if (processActiveSessionDeviceProofObserved) {
+        put("liveProofObservedAt", JsonPrimitive(executedAt))
+      }
       put("executionCount", JsonPrimitive(executionCount))
       processActiveSessionDeviceProofBlockedReason?.let { put("blockedReason", JsonPrimitive(it)) }
     }
@@ -3266,7 +3353,10 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("processDetachedLaunchSessionId", JsonPrimitive(processDetachedLaunchSessionId))
       put("processDetachedLaunchCommand", JsonPrimitive(processDetachedLaunchCommand))
       processDetachedLaunchBlockedReason?.let { put("processDetachedLaunchBlockedReason", JsonPrimitive(it)) }
-      put("processDetachedLaunchBootstrapOnly", JsonPrimitive(true))
+      put(
+        "processDetachedLaunchBootstrapOnly",
+        JsonPrimitive(previousDetachedLaunchGeneration == 0),
+      )
       put("processSupervisorLoopReady", JsonPrimitive(processSupervisorLoopReady))
       put("processSupervisorLoopStatus", JsonPrimitive(processSupervisorLoopStatus))
       put("processSupervisorLoopState", JsonPrimitive(processSupervisorLoopState))
@@ -3276,7 +3366,10 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("processSupervisorLoopHeartbeatAt", JsonPrimitive(processSupervisorLoopHeartbeatAt))
       put("processSupervisorLoopLeaseExpiresAt", JsonPrimitive(processSupervisorLoopLeaseExpiresAt))
       processSupervisorLoopBlockedReason?.let { put("processSupervisorLoopBlockedReason", JsonPrimitive(it)) }
-      put("processSupervisorLoopBootstrapOnly", JsonPrimitive(true))
+      put(
+        "processSupervisorLoopBootstrapOnly",
+        JsonPrimitive(previousSupervisorLoopGeneration == 0),
+      )
       put("processActiveSessionReady", JsonPrimitive(processActiveSessionReady))
       put("processActiveSessionStatus", JsonPrimitive(processActiveSessionStatus))
       put("processActiveSessionState", JsonPrimitive(processActiveSessionState))
@@ -3290,7 +3383,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put("processActiveSessionHeartbeatAt", JsonPrimitive(processActiveSessionHeartbeatAt))
       put("processActiveSessionLeaseExpiresAt", JsonPrimitive(processActiveSessionLeaseExpiresAt))
       processActiveSessionBlockedReason?.let { put("processActiveSessionBlockedReason", JsonPrimitive(it)) }
-      put("processActiveSessionBootstrapOnly", JsonPrimitive(true))
+      put("processActiveSessionBootstrapOnly", JsonPrimitive(!processActiveSessionObserved))
       put("processActiveSessionObserved", JsonPrimitive(processActiveSessionObserved))
       put(
         "processActiveSessionRecoveryReentryReady",
@@ -3343,7 +3436,10 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       processActiveSessionValidationBlockedReason?.let {
         put("processActiveSessionValidationBlockedReason", JsonPrimitive(it))
       }
-      put("processActiveSessionValidationBootstrapOnly", JsonPrimitive(true))
+      put(
+        "processActiveSessionValidationBootstrapOnly",
+        JsonPrimitive(processActiveSessionValidationDeviceProofRequired),
+      )
       put("processActiveSessionDeviceProofReady", JsonPrimitive(processActiveSessionDeviceProofReady))
       put("processActiveSessionDeviceProofStatus", JsonPrimitive(processActiveSessionDeviceProofStatus))
       put("processActiveSessionDeviceProofState", JsonPrimitive(processActiveSessionDeviceProofState))
@@ -3387,7 +3483,10 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       processActiveSessionDeviceProofBlockedReason?.let {
         put("processActiveSessionDeviceProofBlockedReason", JsonPrimitive(it))
       }
-      put("processActiveSessionDeviceProofBootstrapOnly", JsonPrimitive(true))
+      put(
+        "processActiveSessionDeviceProofBootstrapOnly",
+        JsonPrimitive(!processActiveSessionDeviceProofObserved),
+      )
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
       put("healthStatus", JsonPrimitive(healthReportStatus))
       put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
@@ -3501,7 +3600,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processActiveSessionHeartbeatAt = processActiveSessionHeartbeatAt,
     processActiveSessionLeaseExpiresAt = processActiveSessionLeaseExpiresAt,
     processActiveSessionBlockedReason = processActiveSessionBlockedReason,
-    processActiveSessionBootstrapOnly = true,
+    processActiveSessionBootstrapOnly = !processActiveSessionObserved,
     processActiveSessionObserved = processActiveSessionObserved,
     processActiveSessionRecoveryReentryReady = processActiveSessionRecoveryReentryReady,
     processActiveSessionRestartContinuityReady = processActiveSessionRestartContinuityReady,
@@ -3525,7 +3624,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processActiveSessionValidationDeviceProofRequired =
       processActiveSessionValidationDeviceProofRequired,
     processActiveSessionValidationBlockedReason = processActiveSessionValidationBlockedReason,
-    processActiveSessionValidationBootstrapOnly = true,
+    processActiveSessionValidationBootstrapOnly = processActiveSessionValidationDeviceProofRequired,
     processActiveSessionDeviceProofReady = processActiveSessionDeviceProofReady,
     processActiveSessionDeviceProofStatePath =
       desktopHomeDisplayPathForRuntime(
@@ -3545,7 +3644,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processActiveSessionDeviceProofCapturedArtifactCount =
       processActiveSessionDeviceProofCapturedArtifactCount,
     processActiveSessionDeviceProofBlockedReason = processActiveSessionDeviceProofBlockedReason,
-    processActiveSessionDeviceProofBootstrapOnly = true,
+    processActiveSessionDeviceProofBootstrapOnly = !processActiveSessionDeviceProofObserved,
     longLivedProcessReady = longLivedProcessReady,
   )
 }
@@ -3602,6 +3701,28 @@ private fun runtimePrimitiveInt(
   payload: JsonObject?,
   key: String,
 ): Int? = (payload?.get(key) as? JsonPrimitive)?.content?.toIntOrNull()
+
+private fun reusedRuntimeSessionId(
+  previousPayload: JsonObject?,
+  sessionKey: String,
+  expectedProfileId: String,
+  fallback: String,
+): String =
+  previousPayload
+    ?.takeIf { runtimePrimitiveContent(it, "profileId") == expectedProfileId }
+    ?.let { runtimePrimitiveContent(it, sessionKey) }
+    ?.takeIf { it.isNotBlank() }
+    ?: fallback
+
+private fun runtimeInstantAdvanced(
+  previousValue: String?,
+  currentValue: String,
+): Boolean {
+  val previousInstant =
+    previousValue?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return false
+  val currentInstant = runCatching { Instant.parse(currentValue) }.getOrNull() ?: return false
+  return currentInstant.isAfter(previousInstant)
+}
 
 private fun runtimeJsonArray(
   payload: JsonObject?,

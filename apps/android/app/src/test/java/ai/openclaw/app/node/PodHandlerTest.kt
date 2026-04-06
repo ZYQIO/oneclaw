@@ -879,6 +879,70 @@ class PodHandlerTest {
   }
 
   @Test
+  fun handlePodRuntimeDescribe_reportsCapturedLiveActiveSessionProofAfterRepeatReplay() {
+    val context = RuntimeEnvironment.getApplication()
+    context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
+    context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
+    ensureEmbeddedRuntimePodInstalled(context)
+    materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
+    seedBrowserReplayAndCredential(context, "0.17.0")
+    executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+    executeEmbeddedRuntimePodTask(context, "runtime-smoke")
+    executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
+    executeEmbeddedRuntimePodTask(context, "plugin-allowlist-inspect")
+    val handler = PodHandler(context)
+
+    val result = handler.handlePodRuntimeDescribe(null)
+
+    assertTrue(result.ok)
+    val payload = parsePayload(result.payloadJson)
+    assertEquals(
+      "process_runtime_active_session_live_proof_captured",
+      payload.getValue("mainlineStatus").jsonPrimitive.content,
+    )
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionBootstrapOnly").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionObserved").jsonPrimitive.boolean)
+    assertEquals(
+      "validated",
+      payload.getValue("desktopProcessActiveSessionValidationStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      false,
+      payload.getValue("desktopProcessActiveSessionValidationBootstrapOnly").jsonPrimitive.boolean,
+    )
+    assertEquals(
+      true,
+      payload.getValue("desktopProcessActiveSessionValidationLeaseRenewalObserved").jsonPrimitive.boolean,
+    )
+    assertEquals(
+      true,
+      payload.getValue("desktopProcessActiveSessionValidationRecoveryReentryObserved").jsonPrimitive.boolean,
+    )
+    assertEquals(
+      true,
+      payload.getValue("desktopProcessActiveSessionValidationRestartContinuityObserved").jsonPrimitive.boolean,
+    )
+    assertEquals(
+      false,
+      payload.getValue("desktopProcessActiveSessionValidationDeviceProofRequired").jsonPrimitive.boolean,
+    )
+    assertEquals(
+      "verified",
+      payload.getValue("desktopProcessActiveSessionDeviceProofStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      false,
+      payload.getValue("desktopProcessActiveSessionDeviceProofBootstrapOnly").jsonPrimitive.boolean,
+    )
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionDeviceProofObserved").jsonPrimitive.boolean)
+    assertEquals(
+      "process_runtime_lane_hardening",
+      payload.getValue("recommendedNextSlice").jsonPrimitive.content,
+    )
+  }
+
+  @Test
   fun handlePodWorkspaceScan_reportsWorkspaceAssetsAfterInstall() {
     val context = RuntimeEnvironment.getApplication()
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()

@@ -375,12 +375,18 @@ if [[ "$failure_hint" == "" ]]; then
     [[ "$runtime_execute_after_browser_process_status" == "standby" ]] || record_failure "pod_runtime_execute_after_browser_process_status_unexpected"
     [[ "$runtime_execute_after_browser_supervision_status" == "active" ]] || record_failure "pod_runtime_execute_after_browser_supervision_status_unexpected"
     [[ "$runtime_execute_after_browser_active_session_status" == "ready" ]] || record_failure "pod_runtime_execute_after_browser_active_session_status_unexpected"
-    [[ "$runtime_execute_after_browser_active_session_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_active_session_observed_unexpected"
     [[ "$runtime_execute_after_browser_active_session_recovery_reentry_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_recovery_reentry_not_ready"
     [[ "$runtime_execute_after_browser_active_session_restart_continuity_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_restart_continuity_not_ready"
-    [[ "$runtime_execute_after_browser_active_session_validation_status" == "pending_device_proof" ]] || record_failure "pod_runtime_execute_after_browser_validation_status_unexpected"
-    [[ "$runtime_execute_after_browser_active_session_device_proof_status" == "pending_live_proof" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_status_unexpected"
-    [[ "$runtime_execute_after_browser_active_session_device_proof_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_observed_unexpected"
+    if [[ "$runtime_execute_after_browser_active_session_observed" == "true" ]]; then
+      [[ "$runtime_execute_after_browser_active_session_validation_status" == "validated" ]] || record_failure "pod_runtime_execute_after_browser_validation_status_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_status" == "verified" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_status_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_observed" == "true" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_observed_unexpected"
+    else
+      [[ "$runtime_execute_after_browser_active_session_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_active_session_observed_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_validation_status" == "pending_device_proof" ]] || record_failure "pod_runtime_execute_after_browser_validation_status_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_status" == "pending_live_proof" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_status_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_observed_unexpected"
+    fi
   fi
 
   [[ "$runtime_after_ok" == "true" ]] || record_failure "pod_runtime_describe_after_not_ok"
@@ -390,7 +396,7 @@ if [[ "$failure_hint" == "" ]]; then
   [[ "$runtime_after_plugin_execution_state_count" -ge 1 ]] || record_failure "pod_runtime_describe_after_plugin_state_missing"
 
   if [[ "$START_BROWSER" == "1" ]]; then
-    [[ "$runtime_after_mainline_status" == "process_runtime_active_session_device_proof_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_active_session_validation_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_active_session_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_supervisor_loop_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_detached_launch_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_recovery_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_observation_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_supervision_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_activation_bootstrapped" || "$runtime_after_mainline_status" == "process_model_bootstrapped" || "$runtime_after_mainline_status" == "plugin_lane_replayed" || "$runtime_after_mainline_status" == "browser_lane_replayed" || "$runtime_after_mainline_status" == "browser_lane_configured" || "$runtime_after_mainline_status" == "desktop_bundle_ready" || "$runtime_after_mainline_status" == "desktop_home_ready" || "$runtime_after_mainline_status" == "desktop_home_configured" ]] || record_failure "pod_runtime_describe_after_browser_status_mismatch"
+    [[ "$runtime_after_mainline_status" == "process_runtime_active_session_live_proof_captured" || "$runtime_after_mainline_status" == "process_runtime_active_session_device_proof_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_active_session_validation_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_active_session_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_supervisor_loop_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_detached_launch_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_recovery_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_observation_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_supervision_bootstrapped" || "$runtime_after_mainline_status" == "process_runtime_activation_bootstrapped" || "$runtime_after_mainline_status" == "process_model_bootstrapped" || "$runtime_after_mainline_status" == "plugin_lane_replayed" || "$runtime_after_mainline_status" == "browser_lane_replayed" || "$runtime_after_mainline_status" == "browser_lane_configured" || "$runtime_after_mainline_status" == "desktop_bundle_ready" || "$runtime_after_mainline_status" == "desktop_home_ready" || "$runtime_after_mainline_status" == "desktop_home_configured" ]] || record_failure "pod_runtime_describe_after_browser_status_mismatch"
   fi
 fi
 

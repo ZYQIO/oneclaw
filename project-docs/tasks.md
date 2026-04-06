@@ -3,14 +3,14 @@
 ## Immediate Tasks
 
 1. Keep the refreshed `PFEM10` replay boringly repeatable on payload `0.17.0`.
-   - Current state: on April 6, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` already converged to `classification=process_runtime_active_session_device_proof_bootstrapped`, and the browser-lane smoke now also records `runtimeExecuteAfterBrowser.longLivedProcessReady=true`, `processStatus=standby`, `supervisionStatus=active`, and `activeSessionStatus=ready`.
-   - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_device_proof_bootstrapped` and continue leaving the browser-aligned runtime summary in place.
+   - Current state: on April 6, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=process_runtime_active_session_live_proof_captured`, and the browser-lane smoke now records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, and `activeSessionDeviceProofStatus=verified`.
+   - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_live_proof_captured` and continue leaving the browser-aligned runtime summary in place.
 
-2. Capture the next live-proof slice as `process_runtime_active_session_live_proof`.
-   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery/process-runtime-detached-launch/process-runtime-supervisor-loop/bootstrap-validation/bootstrap-device-proof should exist; those are now settled repo-side.
-   - Exit criteria: the bounded active-session-device-proof contract turns into one real detached active session on-device with observed lease renewal, recovery re-entry, and restart continuity.
+2. Preserve the captured live-proof slice as `process_runtime_lane_hardening`.
+   - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery/process-runtime-detached-launch/process-runtime-supervisor-loop/bootstrap-validation/bootstrap-device-proof/live-proof capture should exist; those are now settled.
+   - Exit criteria: the bounded live active-session proof remains replayable on-device with observed lease renewal, recovery re-entry, and restart continuity across repeated reruns.
 
-3. Keep the targeted pod validation lane stable while live-proof work deepens.
+3. Keep the targeted pod validation lane stable while process-runtime hardening deepens.
    - The current green path is `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus targeted Android Gradle reruns for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest`.
    - Exit criteria: those validations keep passing as the process-runtime supervisor-loop/active-session work lands.
 
@@ -22,7 +22,7 @@
 
 2. Keep the active-session-device-proof contract and the live-proof checklist aligned.
    - Focus on observable process state, lease ownership, restart generation, recovery re-entry semantics, and the browser-aligned `runtimeExecuteAfterBrowser` artifact rather than widening browser/tools/plugins again.
-   - Exit criteria: the docs and runtime status surface both describe one coherent active-session-device-proof model, and the next gap is only live device capture.
+   - Exit criteria: the docs and runtime status surface both describe one coherent captured-live-proof model, and the next gap is only hardening.
 
 3. Keep doc/task surfaces aligned with the Android mainline rather than old fork-management work.
    - `project-docs/` should continue to mirror the Android desktop-runtime branch state.
