@@ -201,6 +201,10 @@ elif [[ "$browser_mainline_status" == "desktop_home_configured" ]]; then
   classification="desktop_home_configured"
   recommended_action="none"
   recommended_command=""
+elif [[ "$browser_mainline_status" == "process_runtime_active_session_bootstrapped" ]]; then
+  classification="process_runtime_active_session_bootstrapped"
+  recommended_action="capture-active-session-proof"
+  recommended_command=""
 elif [[ "$browser_mainline_status" == "process_runtime_supervisor_loop_bootstrapped" ]]; then
   classification="process_runtime_supervisor_loop_bootstrapped"
   recommended_action="advance-active-session"
@@ -283,6 +287,9 @@ else
     recommended_command=""
   elif [[ "$browser_recommended_next_slice" == "process_runtime_active_session" ]]; then
     recommended_action="advance-active-session"
+    recommended_command=""
+  elif [[ "$browser_recommended_next_slice" == "process_runtime_active_session_validation" ]]; then
+    recommended_action="capture-active-session-proof"
     recommended_command=""
   elif [[ "$browser_recommended_next_slice" == "process_runtime_activation" ]]; then
     recommended_action="advance-process-runtime"

@@ -25,10 +25,11 @@
     "process-runtime-observation-bootstrap",
     "process-runtime-recovery-bootstrap",
     "process-runtime-detached-launch-bootstrap",
-    "process-runtime-supervisor-loop-bootstrap"
+    "process-runtime-supervisor-loop-bootstrap",
+    "process-runtime-active-session-bootstrap"
   ],
   "limitations": [
     "No packaged browser lane yet",
-    "No executed detached desktop subprocess or live supervisor loop yet"
+    "No verified detached active session on-device yet"
   ]
 }

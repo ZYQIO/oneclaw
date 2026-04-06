@@ -2,13 +2,13 @@
 
 ## Immediate Tasks
 
-1. Re-run the branch on `PFEM10` with payload `0.14.0` until the top-level result reaches `process_runtime_supervisor_loop_bootstrapped`.
+1. Re-run the branch on `PFEM10` with payload `0.15.0` until the top-level result reaches `process_runtime_active_session_bootstrapped`.
    - Current state: repo-side validation is green, but the latest real-device proof still stops at April 4, 2026 `0.7.0` `plugin_lane_replayed`.
-   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_supervisor_loop_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_active_session`.
+   - Exit criteria: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converges to `classification=process_runtime_active_session_bootstrapped` and `runtimeDescribeAfter.recommendedNextSlice=process_runtime_active_session_validation`.
 
 2. Implement the next bounded slice as `process_runtime_active_session`.
    - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery/process-runtime-detached-launch/process-runtime-supervisor-loop bootstrap should exist; those are now settled.
-   - Exit criteria: the bounded long-lived runtime session proves one real detached active session on-device with observed lease renewal, recovery re-entry, and restart continuity.
+   - Exit criteria: the bounded active-session bootstrap turns into one real detached active session on-device with observed lease renewal, recovery re-entry, and restart continuity.
 
 3. Keep the targeted pod validation lane stable while supervisor-loop and active-session work deepen.
    - The current green path is `pnpm test -- apps/android/runtime-pod/prepare.test.ts apps/android/runtime-pod/sync-assets.test.ts` plus targeted Android Gradle reruns for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest`.
@@ -21,8 +21,8 @@
    - Exit criteria: the branch still converges to the expected top-level classification after reinstall and token bootstrap.
 
 2. Define the first real active-session contract for the desktop process model.
-   - Focus on observable process state, lease renewal, restart generation, and recovery re-entry semantics rather than widening browser/tools/plugins again.
-   - Exit criteria: the docs and runtime status surface both describe one coherent active-session model.
+   - Focus on observable process state, lease ownership, restart generation, and recovery re-entry semantics rather than widening browser/tools/plugins again.
+   - Exit criteria: the docs and runtime status surface both describe one coherent active-session model, and the next gap is only device-side proof.
 
 3. Keep doc/task surfaces aligned with the Android mainline rather than old fork-management work.
    - `project-docs/` should continue to mirror the Android desktop-runtime branch state.
