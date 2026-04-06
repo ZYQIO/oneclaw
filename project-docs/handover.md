@@ -8,12 +8,14 @@
 - Current payload baseline: `0.17.0`
 - Latest completed real-device proof: April 6, 2026 `PFEM10` replay reached `classification=process_runtime_active_session_live_proof_captured` on payload `0.17.0`
 - Latest repo-side proof: April 6, 2026 targeted validation confirmed the repeated-replay live-proof capture path on payload `0.17.0`
+- Latest hardening proof: the same April 6, 2026 `PFEM10` doctor rerun now also auto-ran one confirm-only browser-lane replay and left `confirmBrowserLaneSmoke.liveProofReplayed=true`
 
 ## What Was Done
 
 1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay, then process-model bootstrap, activation-contract bootstrap, supervision-contract bootstrap, observation-contract bootstrap, recovery-contract bootstrap, detached-launch-contract bootstrap, supervisor-loop-contract bootstrap, active-session-contract bootstrap, active-session-validation bootstrap, active-session-device-proof bootstrap, and now one captured live active-session proof on-device.
    - Repo-side validation on April 6, 2026 confirmed the repeated-replay live-proof capture path with targeted Android tests.
    - Later that same day, real-device replay on `PFEM10` converged to `classification=process_runtime_active_session_live_proof_captured` on payload `0.17.0`.
+   - The doctor wrapper now also auto-runs one confirm-only browser-lane rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0`, and the latest `PFEM10` replay already preserves `process_runtime_active_session_live_proof_captured` through that confirm pass.
 
 2. `runtime-smoke` now leaves structured process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, detached-launch-contract, supervisor-loop-contract, active-session-contract, active-session-validation, and active-session-device-proof artifacts instead of only profile/health/restart evidence.
    - The app still writes `runtime-smoke-desktop-profile.json`, `runtime-smoke-health-report.json`, and `runtime-smoke-restart-contract.json`.

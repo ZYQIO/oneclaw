@@ -3,8 +3,8 @@
 ## Immediate Tasks
 
 1. Keep the refreshed `PFEM10` replay boringly repeatable on payload `0.17.0`.
-   - Current state: on April 6, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=process_runtime_active_session_live_proof_captured`, and the browser-lane smoke now records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, and `activeSessionDeviceProofStatus=verified`.
-   - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_live_proof_captured` and continue leaving the browser-aligned runtime summary in place.
+   - Current state: on April 6, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=process_runtime_active_session_live_proof_captured`, the browser-lane smoke records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, and `activeSessionDeviceProofStatus=verified`, and the doctor wrapper now also auto-runs a confirm-only browser-lane pass that leaves `confirmBrowserLaneSmoke.liveProofReplayed=true`.
+   - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_live_proof_captured`, keep leaving the browser-aligned runtime summary in place, and keep preserving `confirmBrowserLaneSmoke.liveProofReplayed=true`.
 
 2. Preserve the captured live-proof slice as `process_runtime_lane_hardening`.
    - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery/process-runtime-detached-launch/process-runtime-supervisor-loop/bootstrap-validation/bootstrap-device-proof/live-proof capture should exist; those are now settled.

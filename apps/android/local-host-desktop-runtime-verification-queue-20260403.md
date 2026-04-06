@@ -67,7 +67,7 @@ OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 \
 pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke
 ```
 
-6. Keep the combined doctor artifact and confirm whether the top-level result reaches the new active-session-device-proof bootstrap state.
+6. Keep the combined doctor artifact and confirm whether the top-level result reaches the captured live-proof state and preserves it through the confirm-only rerun.
 
 ```bash
 OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 \
@@ -83,6 +83,7 @@ pnpm android:local-host:embedded-runtime-pod:doctor -- --json
 - Step 4 should now also replay `plugin-allowlist-inspect` and leave `pluginExecute.ok=true` with `pluginExecute.pluginId=openclaw-plugin-host-placeholder`.
 - Step 4 should now also leave `runtimeExecuteAfterBrowser.longLivedProcessReady=true`, `runtimeExecuteAfterBrowser.processStatus=standby`, `runtimeExecuteAfterBrowser.activeSessionStatus=ready`, `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `runtimeExecuteAfterBrowser.activeSessionValidationStatus=validated`, and `runtimeExecuteAfterBrowser.activeSessionDeviceProofStatus=verified`.
 - On the newest `0.17.0` build, the branch should now converge to `runtimeDescribeAfter.mainlineStatus=process_runtime_active_session_live_proof_captured` with `runtimeDescribeAfter.recommendedNextSlice=process_runtime_lane_hardening`.
+- The combined doctor summary should now also leave `confirmBrowserLaneSmoke.required=true`, `executed=true`, `ok=true`, `mainlineStatus=process_runtime_active_session_live_proof_captured`, and `liveProofReplayed=true`.
 
 ## Artifacts To Keep / 建议保留的产物
 

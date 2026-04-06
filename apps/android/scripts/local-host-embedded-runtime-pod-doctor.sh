@@ -6,6 +6,7 @@ TOKEN_SCRIPT="${OPENCLAW_ANDROID_LOCAL_HOST_TOKEN_SCRIPT:-}"
 POD_SMOKE_SCRIPT="${OPENCLAW_ANDROID_LOCAL_HOST_POD_SMOKE_SCRIPT:-$SCRIPT_DIR/local-host-embedded-runtime-pod-smoke.sh}"
 BROWSER_SMOKE_SCRIPT="${OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_SMOKE_SCRIPT:-$SCRIPT_DIR/local-host-embedded-runtime-browser-lane-smoke.sh}"
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-runtime-doctor.XXXXXX)}"
+BROWSER_START="${OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START:-1}"
 JSON=false
 
 usage() {
@@ -23,7 +24,8 @@ What it does:
 
 Notes:
   - This wrapper is for diagnosis and validation prep, so it can still exit 0 even when the result is unhealthy
-  - Pass OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 when you want the confirm-only rerun after completing the external browser auth flow
+  - When the first browser-lane pass reaches live proof with OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1, doctor now automatically reruns one confirm-only browser-lane pass with OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0
+  - Pass OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 when you want only the confirm-only rerun after completing the external browser auth flow
 EOF
 }
 
@@ -74,6 +76,11 @@ run_token_helper() {
 
 require_cmd bash
 require_cmd jq
+
+if [[ "$BROWSER_START" != "0" && "$BROWSER_START" != "1" ]]; then
+  echo "OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START must be 0 or 1." >&2
+  exit 1
+fi
 
 mkdir -p "$ARTIFACT_DIR"
 
@@ -134,6 +141,7 @@ BROWSER_SMOKE_SUMMARY="$BROWSER_SMOKE_DIR/summary.json"
 if [[ "$pod_smoke_ok" == "true" ]]; then
   mkdir -p "$BROWSER_SMOKE_DIR"
   if OPENCLAW_ANDROID_LOCAL_HOST_TOKEN="$token" \
+    OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START="$BROWSER_START" \
     OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR="$BROWSER_SMOKE_DIR" \
     bash "$BROWSER_SMOKE_SCRIPT" >"$BROWSER_SMOKE_STDOUT" 2>&1; then
     browser_smoke_executed=true
@@ -157,6 +165,20 @@ browser_mainline_status=""
 browser_recommended_next_slice=""
 browser_replay_ready="false"
 browser_auth_credential_present="false"
+confirm_browser_smoke_required=false
+confirm_browser_smoke_executed=false
+confirm_browser_smoke_exit_code=0
+CONFIRM_BROWSER_SMOKE_DIR="$ARTIFACT_DIR/browser-lane-confirm-smoke"
+CONFIRM_BROWSER_SMOKE_STDOUT="$ARTIFACT_DIR/browser-lane-confirm-smoke.stdout.txt"
+CONFIRM_BROWSER_SMOKE_SUMMARY="$CONFIRM_BROWSER_SMOKE_DIR/summary.json"
+confirm_browser_smoke_ok="false"
+confirm_browser_smoke_failed_checks=""
+confirm_browser_smoke_hint=""
+confirm_browser_mainline_status=""
+confirm_browser_recommended_next_slice=""
+confirm_browser_replay_ready="false"
+confirm_browser_auth_credential_present="false"
+confirm_browser_live_proof_replayed="false"
 
 if [[ "$browser_smoke_executed" == "true" ]]; then
   browser_smoke_ok="$(jq -r '.ok // false' "$BROWSER_SMOKE_SUMMARY")"
@@ -166,6 +188,38 @@ if [[ "$browser_smoke_executed" == "true" ]]; then
   browser_recommended_next_slice="$(jq -r '.runtimeDescribeAfter.recommendedNextSlice // ""' "$BROWSER_SMOKE_SUMMARY")"
   browser_replay_ready="$(jq -r '.browserDescribeAfter.replayReady // false' "$BROWSER_SMOKE_SUMMARY")"
   browser_auth_credential_present="$(jq -r '.browserDescribeAfter.authCredentialPresent // false' "$BROWSER_SMOKE_SUMMARY")"
+fi
+
+if [[ "$browser_smoke_ok" == "true" && "$browser_mainline_status" == "process_runtime_active_session_live_proof_captured" && "$BROWSER_START" != "0" ]]; then
+  confirm_browser_smoke_required=true
+  mkdir -p "$CONFIRM_BROWSER_SMOKE_DIR"
+  if OPENCLAW_ANDROID_LOCAL_HOST_TOKEN="$token" \
+    OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 \
+    OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR="$CONFIRM_BROWSER_SMOKE_DIR" \
+    bash "$BROWSER_SMOKE_SCRIPT" >"$CONFIRM_BROWSER_SMOKE_STDOUT" 2>&1; then
+    confirm_browser_smoke_executed=true
+    confirm_browser_smoke_exit_code=0
+  else
+    confirm_browser_smoke_executed=true
+    confirm_browser_smoke_exit_code=$?
+  fi
+
+  if [[ ! -f "$CONFIRM_BROWSER_SMOKE_SUMMARY" ]]; then
+    echo "Missing confirm browser smoke summary: $CONFIRM_BROWSER_SMOKE_SUMMARY" >&2
+    cat "$CONFIRM_BROWSER_SMOKE_STDOUT" >&2 || true
+    exit 1
+  fi
+
+  confirm_browser_smoke_ok="$(jq -r '.ok // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_smoke_failed_checks="$(jq -r '[.failedChecks[]?] | join(",")' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_smoke_hint="$(jq -r '.hint // ""' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_mainline_status="$(jq -r '.runtimeDescribeAfter.mainlineStatus // ""' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_recommended_next_slice="$(jq -r '.runtimeDescribeAfter.recommendedNextSlice // ""' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_replay_ready="$(jq -r '.browserDescribeAfter.replayReady // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_auth_credential_present="$(jq -r '.browserDescribeAfter.authCredentialPresent // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  if [[ "$confirm_browser_mainline_status" == "process_runtime_active_session_live_proof_captured" && "$confirm_browser_recommended_next_slice" == "process_runtime_lane_hardening" ]]; then
+    confirm_browser_live_proof_replayed="true"
+  fi
 fi
 
 classification="desktop_runtime_unhealthy"
@@ -201,6 +255,10 @@ elif [[ "$browser_mainline_status" == "desktop_home_configured" ]]; then
   classification="desktop_home_configured"
   recommended_action="none"
   recommended_command=""
+elif [[ "$confirm_browser_smoke_required" == "true" && ( "$confirm_browser_smoke_ok" != "true" || "$confirm_browser_live_proof_replayed" != "true" ) ]]; then
+  classification="process_runtime_lane_hardening_pending"
+  recommended_action="confirm-live-proof-replay"
+  recommended_command="OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 pnpm android:local-host:embedded-runtime-pod:doctor -- --json"
 elif [[ "$browser_mainline_status" == "process_runtime_active_session_live_proof_captured" ]]; then
   classification="process_runtime_active_session_live_proof_captured"
   recommended_action="preserve-live-proof-baseline"
@@ -334,10 +392,15 @@ jq_args=(
   --arg podSmokeSummaryPath "$POD_SMOKE_SUMMARY"
   --arg browserSmokeStdoutPath "$BROWSER_SMOKE_STDOUT"
   --arg browserSmokeSummaryPath "$BROWSER_SMOKE_SUMMARY"
+  --arg confirmBrowserSmokeStdoutPath "$CONFIRM_BROWSER_SMOKE_STDOUT"
+  --arg confirmBrowserSmokeSummaryPath "$CONFIRM_BROWSER_SMOKE_SUMMARY"
   --arg podSmokeFailedChecks "$pod_smoke_failed_checks"
   --arg browserSmokeFailedChecks "$browser_smoke_failed_checks"
+  --arg confirmBrowserSmokeFailedChecks "$confirm_browser_smoke_failed_checks"
   --arg browserMainlineStatus "$browser_mainline_status"
   --arg browserRecommendedNextSlice "$browser_recommended_next_slice"
+  --arg confirmBrowserMainlineStatus "$confirm_browser_mainline_status"
+  --arg confirmBrowserRecommendedNextSlice "$confirm_browser_recommended_next_slice"
   --argjson podSmokeExitCode "$pod_smoke_exit_code"
   --argjson podSmokeOk "$(bool_json "$pod_smoke_ok")"
   --argjson browserSmokeExecuted "$(bool_json "$browser_smoke_executed")"
@@ -345,6 +408,13 @@ jq_args=(
   --argjson browserSmokeOk "$(bool_json "$browser_smoke_ok")"
   --argjson browserReplayReady "$(bool_json "$browser_replay_ready")"
   --argjson browserAuthCredentialPresent "$(bool_json "$browser_auth_credential_present")"
+  --argjson confirmBrowserSmokeRequired "$(bool_json "$confirm_browser_smoke_required")"
+  --argjson confirmBrowserSmokeExecuted "$(bool_json "$confirm_browser_smoke_executed")"
+  --argjson confirmBrowserSmokeExitCode "$confirm_browser_smoke_exit_code"
+  --argjson confirmBrowserSmokeOk "$(bool_json "$confirm_browser_smoke_ok")"
+  --argjson confirmBrowserReplayReady "$(bool_json "$confirm_browser_replay_ready")"
+  --argjson confirmBrowserAuthCredentialPresent "$(bool_json "$confirm_browser_auth_credential_present")"
+  --argjson confirmBrowserLiveProofReplayed "$(bool_json "$confirm_browser_live_proof_replayed")"
   --slurpfile pod "$POD_SMOKE_SUMMARY"
 )
 
@@ -358,6 +428,12 @@ if [[ "$browser_smoke_executed" == "true" ]]; then
   jq_args+=(--slurpfile browser "$BROWSER_SMOKE_SUMMARY")
 else
   jq_args+=(--argjson browser null)
+fi
+
+if [[ "$confirm_browser_smoke_executed" == "true" ]]; then
+  jq_args+=(--slurpfile confirmBrowser "$CONFIRM_BROWSER_SMOKE_SUMMARY")
+else
+  jq_args+=(--argjson confirmBrowser null)
 fi
 
 jq "${jq_args[@]}" '
@@ -415,6 +491,33 @@ jq "${jq_args[@]}" '
         end
       )
     },
+    confirmBrowserLaneSmoke: {
+      required: $confirmBrowserSmokeRequired,
+      executed: $confirmBrowserSmokeExecuted,
+      exitCode: (if $confirmBrowserSmokeExecuted then $confirmBrowserSmokeExitCode else null end),
+      ok: (if $confirmBrowserSmokeExecuted then $confirmBrowserSmokeOk else null end),
+      failedChecks: (
+        if ($confirmBrowserSmokeExecuted | not) or $confirmBrowserSmokeFailedChecks == "" then
+          []
+        else
+          ($confirmBrowserSmokeFailedChecks | split(","))
+        end
+      ),
+      mainlineStatus: (if $confirmBrowserMainlineStatus == "" then null else $confirmBrowserMainlineStatus end),
+      recommendedNextSlice: (if $confirmBrowserRecommendedNextSlice == "" then null else $confirmBrowserRecommendedNextSlice end),
+      liveProofReplayed: $confirmBrowserLiveProofReplayed,
+      replayReady: (if $confirmBrowserSmokeExecuted then $confirmBrowserReplayReady else null end),
+      authCredentialPresent: (if $confirmBrowserSmokeExecuted then $confirmBrowserAuthCredentialPresent else null end),
+      stdoutPath: (if $confirmBrowserSmokeExecuted then $confirmBrowserSmokeStdoutPath else null end),
+      summaryPath: (if $confirmBrowserSmokeExecuted then $confirmBrowserSmokeSummaryPath else null end),
+      summary: (
+        if $confirmBrowser == null then
+          null
+        else
+          $confirmBrowser[0]
+        end
+      )
+    },
     artifacts: {
       rootDir: $artifactDir
     }
@@ -429,6 +532,7 @@ fi
 printf 'runtime_doctor.token_source=%s\n' "$token_source"
 printf 'runtime_doctor.pod_smoke.ok=%s exit_code=%s failed_checks=%s\n' "$pod_smoke_ok" "$pod_smoke_exit_code" "${pod_smoke_failed_checks:-none}"
 printf 'runtime_doctor.browser_smoke.executed=%s ok=%s exit_code=%s failed_checks=%s\n' "$browser_smoke_executed" "$browser_smoke_ok" "$browser_smoke_exit_code" "${browser_smoke_failed_checks:-none}"
+printf 'runtime_doctor.confirm_browser_smoke.required=%s executed=%s ok=%s live_proof_replayed=%s exit_code=%s failed_checks=%s\n' "$confirm_browser_smoke_required" "$confirm_browser_smoke_executed" "$confirm_browser_smoke_ok" "$confirm_browser_live_proof_replayed" "$confirm_browser_smoke_exit_code" "${confirm_browser_smoke_failed_checks:-none}"
 printf 'runtime_doctor.classification=%s\n' "$classification"
 if [[ -n "$recommended_action" ]]; then
   printf 'runtime_doctor.recommended_action=%s\n' "$recommended_action"
