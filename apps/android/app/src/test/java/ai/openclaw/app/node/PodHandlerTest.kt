@@ -57,7 +57,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("ready").jsonPrimitive.boolean)
     assertEquals("ready", payload.getValue("reason").jsonPrimitive.content)
     assertEquals(26, payload.getValue("verifiedFileCount").jsonPrimitive.int)
-    assertEquals("0.15.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
+    assertEquals("0.16.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
   }
 
   @Test
@@ -91,9 +91,9 @@ class PodHandlerTest {
     assertEquals(9, fileStageCounts.getValue("desktop").jsonPrimitive.int)
     assertEquals(3, fileStageCounts.getValue("toolkit").jsonPrimitive.int)
     val podManifest = payload.getValue("podManifest").jsonObject
-    assertEquals("0.15.0", podManifest.getValue("version").jsonPrimitive.content)
+    assertEquals("0.16.0", podManifest.getValue("version").jsonPrimitive.content)
     val podLayout = payload.getValue("podLayout").jsonObject
-    assertEquals("0.15.0", podLayout.getValue("version").jsonPrimitive.content)
+    assertEquals("0.16.0", podLayout.getValue("version").jsonPrimitive.content)
   }
 
   @Test
@@ -193,7 +193,7 @@ class PodHandlerTest {
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
     context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
     ensureEmbeddedRuntimePodInstalled(context)
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -265,7 +265,7 @@ class PodHandlerTest {
     assertEquals("openclaw-desktop-host", payload.getValue("profileId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("desktopHomeReady").jsonPrimitive.boolean)
     assertTrue(payload.getValue("activeProfilePath").jsonPrimitive.content.endsWith("/profiles/active-profile.json"))
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/profiles/active-profile.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/profiles/active-profile.json").isFile)
   }
 
   @Test
@@ -291,9 +291,9 @@ class PodHandlerTest {
     val state = payload.getValue("state").jsonObject
     assertEquals("ok", state.getValue("status").jsonPrimitive.content)
     assertEquals(1, state.getValue("executionCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0/config/runtime-env.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0/state/runtime-smoke.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0/logs/runtime-engine.log").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/config/runtime-env.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/state/runtime-smoke.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/logs/runtime-engine.log").isFile)
   }
 
   @Test
@@ -324,6 +324,12 @@ class PodHandlerTest {
     assertEquals(false, payload.getValue("desktopProcessActiveSessionObserved").jsonPrimitive.boolean)
     assertEquals(false, payload.getValue("desktopProcessActiveSessionRecoveryReentryReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessActiveSessionRestartContinuityReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationBootstrapOnly").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationLeaseRenewalObserved").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationRecoveryReentryObserved").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationRestartContinuityObserved").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationDeviceProofRequired").jsonPrimitive.boolean)
     assertEquals(false, payload.getValue("desktopLongLivedProcessReady").jsonPrimitive.boolean)
     assertEquals("blocked", payload.getValue("desktopProcessStatus").jsonPrimitive.content)
     assertEquals("blocked", payload.getValue("desktopProcessActivationStatus").jsonPrimitive.content)
@@ -382,6 +388,27 @@ class PodHandlerTest {
       "recovery_not_ready:planned",
       payload.getValue("desktopProcessActiveSessionBlockedReason").jsonPrimitive.content,
     )
+    assertEquals(
+      "pending_device_proof",
+      payload.getValue("desktopProcessActiveSessionValidationStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      "awaiting_device_proof",
+      payload.getValue("desktopProcessActiveSessionValidationState").jsonPrimitive.content,
+    )
+    assertEquals(1, payload.getValue("desktopProcessActiveSessionValidationGeneration").jsonPrimitive.int)
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-active-session-1",
+      payload.getValue("desktopProcessActiveSessionValidationSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-supervisor-loop-1",
+      payload.getValue("desktopProcessActiveSessionValidationLeaseOwnerSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "device_active_session_proof_missing",
+      payload.getValue("desktopProcessActiveSessionValidationBlockedReason").jsonPrimitive.content,
+    )
     assertEquals("openclaw-desktop-host-runtime-smoke-1", payload.getValue("desktopProcessSessionId").jsonPrimitive.content)
     val desktopReplay = payload.getValue("desktopProfileReplay").jsonObject
     assertEquals("openclaw-desktop-host", desktopReplay.getValue("profileId").jsonPrimitive.content)
@@ -410,6 +437,15 @@ class PodHandlerTest {
     assertEquals(true, desktopReplay.getValue("processActiveSessionReady").jsonPrimitive.boolean)
     assertEquals("blocked", desktopReplay.getValue("processActiveSessionStatus").jsonPrimitive.content)
     assertEquals("awaiting_supervisor_loop", desktopReplay.getValue("processActiveSessionState").jsonPrimitive.content)
+    assertEquals(true, desktopReplay.getValue("processActiveSessionValidationReady").jsonPrimitive.boolean)
+    assertEquals(
+      "pending_device_proof",
+      desktopReplay.getValue("processActiveSessionValidationStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      "awaiting_device_proof",
+      desktopReplay.getValue("processActiveSessionValidationState").jsonPrimitive.content,
+    )
     assertTrue(
       payload.getValue("desktopProfileReplayStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-desktop-profile.json"),
     )
@@ -447,37 +483,47 @@ class PodHandlerTest {
       payload.getValue("desktopProcessActiveSessionStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-active-session-contract.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-desktop-profile.json").isFile,
+      payload
+        .getValue("desktopProcessActiveSessionValidationStatePath")
+        .jsonPrimitive
+        .content
+        .endsWith("/state/runtime-smoke-active-session-validation.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-health-report.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-desktop-profile.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-restart-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-health-report.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-process-model.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-restart-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-activation-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-process-model.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-supervision-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-activation-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-observation-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-supervision-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-recovery-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-observation-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-detached-launch-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-recovery-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-supervisor-loop-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-detached-launch-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.15.0/state/runtime-smoke-active-session-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-supervisor-loop-contract.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-active-session-contract.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-active-session-validation.json").isFile,
     )
   }
 
@@ -500,7 +546,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("packagedToolDescriptorPresent").jsonPrimitive.boolean)
     assertTrue(payload.getValue("toolResultFilePath").jsonPrimitive.content.endsWith("/work/tool-brief-inspect-result.json"))
     assertEquals(1, payload.getValue("toolResult").jsonObject.getValue("headingCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0/work/tool-brief-inspect-result.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/work/tool-brief-inspect-result.json").isFile)
   }
 
   @Test
@@ -529,7 +575,7 @@ class PodHandlerTest {
       payload.getValue("pluginResultFilePath").jsonPrimitive.content.endsWith("/work/plugin-allowlist-inspect-result.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0/work/plugin-allowlist-inspect-result.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/work/plugin-allowlist-inspect-result.json").isFile,
     )
   }
 
@@ -541,7 +587,7 @@ class PodHandlerTest {
     ensureEmbeddedRuntimePodInstalled(context)
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -576,7 +622,7 @@ class PodHandlerTest {
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
     materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.15.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -666,7 +712,7 @@ class PodHandlerTest {
     context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
     ensureEmbeddedRuntimePodInstalled(context)
     materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
-    seedBrowserReplayAndCredential(context, "0.15.0")
+    seedBrowserReplayAndCredential(context, "0.16.0")
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
     executeEmbeddedRuntimePodTask(context, "plugin-allowlist-inspect")
@@ -676,7 +722,10 @@ class PodHandlerTest {
 
     assertTrue(result.ok)
     val payload = parsePayload(result.payloadJson)
-    assertEquals("process_runtime_active_session_bootstrapped", payload.getValue("mainlineStatus").jsonPrimitive.content)
+    assertEquals(
+      "process_runtime_active_session_validation_bootstrapped",
+      payload.getValue("mainlineStatus").jsonPrimitive.content,
+    )
     assertEquals(true, payload.getValue("desktopProcessModelReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessActivationReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessSupervisionReady").jsonPrimitive.boolean)
@@ -689,6 +738,12 @@ class PodHandlerTest {
     assertEquals(false, payload.getValue("desktopProcessActiveSessionObserved").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessActiveSessionRecoveryReentryReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessActiveSessionRestartContinuityReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationBootstrapOnly").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationLeaseRenewalObserved").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationRecoveryReentryObserved").jsonPrimitive.boolean)
+    assertEquals(false, payload.getValue("desktopProcessActiveSessionValidationRestartContinuityObserved").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessActiveSessionValidationDeviceProofRequired").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopLongLivedProcessReady").jsonPrimitive.boolean)
     assertEquals("standby", payload.getValue("desktopProcessStatus").jsonPrimitive.content)
     assertEquals("ready", payload.getValue("desktopProcessActivationStatus").jsonPrimitive.content)
@@ -735,7 +790,31 @@ class PodHandlerTest {
       "openclaw-desktop-host-runtime-smoke-1-supervisor-loop-1",
       payload.getValue("desktopProcessActiveSessionLeaseOwnerSessionId").jsonPrimitive.content,
     )
-    assertEquals("process_runtime_active_session_validation", payload.getValue("recommendedNextSlice").jsonPrimitive.content)
+    assertEquals(
+      "pending_device_proof",
+      payload.getValue("desktopProcessActiveSessionValidationStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      "awaiting_device_proof",
+      payload.getValue("desktopProcessActiveSessionValidationState").jsonPrimitive.content,
+    )
+    assertEquals(1, payload.getValue("desktopProcessActiveSessionValidationGeneration").jsonPrimitive.int)
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-active-session-1",
+      payload.getValue("desktopProcessActiveSessionValidationSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-supervisor-loop-1",
+      payload.getValue("desktopProcessActiveSessionValidationLeaseOwnerSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "device_active_session_proof_missing",
+      payload.getValue("desktopProcessActiveSessionValidationBlockedReason").jsonPrimitive.content,
+    )
+    assertEquals(
+      "process_runtime_active_session_device_proof",
+      payload.getValue("recommendedNextSlice").jsonPrimitive.content,
+    )
   }
 
   @Test

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "domain": "supervisor",
   "componentId": "openclaw-desktop-runtime-supervisor",
-  "componentVersion": "0.15.0",
+  "componentVersion": "0.16.0",
   "bundleState": "bootstrap_ready",
   "summary": "Lifecycle contract for the packaged Android desktop-runtime environment.",
   "managedActions": [
@@ -16,7 +16,8 @@
     "recover-process",
     "launch-detached-process",
     "run-supervisor-loop",
-    "stabilize-active-session"
+    "stabilize-active-session",
+    "validate-active-session"
   ],
   "capabilities": [
     "lifecycle-contract",
@@ -28,6 +29,7 @@
     "process-runtime-recovery-bootstrap",
     "process-runtime-detached-launch-bootstrap",
     "process-runtime-supervisor-loop-bootstrap",
-    "process-runtime-active-session-bootstrap"
+    "process-runtime-active-session-bootstrap",
+    "process-runtime-active-session-validation-bootstrap"
   ]
 }

@@ -1,6 +1,6 @@
 {
   "engineId": "embedded-runtime-task-engine-v1",
-  "engineVersion": "0.9.0",
+  "engineVersion": "0.10.0",
   "kind": "descriptor",
   "supportedTaskKinds": [
     "runtime-smoke",
@@ -26,10 +26,11 @@
     "process-runtime-recovery-bootstrap",
     "process-runtime-detached-launch-bootstrap",
     "process-runtime-supervisor-loop-bootstrap",
-    "process-runtime-active-session-bootstrap"
+    "process-runtime-active-session-bootstrap",
+    "process-runtime-active-session-validation-bootstrap"
   ],
   "limitations": [
     "No packaged browser lane yet",
-    "No verified detached active session on-device yet"
+    "No verified detached active-session device proof on-device yet"
   ]
 }
