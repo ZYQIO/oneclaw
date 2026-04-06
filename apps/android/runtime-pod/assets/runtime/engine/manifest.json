@@ -24,7 +24,8 @@
     "process-runtime-supervision-bootstrap",
     "process-runtime-observation-bootstrap",
     "process-runtime-recovery-bootstrap",
-    "process-runtime-detached-launch-bootstrap"
+    "process-runtime-detached-launch-bootstrap",
+    "process-runtime-supervisor-loop-bootstrap"
   ],
   "limitations": [
     "No packaged browser lane yet",

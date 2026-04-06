@@ -57,7 +57,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("ready").jsonPrimitive.boolean)
     assertEquals("ready", payload.getValue("reason").jsonPrimitive.content)
     assertEquals(26, payload.getValue("verifiedFileCount").jsonPrimitive.int)
-    assertEquals("0.13.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
+    assertEquals("0.14.0", payload.getValue("installedVersions").jsonArray.single().jsonPrimitive.content)
   }
 
   @Test
@@ -91,9 +91,9 @@ class PodHandlerTest {
     assertEquals(9, fileStageCounts.getValue("desktop").jsonPrimitive.int)
     assertEquals(3, fileStageCounts.getValue("toolkit").jsonPrimitive.int)
     val podManifest = payload.getValue("podManifest").jsonObject
-    assertEquals("0.13.0", podManifest.getValue("version").jsonPrimitive.content)
+    assertEquals("0.14.0", podManifest.getValue("version").jsonPrimitive.content)
     val podLayout = payload.getValue("podLayout").jsonObject
-    assertEquals("0.13.0", podLayout.getValue("version").jsonPrimitive.content)
+    assertEquals("0.14.0", podLayout.getValue("version").jsonPrimitive.content)
   }
 
   @Test
@@ -193,7 +193,7 @@ class PodHandlerTest {
     context.filesDir.resolve("openclaw/embedded-runtime-pod").deleteRecursively()
     context.filesDir.resolve("openclaw/embedded-runtime-home").deleteRecursively()
     ensureEmbeddedRuntimePodInstalled(context)
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -265,7 +265,7 @@ class PodHandlerTest {
     assertEquals("openclaw-desktop-host", payload.getValue("profileId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("desktopHomeReady").jsonPrimitive.boolean)
     assertTrue(payload.getValue("activeProfilePath").jsonPrimitive.content.endsWith("/profiles/active-profile.json"))
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/profiles/active-profile.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/profiles/active-profile.json").isFile)
   }
 
   @Test
@@ -291,9 +291,9 @@ class PodHandlerTest {
     val state = payload.getValue("state").jsonObject
     assertEquals("ok", state.getValue("status").jsonPrimitive.content)
     assertEquals(1, state.getValue("executionCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0/config/runtime-env.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0/state/runtime-smoke.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0/logs/runtime-engine.log").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0/config/runtime-env.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0/state/runtime-smoke.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0/logs/runtime-engine.log").isFile)
   }
 
   @Test
@@ -318,6 +318,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("desktopProcessObservationReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessRecoveryReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessDetachedLaunchReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessSupervisorLoopReady").jsonPrimitive.boolean)
     assertEquals(false, payload.getValue("desktopLongLivedProcessReady").jsonPrimitive.boolean)
     assertEquals("blocked", payload.getValue("desktopProcessStatus").jsonPrimitive.content)
     assertEquals("blocked", payload.getValue("desktopProcessActivationStatus").jsonPrimitive.content)
@@ -350,6 +351,17 @@ class PodHandlerTest {
       "recovery_not_ready:planned",
       payload.getValue("desktopProcessDetachedLaunchBlockedReason").jsonPrimitive.content,
     )
+    assertEquals("blocked", payload.getValue("desktopProcessSupervisorLoopStatus").jsonPrimitive.content)
+    assertEquals("awaiting_detached_launch", payload.getValue("desktopProcessSupervisorLoopState").jsonPrimitive.content)
+    assertEquals(1, payload.getValue("desktopProcessSupervisorLoopGeneration").jsonPrimitive.int)
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-supervisor-loop-1",
+      payload.getValue("desktopProcessSupervisorLoopSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "recovery_not_ready:planned",
+      payload.getValue("desktopProcessSupervisorLoopBlockedReason").jsonPrimitive.content,
+    )
     assertEquals("openclaw-desktop-host-runtime-smoke-1", payload.getValue("desktopProcessSessionId").jsonPrimitive.content)
     val desktopReplay = payload.getValue("desktopProfileReplay").jsonObject
     assertEquals("openclaw-desktop-host", desktopReplay.getValue("profileId").jsonPrimitive.content)
@@ -372,6 +384,9 @@ class PodHandlerTest {
     assertEquals(true, desktopReplay.getValue("processDetachedLaunchReady").jsonPrimitive.boolean)
     assertEquals("blocked", desktopReplay.getValue("processDetachedLaunchStatus").jsonPrimitive.content)
     assertEquals("awaiting_recovery", desktopReplay.getValue("processDetachedLaunchState").jsonPrimitive.content)
+    assertEquals(true, desktopReplay.getValue("processSupervisorLoopReady").jsonPrimitive.boolean)
+    assertEquals("blocked", desktopReplay.getValue("processSupervisorLoopStatus").jsonPrimitive.content)
+    assertEquals("awaiting_detached_launch", desktopReplay.getValue("processSupervisorLoopState").jsonPrimitive.content)
     assertTrue(
       payload.getValue("desktopProfileReplayStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-desktop-profile.json"),
     )
@@ -403,31 +418,37 @@ class PodHandlerTest {
       payload.getValue("desktopProcessDetachedLaunchStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-detached-launch-contract.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-desktop-profile.json").isFile,
+      payload.getValue("desktopProcessSupervisorLoopStatePath").jsonPrimitive.content.endsWith("/state/runtime-smoke-supervisor-loop-contract.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-health-report.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-desktop-profile.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-restart-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-health-report.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-process-model.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-restart-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-activation-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-process-model.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-supervision-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-activation-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-observation-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-supervision-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-recovery-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-observation-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.13.0/state/runtime-smoke-detached-launch-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-recovery-contract.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-detached-launch-contract.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.14.0/state/runtime-smoke-supervisor-loop-contract.json").isFile,
     )
   }
 
@@ -450,7 +471,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("packagedToolDescriptorPresent").jsonPrimitive.boolean)
     assertTrue(payload.getValue("toolResultFilePath").jsonPrimitive.content.endsWith("/work/tool-brief-inspect-result.json"))
     assertEquals(1, payload.getValue("toolResult").jsonObject.getValue("headingCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0/work/tool-brief-inspect-result.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0/work/tool-brief-inspect-result.json").isFile)
   }
 
   @Test
@@ -479,7 +500,7 @@ class PodHandlerTest {
       payload.getValue("pluginResultFilePath").jsonPrimitive.content.endsWith("/work/plugin-allowlist-inspect-result.json"),
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0/work/plugin-allowlist-inspect-result.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0/work/plugin-allowlist-inspect-result.json").isFile,
     )
   }
 
@@ -491,7 +512,7 @@ class PodHandlerTest {
     ensureEmbeddedRuntimePodInstalled(context)
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -526,7 +547,7 @@ class PodHandlerTest {
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
     materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
-    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.13.0")
+    val runtimeHome = context.filesDir.resolve("openclaw/embedded-runtime-home/0.14.0")
     runtimeHome.resolve("state").mkdirs()
     runtimeHome.resolve("logs").mkdirs()
     runtimeHome
@@ -569,6 +590,7 @@ class PodHandlerTest {
     assertEquals(true, payload.getValue("desktopProcessObservationReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessRecoveryReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessDetachedLaunchReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessSupervisorLoopReady").jsonPrimitive.boolean)
     assertEquals(false, payload.getValue("desktopLongLivedProcessReady").jsonPrimitive.boolean)
     assertEquals("blocked", payload.getValue("desktopProcessStatus").jsonPrimitive.content)
     assertEquals("blocked", payload.getValue("desktopProcessActivationStatus").jsonPrimitive.content)
@@ -586,6 +608,9 @@ class PodHandlerTest {
     assertEquals("blocked", payload.getValue("desktopProcessDetachedLaunchStatus").jsonPrimitive.content)
     assertEquals("awaiting_recovery", payload.getValue("desktopProcessDetachedLaunchState").jsonPrimitive.content)
     assertEquals(1, payload.getValue("desktopProcessDetachedLaunchGeneration").jsonPrimitive.int)
+    assertEquals("blocked", payload.getValue("desktopProcessSupervisorLoopStatus").jsonPrimitive.content)
+    assertEquals("awaiting_detached_launch", payload.getValue("desktopProcessSupervisorLoopState").jsonPrimitive.content)
+    assertEquals(1, payload.getValue("desktopProcessSupervisorLoopGeneration").jsonPrimitive.int)
     assertEquals(
       "openclaw-desktop-host-runtime-smoke-1",
       payload.getValue("desktopProcessSessionId").jsonPrimitive.content,
@@ -604,7 +629,7 @@ class PodHandlerTest {
     context.filesDir.resolve("openclaw/embedded-desktop-home").deleteRecursively()
     ensureEmbeddedRuntimePodInstalled(context)
     materializeEmbeddedRuntimeDesktopEnvironment(context, "openclaw-desktop-host")
-    seedBrowserReplayAndCredential(context, "0.13.0")
+    seedBrowserReplayAndCredential(context, "0.14.0")
     executeEmbeddedRuntimePodTask(context, "runtime-smoke")
     executeEmbeddedRuntimePodTask(context, "tool-brief-inspect")
     executeEmbeddedRuntimePodTask(context, "plugin-allowlist-inspect")
@@ -614,13 +639,14 @@ class PodHandlerTest {
 
     assertTrue(result.ok)
     val payload = parsePayload(result.payloadJson)
-    assertEquals("process_runtime_detached_launch_bootstrapped", payload.getValue("mainlineStatus").jsonPrimitive.content)
+    assertEquals("process_runtime_supervisor_loop_bootstrapped", payload.getValue("mainlineStatus").jsonPrimitive.content)
     assertEquals(true, payload.getValue("desktopProcessModelReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessActivationReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessSupervisionReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessObservationReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessRecoveryReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopProcessDetachedLaunchReady").jsonPrimitive.boolean)
+    assertEquals(true, payload.getValue("desktopProcessSupervisorLoopReady").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("desktopLongLivedProcessReady").jsonPrimitive.boolean)
     assertEquals("standby", payload.getValue("desktopProcessStatus").jsonPrimitive.content)
     assertEquals("ready", payload.getValue("desktopProcessActivationStatus").jsonPrimitive.content)
@@ -649,7 +675,14 @@ class PodHandlerTest {
     assertTrue(
       payload.getValue("desktopProcessDetachedLaunchCommand").jsonPrimitive.content.contains("--launch-detached"),
     )
-    assertEquals("process_runtime_supervisor_loop", payload.getValue("recommendedNextSlice").jsonPrimitive.content)
+    assertEquals("ready", payload.getValue("desktopProcessSupervisorLoopStatus").jsonPrimitive.content)
+    assertEquals("bootstrap_ready", payload.getValue("desktopProcessSupervisorLoopState").jsonPrimitive.content)
+    assertEquals(1, payload.getValue("desktopProcessSupervisorLoopGeneration").jsonPrimitive.int)
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-supervisor-loop-1",
+      payload.getValue("desktopProcessSupervisorLoopSessionId").jsonPrimitive.content,
+    )
+    assertEquals("process_runtime_active_session", payload.getValue("recommendedNextSlice").jsonPrimitive.content)
   }
 
   @Test
