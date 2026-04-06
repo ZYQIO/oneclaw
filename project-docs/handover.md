@@ -9,6 +9,7 @@
 - Latest completed real-device proof: April 6, 2026 `PFEM10` replay reached `classification=process_runtime_active_session_live_proof_captured` on payload `0.17.0`
 - Latest repo-side proof: April 6, 2026 targeted validation confirmed the repeated-replay live-proof capture path on payload `0.17.0`
 - Latest hardening proof: the same April 6, 2026 `PFEM10` doctor rerun now also auto-ran one confirm-only browser-lane replay and left `confirmBrowserLaneSmoke.liveProofReplayed=true`
+- Latest hardening guard: `local-host-embedded-runtime-pod-doctor.sh` now also compares the confirm-only replay against the first live-proof capture and records `confirmBrowserLaneSmoke.liveProofContinuity` so replay hardening is not reduced to checking the top-level classification alone
 
 ## What Was Done
 
@@ -16,6 +17,7 @@
    - Repo-side validation on April 6, 2026 confirmed the repeated-replay live-proof capture path with targeted Android tests.
    - Later that same day, real-device replay on `PFEM10` converged to `classification=process_runtime_active_session_live_proof_captured` on payload `0.17.0`.
    - The doctor wrapper now also auto-runs one confirm-only browser-lane rerun with `OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0`, and the latest `PFEM10` replay already preserves `process_runtime_active_session_live_proof_captured` through that confirm pass.
+   - This round also hardens the doctor wrapper so the confirm pass must preserve browser replay, long-lived process readiness, active-session observation, recovery re-entry, restart continuity, validation status, and device-proof status, all surfaced through `confirmBrowserLaneSmoke.liveProofContinuity`.
 
 2. `runtime-smoke` now leaves structured process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, detached-launch-contract, supervisor-loop-contract, active-session-contract, active-session-validation, and active-session-device-proof artifacts instead of only profile/health/restart evidence.
    - The app still writes `runtime-smoke-desktop-profile.json`, `runtime-smoke-health-report.json`, and `runtime-smoke-restart-contract.json`.
@@ -50,6 +52,7 @@
 - The branch still does not provide full executable desktop parity. Generic browser tooling, unrestricted shell parity, generic plugin/runtime parity, and stronger detached-process observation/recovery semantics are still missing.
 - The new live proof is still a bounded repeated-replay contract, not a claim of full executable desktop parity or generic detached-process supervision.
 - The captured proof currently depends on the existing browser-aligned replay flow and repeated `runtime-smoke` executions; we should keep replayability boring before widening scope.
+- The new doctor continuity guard reduces the risk of silently treating a downgraded confirm replay as healthy, but the real-device `PFEM10` lane still remains the source of truth for whether those continuity signals stay stable on actual hardware.
 
 ## Recommended Next Move
 
