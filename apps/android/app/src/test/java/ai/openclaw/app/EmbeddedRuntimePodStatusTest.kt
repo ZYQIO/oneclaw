@@ -27,7 +27,7 @@ class EmbeddedRuntimePodStatusTest {
     assertEquals("not_extracted", snapshot.getValue("reason").jsonPrimitive.content)
     assertEquals("embedded-runtime-pod/manifest.json", snapshot.getValue("assetManifestPath").jsonPrimitive.content)
     assertEquals("filesDir/openclaw/embedded-runtime-pod", snapshot.getValue("installRoot").jsonPrimitive.content)
-    assertEquals("0.16.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
+    assertEquals("0.17.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
     assertEquals(26, snapshot.getValue("manifestFileCount").jsonPrimitive.int)
     assertEquals(false, snapshot.getValue("installRootExists").jsonPrimitive.boolean)
     assertEquals(0, snapshot.getValue("verifiedFileCount").jsonPrimitive.int)
@@ -41,14 +41,14 @@ class EmbeddedRuntimePodStatusTest {
 
     val inspection = ensureEmbeddedRuntimePodInstalled(context)
     val snapshot = embeddedRuntimePodStatusSnapshot(context)
-    val versionDir = context.filesDir.resolve("openclaw/embedded-runtime-pod/0.16.0")
+    val versionDir = context.filesDir.resolve("openclaw/embedded-runtime-pod/0.17.0")
 
     assertTrue(inspection.ready)
     assertEquals("ready", inspection.reason)
     assertEquals(true, snapshot.getValue("available").jsonPrimitive.boolean)
     assertEquals(true, snapshot.getValue("ready").jsonPrimitive.boolean)
     assertEquals("ready", snapshot.getValue("reason").jsonPrimitive.content)
-    assertEquals("0.16.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
+    assertEquals("0.17.0", snapshot.getValue("manifestVersion").jsonPrimitive.content)
     assertEquals(true, snapshot.getValue("manifestVersionExtracted").jsonPrimitive.boolean)
     assertEquals(1, snapshot.getValue("installedVersionCount").jsonPrimitive.int)
     assertEquals(26, snapshot.getValue("verifiedFileCount").jsonPrimitive.int)
@@ -78,7 +78,7 @@ class EmbeddedRuntimePodStatusTest {
     assertEquals(26, payload.getValue("fileCount").jsonPrimitive.int)
     assertEquals(true, payload.getValue("workspaceStageDeclared").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("workspaceStageInstalled").jsonPrimitive.boolean)
-    assertEquals("0.16.0", payload.getValue("podManifest").jsonObject.getValue("version").jsonPrimitive.content)
+    assertEquals("0.17.0", payload.getValue("podManifest").jsonObject.getValue("version").jsonPrimitive.content)
   }
 
   @Test
@@ -97,8 +97,8 @@ class EmbeddedRuntimePodStatusTest {
     assertEquals(false, payload.getValue("desktopProfileReplayReady").jsonPrimitive.boolean)
     assertEquals(false, payload.getValue("desktopEnvironmentSupervisionReady").jsonPrimitive.boolean)
     assertEquals(1, payload.getValue("executionCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/config/runtime-env.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/state/runtime-smoke.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.17.0/config/runtime-env.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.17.0/state/runtime-smoke.json").isFile)
   }
 
   @Test
@@ -268,6 +268,27 @@ class EmbeddedRuntimePodStatusTest {
       payload.getValue("desktopProcessActiveSessionValidationBlockedReason").jsonPrimitive.content,
     )
     assertEquals(
+      "pending_live_proof",
+      payload.getValue("desktopProcessActiveSessionDeviceProofStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      "awaiting_live_proof",
+      payload.getValue("desktopProcessActiveSessionDeviceProofState").jsonPrimitive.content,
+    )
+    assertEquals(1, payload.getValue("desktopProcessActiveSessionDeviceProofGeneration").jsonPrimitive.int)
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-active-session-1",
+      payload.getValue("desktopProcessActiveSessionDeviceProofSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "openclaw-desktop-host-runtime-smoke-1-supervisor-loop-1",
+      payload.getValue("desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId").jsonPrimitive.content,
+    )
+    assertEquals(
+      "live_active_session_proof_missing",
+      payload.getValue("desktopProcessActiveSessionDeviceProofBlockedReason").jsonPrimitive.content,
+    )
+    assertEquals(
       "openclaw-desktop-host-runtime-smoke-1",
       payload.getValue("desktopProcessSessionId").jsonPrimitive.content,
     )
@@ -403,44 +424,63 @@ class EmbeddedRuntimePodStatusTest {
       1,
       payload.getValue("desktopProfileReplay").jsonObject.getValue("processActiveSessionValidationGeneration").jsonPrimitive.int,
     )
-    assertTrue(
-      context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/work/runtime-smoke-desktop-profile.json").isFile,
+    assertEquals(
+      true,
+      payload.getValue("desktopProfileReplay").jsonObject.getValue("processActiveSessionDeviceProofReady").jsonPrimitive.boolean,
+    )
+    assertEquals(
+      "pending_live_proof",
+      payload.getValue("desktopProfileReplay").jsonObject.getValue("processActiveSessionDeviceProofStatus").jsonPrimitive.content,
+    )
+    assertEquals(
+      "awaiting_live_proof",
+      payload.getValue("desktopProfileReplay").jsonObject.getValue("processActiveSessionDeviceProofState").jsonPrimitive.content,
+    )
+    assertEquals(
+      1,
+      payload.getValue("desktopProfileReplay").jsonObject.getValue("processActiveSessionDeviceProofGeneration").jsonPrimitive.int,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-desktop-profile.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-runtime-home/0.17.0/work/runtime-smoke-desktop-profile.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-health-report.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-desktop-profile.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-restart-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-health-report.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-process-model.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-restart-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-activation-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-process-model.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-supervision-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-activation-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-observation-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-supervision-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-recovery-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-observation-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-detached-launch-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-recovery-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-supervisor-loop-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-detached-launch-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-active-session-contract.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-supervisor-loop-contract.json").isFile,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/state/runtime-smoke-active-session-validation.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-active-session-contract.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-active-session-validation.json").isFile,
+    )
+    assertTrue(
+      context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-active-session-device-proof.json").isFile,
     )
   }
 
@@ -460,7 +500,7 @@ class EmbeddedRuntimePodStatusTest {
     assertEquals(true, payload.getValue("toolkitCommandPolicyPresent").jsonPrimitive.boolean)
     assertEquals(true, payload.getValue("packagedToolDescriptorPresent").jsonPrimitive.boolean)
     assertEquals(1, payload.getValue("toolResult").jsonObject.getValue("headingCount").jsonPrimitive.int)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/work/tool-brief-inspect-result.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-runtime-home/0.17.0/work/tool-brief-inspect-result.json").isFile)
   }
 
   @Test
@@ -484,7 +524,7 @@ class EmbeddedRuntimePodStatusTest {
       payload.getValue("pluginResult").jsonObject.getValue("profileSource").jsonPrimitive.content,
     )
     assertTrue(
-      context.filesDir.resolve("openclaw/embedded-runtime-home/0.16.0/work/plugin-allowlist-inspect-result.json").isFile,
+      context.filesDir.resolve("openclaw/embedded-runtime-home/0.17.0/work/plugin-allowlist-inspect-result.json").isFile,
     )
   }
 
@@ -502,10 +542,10 @@ class EmbeddedRuntimePodStatusTest {
     val payload = result.payload ?: error("expected payload")
     assertEquals("openclaw-desktop-host", payload.getValue("profileId").jsonPrimitive.content)
     assertEquals(true, payload.getValue("desktopHomeReady").jsonPrimitive.boolean)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/engine/manifest.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/browser/manifest.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/tools/manifest.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/plugins/manifest.json").isFile)
-    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.16.0/profiles/active-profile.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/engine/manifest.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/browser/manifest.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/tools/manifest.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/plugins/manifest.json").isFile)
+    assertTrue(context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/profiles/active-profile.json").isFile)
   }
 }

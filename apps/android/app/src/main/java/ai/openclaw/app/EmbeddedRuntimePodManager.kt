@@ -538,6 +538,16 @@ fun describeEmbeddedRuntimeDesktopRuntime(
         browser.browserReplayReady &&
         browser.authCredentialPresent &&
         carrier.runtimePluginExecutionStateCount > 0 &&
+        desktopReplay.processActiveSessionDeviceProofReady ->
+        "process_runtime_active_session_device_proof_bootstrapped"
+      inspection.ready &&
+        desktop.desktopHomeReady &&
+        carrier.runtimeHomeReady &&
+        toolsIntegrated &&
+        browserIntegrated &&
+        browser.browserReplayReady &&
+        browser.authCredentialPresent &&
+        carrier.runtimePluginExecutionStateCount > 0 &&
         desktopReplay.processActiveSessionValidationReady ->
         "process_runtime_active_session_validation_bootstrapped"
       inspection.ready &&
@@ -913,6 +923,56 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           "desktopProcessActiveSessionValidationBootstrapOnly",
           JsonPrimitive(desktopReplay.processActiveSessionValidationBootstrapOnly),
         )
+        put(
+          "desktopProcessActiveSessionDeviceProofReady",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofReady),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofStatePresent",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofStatePresent),
+        )
+        desktopReplay.processActiveSessionDeviceProofStatus?.let {
+          put("desktopProcessActiveSessionDeviceProofStatus", JsonPrimitive(it))
+        }
+        desktopReplay.processActiveSessionDeviceProofState?.let {
+          put("desktopProcessActiveSessionDeviceProofState", JsonPrimitive(it))
+        }
+        desktopReplay.processActiveSessionDeviceProofStatePath?.let {
+          put("desktopProcessActiveSessionDeviceProofStatePath", JsonPrimitive(it))
+        }
+        put(
+          "desktopProcessActiveSessionDeviceProofGeneration",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofGeneration),
+        )
+        desktopReplay.processActiveSessionDeviceProofSessionId?.let {
+          put("desktopProcessActiveSessionDeviceProofSessionId", JsonPrimitive(it))
+        }
+        desktopReplay.processActiveSessionDeviceProofLeaseOwnerSessionId?.let {
+          put("desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId", JsonPrimitive(it))
+        }
+        put(
+          "desktopProcessActiveSessionDeviceProofObserved",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofObserved),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofLiveProofRequired",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofLiveProofRequired),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofExpectedArtifactCount",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofExpectedArtifactCount),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofCapturedArtifactCount",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofCapturedArtifactCount),
+        )
+        desktopReplay.processActiveSessionDeviceProofBlockedReason?.let {
+          put("desktopProcessActiveSessionDeviceProofBlockedReason", JsonPrimitive(it))
+        }
+        put(
+          "desktopProcessActiveSessionDeviceProofBootstrapOnly",
+          JsonPrimitive(desktopReplay.processActiveSessionDeviceProofBootstrapOnly),
+        )
         put("desktopLongLivedProcessReady", JsonPrimitive(desktopReplay.longLivedProcessReady))
         desktopReplay.profileId?.let { put("desktopReplayProfileId", JsonPrimitive(it)) }
         desktopReplay.environmentId?.let { put("desktopReplayEnvironmentId", JsonPrimitive(it)) }
@@ -1108,7 +1168,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 integrated = environmentIntegrated,
                 summary =
                   if (desktopReplay.processSupervisorLoopReady) {
-                    if (desktopReplay.processActiveSessionValidationReady) {
+                    if (desktopReplay.processActiveSessionDeviceProofReady) {
+                      "The app now also leaves an active-session-device-proof artifact alongside the validation, active-session, supervisor-loop, detached-launch, recovery, observation, supervision, activation, and process-model contracts, so the remaining gap is no longer defining the proof bundle but capturing one live detached session on-device."
+                    } else if (desktopReplay.processActiveSessionValidationReady) {
                       "The app now also leaves an active-session-validation artifact alongside the active-session, supervisor-loop, detached-launch, recovery, observation, supervision, activation, and process-model contracts, making the remaining gap explicit: capture one real detached active-session proof on-device."
                     } else if (desktopReplay.processActiveSessionReady) {
                       "The app now leaves an active-session contract alongside the supervisor-loop, detached-launch, recovery, observation, supervision, activation, and process-model artifacts, tying lease ownership to restart continuity and recovery re-entry for the bounded detached runtime handoff."
@@ -1221,7 +1283,9 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !desktopReplay.processSupervisorLoopReady -> "process_runtime_supervisor_loop"
               !desktopReplay.processActiveSessionReady -> "process_runtime_active_session"
               !desktopReplay.processActiveSessionValidationReady -> "process_runtime_active_session_validation"
-              else -> "process_runtime_active_session_device_proof"
+              !desktopReplay.processActiveSessionDeviceProofReady ->
+                "process_runtime_active_session_device_proof"
+              else -> "process_runtime_active_session_live_proof"
             },
           ),
         )
@@ -1271,8 +1335,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
                 "Deepen runtime-smoke again so the desktop-home replay also leaves an active-session contract artifact that ties together lease ownership, recovery re-entry readiness, and restart continuity for the bounded detached runtime handoff."
               !desktopReplay.processActiveSessionValidationReady ->
                 "Deepen runtime-smoke again so the desktop-home replay also leaves an active-session-validation artifact that turns the bounded contract into an explicit device-proof checklist for lease renewal, recovery re-entry, and restart continuity."
+              !desktopReplay.processActiveSessionDeviceProofReady ->
+                "Deepen runtime-smoke again so the desktop-home replay also leaves an active-session-device-proof artifact that binds the checklist to the exact doctor, smoke, and browser-lane evidence bundle needed for one live detached-session proof."
               else ->
-                "Reinstall the current debug app on-device, rerun doctor, and prove the active-session-validation contract as one real detached session with observed lease renewal, recovery re-entry, and restart continuity."
+                "Reinstall the current debug app on-device, rerun doctor plus the bounded smoke scripts, and capture one live detached session proof bundle with observed lease renewal, recovery re-entry, and restart continuity."
             },
           ),
         )

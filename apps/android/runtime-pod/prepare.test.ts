@@ -43,7 +43,7 @@ describe("prepareRuntimePod", () => {
     const manifest = JSON.parse(manifestText) as { fileCount: number; stageCount: number; version: string };
     const layout = JSON.parse(layoutText) as { files: Array<{ relativePath: string }> };
 
-    expect(manifest.version).toBe("0.16.0");
+    expect(manifest.version).toBe("0.17.0");
     expect(manifest.stageCount).toBe(6);
     expect(manifest.fileCount).toBe(26);
     expect(layout.files.map((file) => file.relativePath)).toEqual([

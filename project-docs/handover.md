@@ -5,19 +5,19 @@
 - Date: 2026-04-06
 - Active branch: `android-desktop-runtime-mainline-20260403`
 - Remote branch: `origin/android-desktop-runtime-mainline-20260403`
-- Current payload baseline: `0.16.0`
+- Current payload baseline: `0.17.0`
 - Latest completed real-device proof: April 4, 2026 `PFEM10` replay reached `classification=plugin_lane_replayed` on payload `0.7.0`
-- Latest repo-side proof: April 6, 2026 targeted validation confirmed the new process-runtime active-session-validation bootstrap slice on payload `0.16.0`
+- Latest repo-side proof: April 6, 2026 targeted validation confirmed the new process-runtime active-session-device-proof bootstrap slice on payload `0.17.0`
 
 ## What Was Done
 
-1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay, then process-model bootstrap, activation-contract bootstrap, supervision-contract bootstrap, observation-contract bootstrap, recovery-contract bootstrap, detached-launch-contract bootstrap, supervisor-loop-contract bootstrap, active-session-contract bootstrap, and now the first active-session-validation bootstrap slice.
+1. The Android desktop-runtime branch advanced from desktop-home proof into plugin replay, then process-model bootstrap, activation-contract bootstrap, supervision-contract bootstrap, observation-contract bootstrap, recovery-contract bootstrap, detached-launch-contract bootstrap, supervisor-loop-contract bootstrap, active-session-contract bootstrap, active-session-validation bootstrap, and now the first active-session-device-proof bootstrap slice.
    - Real-device replay on `PFEM10` already converged to `classification=plugin_lane_replayed` on payload `0.7.0`.
-   - Repo-side validation on April 6, 2026 moved the branch one slice further again to the new `0.16.0` process-runtime-active-session-validation-bootstrap state.
+   - Repo-side validation on April 6, 2026 moved the branch one slice further again to the new `0.17.0` process-runtime-active-session-device-proof-bootstrap state.
 
-2. `runtime-smoke` now leaves structured process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, detached-launch-contract, supervisor-loop-contract, active-session-contract, and active-session-validation artifacts instead of only profile/health/restart evidence.
+2. `runtime-smoke` now leaves structured process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, detached-launch-contract, supervisor-loop-contract, active-session-contract, active-session-validation, and active-session-device-proof artifacts instead of only profile/health/restart evidence.
    - The app still writes `runtime-smoke-desktop-profile.json`, `runtime-smoke-health-report.json`, and `runtime-smoke-restart-contract.json`.
-   - It now also writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, `runtime-smoke-observation-contract.json`, `runtime-smoke-recovery-contract.json`, `runtime-smoke-detached-launch-contract.json`, `runtime-smoke-supervisor-loop-contract.json`, `runtime-smoke-active-session-contract.json`, and `runtime-smoke-active-session-validation.json`, and exposes all nine field groups through `pod.runtime.describe`.
+   - It now also writes `runtime-smoke-process-model.json`, `runtime-smoke-activation-contract.json`, `runtime-smoke-supervision-contract.json`, `runtime-smoke-observation-contract.json`, `runtime-smoke-recovery-contract.json`, `runtime-smoke-detached-launch-contract.json`, `runtime-smoke-supervisor-loop-contract.json`, `runtime-smoke-active-session-contract.json`, `runtime-smoke-active-session-validation.json`, and `runtime-smoke-active-session-device-proof.json`, and exposes all ten field groups through `pod.runtime.describe`.
 
 3. The direct desktop-home bridge and bounded browser/tool/plugin lanes remain intact.
    - `pod.desktop.materialize` still materializes the packaged desktop home in app-private storage.
@@ -29,7 +29,7 @@
    - The targeted Android Gradle rerun for `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, and `InvokeCommandRegistryTest` also passes.
 
 5. The Android and project-level handoff docs were updated to reflect the new split state.
-   - Repo-verified `0.16.0` process-runtime active-session-validation bootstrap is now documented explicitly.
+   - Repo-verified `0.17.0` process-runtime active-session-device-proof bootstrap is now documented explicitly.
    - The latest real-device state is still called out separately as April 4, 2026 `0.7.0` `plugin_lane_replayed`.
 
 ## Validation Run
@@ -45,11 +45,11 @@
 ## Current Risks
 
 - The branch still does not provide full executable desktop parity. Generic browser tooling, unrestricted shell parity, generic plugin/runtime parity, and stronger detached-process observation/recovery semantics are still missing.
-- The new process-runtime active-session-validation bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.16.0`.
+- The new process-runtime active-session-device-proof bootstrap is repo-verified, but there is not yet fresh real-device proof for payload `0.17.0`.
 - In the repo-side targeted lane, the new bootstrap currently reports `desktopProcessStatus=blocked`, `desktopProcessActivationStatus=blocked`, `desktopProcessSupervisionStatus=blocked`, and `desktopProcessObservationStatus=blocked` until browser replay is present; that is expected, but it means we should not overstate readiness.
 
 ## Recommended Next Move
 
-- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_runtime_active_session_validation_bootstrapped`.
-- Once that device-side convergence exists, capture one real detached active-session proof instead of reopening the earlier plugin-lane decision.
+- Reinstall the current debug app on `PFEM10`, rerun `pnpm android:local-host:embedded-runtime-pod:doctor -- --json`, and drive the device-side state to `classification=process_runtime_active_session_device_proof_bootstrapped`.
+- Once that device-side convergence exists, capture one real live detached active-session proof instead of reopening the earlier plugin-lane decision.
 - Keep the current `doctor` + `smoke` + `browser-lane:smoke` path boringly replayable before widening the branch surface again.

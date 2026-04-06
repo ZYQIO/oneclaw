@@ -33,6 +33,8 @@ private const val embeddedRuntimeDesktopProcessSupervisorLoopStateFile = "state/
 private const val embeddedRuntimeDesktopProcessActiveSessionStateFile = "state/runtime-smoke-active-session-contract.json"
 private const val embeddedRuntimeDesktopProcessActiveSessionValidationStateFile =
   "state/runtime-smoke-active-session-validation.json"
+private const val embeddedRuntimeDesktopProcessActiveSessionDeviceProofStateFile =
+  "state/runtime-smoke-active-session-device-proof.json"
 private const val embeddedRuntimeDesktopProcessDetachedLaunchLogFile = "logs/runtime-smoke-detached-launch.log"
 private const val embeddedRuntimeDesktopProcessDetachedLaunchSentinelFile = "state/runtime-smoke-detached-launch-sentinel.json"
 private const val embeddedRuntimeDesktopLogFileNameForRuntime = "desktop-home.log"
@@ -245,6 +247,20 @@ data class EmbeddedRuntimeDesktopProfileReplayInspection(
   val processActiveSessionValidationDeviceProofRequired: Boolean = false,
   val processActiveSessionValidationBlockedReason: String? = null,
   val processActiveSessionValidationBootstrapOnly: Boolean = false,
+  val processActiveSessionDeviceProofReady: Boolean = false,
+  val processActiveSessionDeviceProofStatePresent: Boolean = false,
+  val processActiveSessionDeviceProofStatus: String? = null,
+  val processActiveSessionDeviceProofState: String? = null,
+  val processActiveSessionDeviceProofStatePath: String? = null,
+  val processActiveSessionDeviceProofGeneration: Int = 0,
+  val processActiveSessionDeviceProofSessionId: String? = null,
+  val processActiveSessionDeviceProofLeaseOwnerSessionId: String? = null,
+  val processActiveSessionDeviceProofObserved: Boolean = false,
+  val processActiveSessionDeviceProofLiveProofRequired: Boolean = false,
+  val processActiveSessionDeviceProofExpectedArtifactCount: Int = 0,
+  val processActiveSessionDeviceProofCapturedArtifactCount: Int = 0,
+  val processActiveSessionDeviceProofBlockedReason: String? = null,
+  val processActiveSessionDeviceProofBootstrapOnly: Boolean = false,
   val longLivedProcessReady: Boolean = false,
   val profileId: String? = null,
   val environmentId: String? = null,
@@ -562,6 +578,19 @@ fun executeEmbeddedRuntimePodTask(
   var desktopProcessActiveSessionValidationDeviceProofRequired = false
   var desktopProcessActiveSessionValidationBlockedReason: String? = null
   var desktopProcessActiveSessionValidationBootstrapOnly = false
+  var desktopProcessActiveSessionDeviceProofReady = false
+  var desktopProcessActiveSessionDeviceProofStatePath: String? = null
+  var desktopProcessActiveSessionDeviceProofStatus: String? = null
+  var desktopProcessActiveSessionDeviceProofState: String? = null
+  var desktopProcessActiveSessionDeviceProofGeneration = 0
+  var desktopProcessActiveSessionDeviceProofSessionId: String? = null
+  var desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId: String? = null
+  var desktopProcessActiveSessionDeviceProofObserved = false
+  var desktopProcessActiveSessionDeviceProofLiveProofRequired = false
+  var desktopProcessActiveSessionDeviceProofExpectedArtifactCount = 0
+  var desktopProcessActiveSessionDeviceProofCapturedArtifactCount = 0
+  var desktopProcessActiveSessionDeviceProofBlockedReason: String? = null
+  var desktopProcessActiveSessionDeviceProofBootstrapOnly = false
   var desktopLongLivedProcessReady = false
 
   if (task.kind == "desktop-tool") {
@@ -712,6 +741,32 @@ fun executeEmbeddedRuntimePodTask(
       desktopReplay?.processActiveSessionValidationBlockedReason
     desktopProcessActiveSessionValidationBootstrapOnly =
       desktopReplay?.processActiveSessionValidationBootstrapOnly == true
+    desktopProcessActiveSessionDeviceProofReady =
+      desktopReplay?.processActiveSessionDeviceProofReady == true
+    desktopProcessActiveSessionDeviceProofStatePath =
+      desktopReplay?.processActiveSessionDeviceProofStatePath
+    desktopProcessActiveSessionDeviceProofStatus =
+      desktopReplay?.processActiveSessionDeviceProofStatus
+    desktopProcessActiveSessionDeviceProofState =
+      desktopReplay?.processActiveSessionDeviceProofState
+    desktopProcessActiveSessionDeviceProofGeneration =
+      desktopReplay?.processActiveSessionDeviceProofGeneration ?: 0
+    desktopProcessActiveSessionDeviceProofSessionId =
+      desktopReplay?.processActiveSessionDeviceProofSessionId
+    desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId =
+      desktopReplay?.processActiveSessionDeviceProofLeaseOwnerSessionId
+    desktopProcessActiveSessionDeviceProofObserved =
+      desktopReplay?.processActiveSessionDeviceProofObserved == true
+    desktopProcessActiveSessionDeviceProofLiveProofRequired =
+      desktopReplay?.processActiveSessionDeviceProofLiveProofRequired == true
+    desktopProcessActiveSessionDeviceProofExpectedArtifactCount =
+      desktopReplay?.processActiveSessionDeviceProofExpectedArtifactCount ?: 0
+    desktopProcessActiveSessionDeviceProofCapturedArtifactCount =
+      desktopReplay?.processActiveSessionDeviceProofCapturedArtifactCount ?: 0
+    desktopProcessActiveSessionDeviceProofBlockedReason =
+      desktopReplay?.processActiveSessionDeviceProofBlockedReason
+    desktopProcessActiveSessionDeviceProofBootstrapOnly =
+      desktopReplay?.processActiveSessionDeviceProofBootstrapOnly == true
     desktopLongLivedProcessReady = desktopReplay?.longLivedProcessReady == true
   }
 
@@ -775,6 +830,30 @@ fun executeEmbeddedRuntimePodTask(
       put(
         "desktopProcessActiveSessionValidationDeviceProofRequired",
         JsonPrimitive(desktopProcessActiveSessionValidationDeviceProofRequired),
+      )
+      put(
+        "desktopProcessActiveSessionDeviceProofReady",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofReady),
+      )
+      put(
+        "desktopProcessActiveSessionDeviceProofBootstrapOnly",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofBootstrapOnly),
+      )
+      put(
+        "desktopProcessActiveSessionDeviceProofObserved",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofObserved),
+      )
+      put(
+        "desktopProcessActiveSessionDeviceProofLiveProofRequired",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofLiveProofRequired),
+      )
+      put(
+        "desktopProcessActiveSessionDeviceProofExpectedArtifactCount",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofExpectedArtifactCount),
+      )
+      put(
+        "desktopProcessActiveSessionDeviceProofCapturedArtifactCount",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofCapturedArtifactCount),
       )
       put("desktopLongLivedProcessReady", JsonPrimitive(desktopLongLivedProcessReady))
       desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
@@ -886,6 +965,28 @@ fun executeEmbeddedRuntimePodTask(
       desktopProcessActiveSessionValidationBlockedReason?.let {
         put("desktopProcessActiveSessionValidationBlockedReason", JsonPrimitive(it))
       }
+      desktopProcessActiveSessionDeviceProofStatePath?.let {
+        put("desktopProcessActiveSessionDeviceProofStatePath", JsonPrimitive(it))
+      }
+      desktopProcessActiveSessionDeviceProofStatus?.let {
+        put("desktopProcessActiveSessionDeviceProofStatus", JsonPrimitive(it))
+      }
+      desktopProcessActiveSessionDeviceProofState?.let {
+        put("desktopProcessActiveSessionDeviceProofState", JsonPrimitive(it))
+      }
+      put(
+        "desktopProcessActiveSessionDeviceProofGeneration",
+        JsonPrimitive(desktopProcessActiveSessionDeviceProofGeneration),
+      )
+      desktopProcessActiveSessionDeviceProofSessionId?.let {
+        put("desktopProcessActiveSessionDeviceProofSessionId", JsonPrimitive(it))
+      }
+      desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId?.let {
+        put("desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId", JsonPrimitive(it))
+      }
+      desktopProcessActiveSessionDeviceProofBlockedReason?.let {
+        put("desktopProcessActiveSessionDeviceProofBlockedReason", JsonPrimitive(it))
+      }
       desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
       toolId?.let { put("toolId", JsonPrimitive(it)) }
       toolResultFilePath?.let { put("toolResultFilePath", JsonPrimitive(it)) }
@@ -971,6 +1072,30 @@ fun executeEmbeddedRuntimePodTask(
         put(
           "desktopProcessActiveSessionValidationDeviceProofRequired",
           JsonPrimitive(desktopProcessActiveSessionValidationDeviceProofRequired),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofReady",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofReady),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofBootstrapOnly",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofBootstrapOnly),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofObserved",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofObserved),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofLiveProofRequired",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofLiveProofRequired),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofExpectedArtifactCount",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofExpectedArtifactCount),
+        )
+        put(
+          "desktopProcessActiveSessionDeviceProofCapturedArtifactCount",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofCapturedArtifactCount),
         )
         put("desktopLongLivedProcessReady", JsonPrimitive(desktopLongLivedProcessReady))
         desktopProfileReplayStatePath?.let { put("desktopProfileReplayStatePath", JsonPrimitive(it)) }
@@ -1106,6 +1231,28 @@ fun executeEmbeddedRuntimePodTask(
         desktopProcessActiveSessionValidationBlockedReason?.let {
           put("desktopProcessActiveSessionValidationBlockedReason", JsonPrimitive(it))
         }
+        desktopProcessActiveSessionDeviceProofStatePath?.let {
+          put("desktopProcessActiveSessionDeviceProofStatePath", JsonPrimitive(it))
+        }
+        desktopProcessActiveSessionDeviceProofStatus?.let {
+          put("desktopProcessActiveSessionDeviceProofStatus", JsonPrimitive(it))
+        }
+        desktopProcessActiveSessionDeviceProofState?.let {
+          put("desktopProcessActiveSessionDeviceProofState", JsonPrimitive(it))
+        }
+        put(
+          "desktopProcessActiveSessionDeviceProofGeneration",
+          JsonPrimitive(desktopProcessActiveSessionDeviceProofGeneration),
+        )
+        desktopProcessActiveSessionDeviceProofSessionId?.let {
+          put("desktopProcessActiveSessionDeviceProofSessionId", JsonPrimitive(it))
+        }
+        desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId?.let {
+          put("desktopProcessActiveSessionDeviceProofLeaseOwnerSessionId", JsonPrimitive(it))
+        }
+        desktopProcessActiveSessionDeviceProofBlockedReason?.let {
+          put("desktopProcessActiveSessionDeviceProofBlockedReason", JsonPrimitive(it))
+        }
         desktopProfileReplayPayload?.let { put("desktopProfileReplay", it) }
         toolId?.let { put("toolId", JsonPrimitive(it)) }
         put("toolkitStageInstalled", JsonPrimitive(toolkitStageInstalled))
@@ -1148,6 +1295,8 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val processActiveSessionFile = desktopHome.resolve(embeddedRuntimeDesktopProcessActiveSessionStateFile)
   val processActiveSessionValidationFile =
     desktopHome.resolve(embeddedRuntimeDesktopProcessActiveSessionValidationStateFile)
+  val processActiveSessionDeviceProofFile =
+    desktopHome.resolve(embeddedRuntimeDesktopProcessActiveSessionDeviceProofStateFile)
   val statePayload = stateFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val healthPayload = healthReportFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val restartPayload = restartContractFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
@@ -1161,6 +1310,8 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val activeSessionPayload = processActiveSessionFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val activeSessionValidationPayload =
     processActiveSessionValidationFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val activeSessionDeviceProofPayload =
+    processActiveSessionDeviceProofFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
   val dependencyStatus = statePayload?.get("dependencyStatus") as? JsonObject
   val missingDependencies = statePayload?.get("missingDependencies") as? JsonArray
   val status = runtimePrimitiveContent(statePayload, "status")
@@ -1184,6 +1335,10 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
   val activeSessionState = runtimePrimitiveContent(activeSessionPayload, "sessionState")
   val activeSessionValidationStatus = runtimePrimitiveContent(activeSessionValidationPayload, "status")
   val activeSessionValidationState = runtimePrimitiveContent(activeSessionValidationPayload, "validationState")
+  val activeSessionDeviceProofStatus =
+    runtimePrimitiveContent(activeSessionDeviceProofPayload, "status")
+  val activeSessionDeviceProofState =
+    runtimePrimitiveContent(activeSessionDeviceProofPayload, "deviceProofState")
   val environmentSupervisionReady =
     stateFile.isFile &&
       resultFile.isFile &&
@@ -1235,6 +1390,11 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
       activeSessionValidationStatus != null &&
       activeSessionValidationState != null &&
       activeSessionValidationStatus != "unsupported"
+  val processActiveSessionDeviceProofReady =
+    processActiveSessionDeviceProofFile.isFile &&
+      activeSessionDeviceProofStatus != null &&
+      activeSessionDeviceProofState != null &&
+      activeSessionDeviceProofStatus != "unsupported"
   return EmbeddedRuntimeDesktopProfileReplayInspection(
     replayReady = stateFile.isFile && resultFile.isFile && status != null,
     statePresent = stateFile.isFile,
@@ -1356,6 +1516,33 @@ fun inspectEmbeddedRuntimeDesktopProfileReplay(
       runtimePrimitiveContent(activeSessionValidationPayload, "blockedReason"),
     processActiveSessionValidationBootstrapOnly =
       runtimePrimitiveBoolean(activeSessionValidationPayload, "bootstrapOnly") == true,
+    processActiveSessionDeviceProofReady = processActiveSessionDeviceProofReady,
+    processActiveSessionDeviceProofStatePresent = processActiveSessionDeviceProofFile.isFile,
+    processActiveSessionDeviceProofStatus = activeSessionDeviceProofStatus,
+    processActiveSessionDeviceProofState = activeSessionDeviceProofState,
+    processActiveSessionDeviceProofStatePath =
+      desktopHomeDisplayPathForRuntime(
+        manifestVersion,
+        embeddedRuntimeDesktopProcessActiveSessionDeviceProofStateFile,
+      ),
+    processActiveSessionDeviceProofGeneration =
+      runtimePrimitiveInt(activeSessionDeviceProofPayload, "generation") ?: 0,
+    processActiveSessionDeviceProofSessionId =
+      runtimePrimitiveContent(activeSessionDeviceProofPayload, "activeSessionId"),
+    processActiveSessionDeviceProofLeaseOwnerSessionId =
+      runtimePrimitiveContent(activeSessionDeviceProofPayload, "leaseOwnerSessionId"),
+    processActiveSessionDeviceProofObserved =
+      runtimePrimitiveBoolean(activeSessionDeviceProofPayload, "liveProofObserved") == true,
+    processActiveSessionDeviceProofLiveProofRequired =
+      runtimePrimitiveBoolean(activeSessionDeviceProofPayload, "liveProofRequired") == true,
+    processActiveSessionDeviceProofExpectedArtifactCount =
+      runtimePrimitiveInt(activeSessionDeviceProofPayload, "expectedArtifactCount") ?: 0,
+    processActiveSessionDeviceProofCapturedArtifactCount =
+      runtimePrimitiveInt(activeSessionDeviceProofPayload, "capturedArtifactCount") ?: 0,
+    processActiveSessionDeviceProofBlockedReason =
+      runtimePrimitiveContent(activeSessionDeviceProofPayload, "blockedReason"),
+    processActiveSessionDeviceProofBootstrapOnly =
+      runtimePrimitiveBoolean(activeSessionDeviceProofPayload, "bootstrapOnly") == true,
     longLivedProcessReady =
       runtimePrimitiveBoolean(detachedLaunchPayload, "longLivedProcessReady") == true ||
       runtimePrimitiveBoolean(supervisorLoopPayload, "longLivedProcessReady") == true ||
@@ -1747,6 +1934,19 @@ private data class EmbeddedRuntimeDesktopProfileReplayExecution(
   val processActiveSessionValidationDeviceProofRequired: Boolean,
   val processActiveSessionValidationBlockedReason: String?,
   val processActiveSessionValidationBootstrapOnly: Boolean,
+  val processActiveSessionDeviceProofReady: Boolean,
+  val processActiveSessionDeviceProofStatePath: String,
+  val processActiveSessionDeviceProofStatus: String,
+  val processActiveSessionDeviceProofState: String,
+  val processActiveSessionDeviceProofGeneration: Int,
+  val processActiveSessionDeviceProofSessionId: String,
+  val processActiveSessionDeviceProofLeaseOwnerSessionId: String,
+  val processActiveSessionDeviceProofObserved: Boolean,
+  val processActiveSessionDeviceProofLiveProofRequired: Boolean,
+  val processActiveSessionDeviceProofExpectedArtifactCount: Int,
+  val processActiveSessionDeviceProofCapturedArtifactCount: Int,
+  val processActiveSessionDeviceProofBlockedReason: String?,
+  val processActiveSessionDeviceProofBootstrapOnly: Boolean,
   val longLivedProcessReady: Boolean,
 )
 
@@ -2792,6 +2992,178 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
     processActiveSessionValidationFile.isFile &&
       activeSessionValidationSupported &&
       processActiveSessionValidationStatus != "unsupported"
+  val activeSessionDeviceProofSupported =
+    runtimeJsonArray(supervisorManifest, "managedActions").any {
+      it.content == "capture-active-session-device-proof"
+    } ||
+      runtimeJsonArray(supervisorManifest, "capabilities").any {
+        it.content == "process-runtime-active-session-device-proof-bootstrap"
+      } ||
+      runtimeJsonArray(environmentManifest, "capabilities").any {
+        it.content == "process-runtime-active-session-device-proof-bootstrap"
+      }
+  val processActiveSessionDeviceProofFile =
+    desktopHome.resolve(embeddedRuntimeDesktopProcessActiveSessionDeviceProofStateFile)
+  processActiveSessionDeviceProofFile.parentFile?.mkdirs()
+  val previousActiveSessionDeviceProofPayload =
+    processActiveSessionDeviceProofFile.takeIf { it.isFile }?.let(::readRuntimeJsonObjectOrNull)
+  val previousActiveSessionDeviceProofGeneration =
+    runtimePrimitiveInt(previousActiveSessionDeviceProofPayload, "generation") ?: 0
+  val processActiveSessionDeviceProofGeneration =
+    previousActiveSessionDeviceProofGeneration + 1
+  val processActiveSessionDeviceProofObserved =
+    runtimePrimitiveBoolean(previousActiveSessionDeviceProofPayload, "liveProofObserved") == true
+  val processActiveSessionDeviceProofExpectedArtifactCount = 3
+  val processActiveSessionDeviceProofCapturedArtifactCount =
+    if (processActiveSessionDeviceProofObserved) {
+      processActiveSessionDeviceProofExpectedArtifactCount
+    } else {
+      0
+    }
+  val processActiveSessionDeviceProofLiveProofRequired =
+    !processActiveSessionDeviceProofObserved
+  val processActiveSessionDeviceProofStatus =
+    when {
+      !activeSessionDeviceProofSupported -> "unsupported"
+      !processActiveSessionValidationReady -> "blocked"
+      processActiveSessionDeviceProofLiveProofRequired -> "pending_live_proof"
+      else -> "verified"
+    }
+  val processActiveSessionDeviceProofState =
+    when {
+      !activeSessionDeviceProofSupported -> "unsupported"
+      !processActiveSessionValidationReady -> "awaiting_validation"
+      processActiveSessionDeviceProofLiveProofRequired -> "awaiting_live_proof"
+      else -> "verified"
+    }
+  val processActiveSessionDeviceProofBlockedReason =
+    when {
+      !activeSessionDeviceProofSupported -> "active_session_device_proof_not_supported"
+      !processActiveSessionValidationReady ->
+        processActiveSessionValidationBlockedReason
+          ?: "active_session_validation_not_ready:$processActiveSessionValidationStatus"
+      processActiveSessionDeviceProofLiveProofRequired -> "live_active_session_proof_missing"
+      else -> null
+    }
+  val processActiveSessionDeviceProofPayload =
+    buildJsonObject {
+      put("status", JsonPrimitive(processActiveSessionDeviceProofStatus))
+      put("deviceProofState", JsonPrimitive(processActiveSessionDeviceProofState))
+      put("taskId", JsonPrimitive(embeddedRuntimeDefaultTaskId))
+      put("profileId", JsonPrimitive(profileId))
+      put("sessionId", JsonPrimitive(processSessionId))
+      put("activeSessionId", JsonPrimitive(processActiveSessionSessionId))
+      put("leaseOwnerSessionId", JsonPrimitive(processSupervisorLoopSessionId))
+      put("generation", JsonPrimitive(processActiveSessionDeviceProofGeneration))
+      put("previousGeneration", JsonPrimitive(previousActiveSessionDeviceProofGeneration))
+      put("activeSessionDeviceProofSupported", JsonPrimitive(activeSessionDeviceProofSupported))
+      put("bootstrapOnly", JsonPrimitive(true))
+      put("liveProofObserved", JsonPrimitive(processActiveSessionDeviceProofObserved))
+      put("liveProofRequired", JsonPrimitive(processActiveSessionDeviceProofLiveProofRequired))
+      put(
+        "expectedArtifactCount",
+        JsonPrimitive(processActiveSessionDeviceProofExpectedArtifactCount),
+      )
+      put(
+        "capturedArtifactCount",
+        JsonPrimitive(processActiveSessionDeviceProofCapturedArtifactCount),
+      )
+      put(
+        "expectedClassification",
+        JsonPrimitive("process_runtime_active_session_device_proof_bootstrapped"),
+      )
+      put("nextLiveSlice", JsonPrimitive("process_runtime_active_session_live_proof"))
+      put("proofCommand", JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
+      put(
+        "proofCommands",
+        buildJsonArray {
+          add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
+          add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:smoke"))
+          add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke"))
+        },
+      )
+      put(
+        "requiredArtifacts",
+        buildJsonArray {
+          add(JsonPrimitive("doctor-summary"))
+          add(JsonPrimitive("pod-smoke-summary"))
+          add(JsonPrimitive("browser-lane-summary"))
+        },
+      )
+      put(
+        "requiredObservations",
+        buildJsonArray {
+          add(JsonPrimitive("lease_renewal"))
+          add(JsonPrimitive("recovery_reentry"))
+          add(JsonPrimitive("restart_continuity"))
+        },
+      )
+      put(
+        "validationStatePath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopProcessActiveSessionValidationStateFile,
+          ),
+        ),
+      )
+      put(
+        "activeSessionContractPath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopProcessActiveSessionStateFile,
+          ),
+        ),
+      )
+      put(
+        "supervisorLoopContractPath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopProcessSupervisorLoopStateFile,
+          ),
+        ),
+      )
+      put(
+        "detachedLaunchContractPath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopProcessDetachedLaunchStateFile,
+          ),
+        ),
+      )
+      put(
+        "recoveryContractPath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopProcessRecoveryStateFile,
+          ),
+        ),
+      )
+      put(
+        "restartContractPath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopRestartContractStateFile,
+          ),
+        ),
+      )
+      put("observedAt", JsonPrimitive(executedAt))
+      put("executionCount", JsonPrimitive(executionCount))
+      processActiveSessionDeviceProofBlockedReason?.let { put("blockedReason", JsonPrimitive(it)) }
+    }
+  processActiveSessionDeviceProofFile.writeText(
+    "${processActiveSessionDeviceProofPayload}\n",
+    Charsets.UTF_8,
+  )
+  val processActiveSessionDeviceProofReady =
+    processActiveSessionDeviceProofFile.isFile &&
+      activeSessionDeviceProofSupported &&
+      processActiveSessionDeviceProofStatus != "unsupported"
   val resultPayload =
     buildJsonObject {
       put("status", JsonPrimitive(if (missingDependencies.isEmpty()) "ready" else "degraded"))
@@ -2972,6 +3344,50 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
         put("processActiveSessionValidationBlockedReason", JsonPrimitive(it))
       }
       put("processActiveSessionValidationBootstrapOnly", JsonPrimitive(true))
+      put("processActiveSessionDeviceProofReady", JsonPrimitive(processActiveSessionDeviceProofReady))
+      put("processActiveSessionDeviceProofStatus", JsonPrimitive(processActiveSessionDeviceProofStatus))
+      put("processActiveSessionDeviceProofState", JsonPrimitive(processActiveSessionDeviceProofState))
+      put(
+        "processActiveSessionDeviceProofStatePath",
+        JsonPrimitive(
+          desktopHomeDisplayPathForRuntime(
+            manifestVersion,
+            embeddedRuntimeDesktopProcessActiveSessionDeviceProofStateFile,
+          ),
+        ),
+      )
+      put(
+        "processActiveSessionDeviceProofGeneration",
+        JsonPrimitive(processActiveSessionDeviceProofGeneration),
+      )
+      put(
+        "processActiveSessionDeviceProofSessionId",
+        JsonPrimitive(processActiveSessionSessionId),
+      )
+      put(
+        "processActiveSessionDeviceProofLeaseOwnerSessionId",
+        JsonPrimitive(processSupervisorLoopSessionId),
+      )
+      put(
+        "processActiveSessionDeviceProofObserved",
+        JsonPrimitive(processActiveSessionDeviceProofObserved),
+      )
+      put(
+        "processActiveSessionDeviceProofLiveProofRequired",
+        JsonPrimitive(processActiveSessionDeviceProofLiveProofRequired),
+      )
+      put(
+        "processActiveSessionDeviceProofExpectedArtifactCount",
+        JsonPrimitive(processActiveSessionDeviceProofExpectedArtifactCount),
+      )
+      put(
+        "processActiveSessionDeviceProofCapturedArtifactCount",
+        JsonPrimitive(processActiveSessionDeviceProofCapturedArtifactCount),
+      )
+      processActiveSessionDeviceProofBlockedReason?.let {
+        put("processActiveSessionDeviceProofBlockedReason", JsonPrimitive(it))
+      }
+      put("processActiveSessionDeviceProofBootstrapOnly", JsonPrimitive(true))
       put("longLivedProcessReady", JsonPrimitive(longLivedProcessReady))
       put("healthStatus", JsonPrimitive(healthReportStatus))
       put("healthReportPath", JsonPrimitive(desktopHomeDisplayPathForRuntime(manifestVersion, embeddedRuntimeDesktopHealthReportStateFile)))
@@ -3110,6 +3526,26 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       processActiveSessionValidationDeviceProofRequired,
     processActiveSessionValidationBlockedReason = processActiveSessionValidationBlockedReason,
     processActiveSessionValidationBootstrapOnly = true,
+    processActiveSessionDeviceProofReady = processActiveSessionDeviceProofReady,
+    processActiveSessionDeviceProofStatePath =
+      desktopHomeDisplayPathForRuntime(
+        manifestVersion,
+        embeddedRuntimeDesktopProcessActiveSessionDeviceProofStateFile,
+      ),
+    processActiveSessionDeviceProofStatus = processActiveSessionDeviceProofStatus,
+    processActiveSessionDeviceProofState = processActiveSessionDeviceProofState,
+    processActiveSessionDeviceProofGeneration = processActiveSessionDeviceProofGeneration,
+    processActiveSessionDeviceProofSessionId = processActiveSessionSessionId,
+    processActiveSessionDeviceProofLeaseOwnerSessionId = processSupervisorLoopSessionId,
+    processActiveSessionDeviceProofObserved = processActiveSessionDeviceProofObserved,
+    processActiveSessionDeviceProofLiveProofRequired =
+      processActiveSessionDeviceProofLiveProofRequired,
+    processActiveSessionDeviceProofExpectedArtifactCount =
+      processActiveSessionDeviceProofExpectedArtifactCount,
+    processActiveSessionDeviceProofCapturedArtifactCount =
+      processActiveSessionDeviceProofCapturedArtifactCount,
+    processActiveSessionDeviceProofBlockedReason = processActiveSessionDeviceProofBlockedReason,
+    processActiveSessionDeviceProofBootstrapOnly = true,
     longLivedProcessReady = longLivedProcessReady,
   )
 }
