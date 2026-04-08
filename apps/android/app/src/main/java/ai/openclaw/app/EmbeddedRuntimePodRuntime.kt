@@ -3108,6 +3108,12 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       processActiveSessionDeviceProofLiveProofRequired -> "live_active_session_proof_missing"
       else -> null
     }
+  val processActiveSessionDeviceProofProofCommand =
+    if (processActiveSessionDeviceProofObserved) {
+      "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3"
+    } else {
+      "pnpm android:local-host:embedded-runtime-pod:doctor -- --json"
+    }
   val processActiveSessionDeviceProofPayload =
     buildJsonObject {
       put("status", JsonPrimitive(processActiveSessionDeviceProofStatus))
@@ -3157,11 +3163,14 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
           },
         ),
       )
-      put("proofCommand", JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
+      put("proofCommand", JsonPrimitive(processActiveSessionDeviceProofProofCommand))
       put(
         "proofCommands",
         buildJsonArray {
-          add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
+          add(JsonPrimitive(processActiveSessionDeviceProofProofCommand))
+          if (processActiveSessionDeviceProofObserved) {
+            add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
+          }
           add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:smoke"))
           add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke"))
         },
@@ -3169,6 +3178,9 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
       put(
         "requiredArtifacts",
         buildJsonArray {
+          if (processActiveSessionDeviceProofObserved) {
+            add(JsonPrimitive("stability-summary"))
+          }
           add(JsonPrimitive("doctor-summary"))
           add(JsonPrimitive("pod-smoke-summary"))
           add(JsonPrimitive("browser-lane-summary"))

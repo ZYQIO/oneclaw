@@ -565,6 +565,21 @@ class PodHandlerTest {
     assertTrue(
       context.filesDir.resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-active-session-device-proof.json").isFile,
     )
+    val pendingLiveProofPayload =
+      json
+        .parseToJsonElement(
+          context.filesDir
+            .resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-active-session-device-proof.json")
+            .readText(),
+        ).jsonObject
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:doctor -- --json",
+      pendingLiveProofPayload.getValue("proofCommand").jsonPrimitive.content,
+    )
+    assertEquals(
+      "doctor-summary",
+      pendingLiveProofPayload.getValue("requiredArtifacts").jsonArray.first().jsonPrimitive.content,
+    )
   }
 
   @Test
@@ -939,6 +954,26 @@ class PodHandlerTest {
     assertEquals(
       "process_runtime_lane_hardening",
       payload.getValue("recommendedNextSlice").jsonPrimitive.content,
+    )
+    val capturedLiveProofPayload =
+      json
+        .parseToJsonElement(
+          context.filesDir
+            .resolve("openclaw/embedded-desktop-home/0.17.0/state/runtime-smoke-active-session-device-proof.json")
+            .readText(),
+        ).jsonObject
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3",
+      capturedLiveProofPayload.getValue("proofCommand").jsonPrimitive.content,
+    )
+    val proofCommands = capturedLiveProofPayload.getValue("proofCommands").jsonArray
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3",
+      proofCommands.first().jsonPrimitive.content,
+    )
+    assertEquals(
+      "stability-summary",
+      capturedLiveProofPayload.getValue("requiredArtifacts").jsonArray.first().jsonPrimitive.content,
     )
   }
 
