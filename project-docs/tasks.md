@@ -3,9 +3,9 @@
 ## Immediate Tasks
 
 1. Keep the refreshed `PFEM10` replay boringly repeatable on payload `0.17.0`.
-   - Current state: on April 6, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=process_runtime_active_session_live_proof_captured`, the browser-lane smoke records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, and `activeSessionDeviceProofStatus=verified`, and the doctor wrapper now also auto-runs a confirm-only browser-lane pass that leaves `confirmBrowserLaneSmoke.liveProofReplayed=true`.
-   - Current guardrail: the doctor summary now also exposes `confirmBrowserLaneSmoke.liveProofContinuity`, so confirm replay hardening explicitly checks browser replay, long-lived process readiness, active-session observation, recovery re-entry, restart continuity, validation status, and device-proof status against the first live-proof capture.
-   - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_live_proof_captured`, keep leaving the browser-aligned runtime summary in place, keep preserving `confirmBrowserLaneSmoke.liveProofReplayed=true`, and keep reporting `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`.
+   - Current state: on April 8, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` again converged to `classification=process_runtime_active_session_live_proof_captured`, the browser-lane smoke records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, `activeSessionDeviceProofStatus=verified`, and the doctor wrapper's confirm-only browser-lane pass still leaves both `confirmBrowserLaneSmoke.liveProofReplayed=true` and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`.
+   - Current guardrail: the doctor summary now also exposes `confirmBrowserLaneSmoke.liveProofContinuity`, and the browser-lane smoke now carries validation/device-proof observations such as lease renewal, recovery re-entry, restart continuity, and captured-vs-expected proof artifact counts into `runtimeExecuteAfterBrowser`.
+   - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_live_proof_captured`, keep leaving the browser-aligned runtime summary in place, keep preserving `confirmBrowserLaneSmoke.liveProofReplayed=true`, and keep reporting `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true` without losing lease-renewal or proof-artifact completeness.
 
 2. Preserve the captured live-proof slice as `process_runtime_lane_hardening`.
    - The branch no longer needs a decision about whether plugin/process-model/process-runtime-activation/process-runtime-supervision/process-runtime-observation/process-runtime-recovery/process-runtime-detached-launch/process-runtime-supervisor-loop/bootstrap-validation/bootstrap-device-proof/live-proof capture should exist; those are now settled.
@@ -22,7 +22,7 @@
    - Exit criteria: the branch still converges to the expected top-level classification after reinstall and token bootstrap.
 
 2. Keep the active-session-device-proof contract and the live-proof checklist aligned.
-   - Focus on observable process state, lease ownership, restart generation, recovery re-entry semantics, restart continuity, and the browser-aligned `runtimeExecuteAfterBrowser` artifact rather than widening browser/tools/plugins again.
+   - Focus on observable process state, lease ownership, lease-renewal observation, restart generation, recovery re-entry semantics, restart continuity, proof-artifact completeness, and the browser-aligned `runtimeExecuteAfterBrowser` artifact rather than widening browser/tools/plugins again.
    - Exit criteria: the docs and runtime status surface both describe one coherent captured-live-proof model, and the next gap is only hardening.
 
 3. Keep doc/task surfaces aligned with the Android mainline rather than old fork-management work.

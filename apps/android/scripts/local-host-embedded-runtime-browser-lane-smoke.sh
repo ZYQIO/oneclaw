@@ -265,8 +265,15 @@ runtime_execute_after_browser_active_session_observed="$(jq -r '.payload.desktop
 runtime_execute_after_browser_active_session_recovery_reentry_ready="$(jq -r '.payload.desktopProcessActiveSessionRecoveryReentryReady // false' "$runtime_execute_after_browser_json")"
 runtime_execute_after_browser_active_session_restart_continuity_ready="$(jq -r '.payload.desktopProcessActiveSessionRestartContinuityReady // false' "$runtime_execute_after_browser_json")"
 runtime_execute_after_browser_active_session_validation_status="$(jq -r '.payload.desktopProcessActiveSessionValidationStatus // ""' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_validation_lease_renewal_observed="$(jq -r '.payload.desktopProcessActiveSessionValidationLeaseRenewalObserved // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_validation_recovery_reentry_observed="$(jq -r '.payload.desktopProcessActiveSessionValidationRecoveryReentryObserved // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_validation_restart_continuity_observed="$(jq -r '.payload.desktopProcessActiveSessionValidationRestartContinuityObserved // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_validation_device_proof_required="$(jq -r '.payload.desktopProcessActiveSessionValidationDeviceProofRequired // false' "$runtime_execute_after_browser_json")"
 runtime_execute_after_browser_active_session_device_proof_status="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofStatus // ""' "$runtime_execute_after_browser_json")"
 runtime_execute_after_browser_active_session_device_proof_observed="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofObserved // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_device_proof_live_proof_required="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofLiveProofRequired // false' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_device_proof_expected_artifact_count="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofExpectedArtifactCount // 0' "$runtime_execute_after_browser_json")"
+runtime_execute_after_browser_active_session_device_proof_captured_artifact_count="$(jq -r '.payload.desktopProcessActiveSessionDeviceProofCapturedArtifactCount // 0' "$runtime_execute_after_browser_json")"
 
 tool_execute_ok="$(jq -r '.ok // false' "$tool_execute_json")"
 tool_execute_command="$(jq -r '.payload.command // ""' "$tool_execute_json")"
@@ -379,8 +386,15 @@ if [[ "$failure_hint" == "" ]]; then
     [[ "$runtime_execute_after_browser_active_session_restart_continuity_ready" == "true" ]] || record_failure "pod_runtime_execute_after_browser_restart_continuity_not_ready"
     if [[ "$runtime_execute_after_browser_active_session_observed" == "true" ]]; then
       [[ "$runtime_execute_after_browser_active_session_validation_status" == "validated" ]] || record_failure "pod_runtime_execute_after_browser_validation_status_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_validation_lease_renewal_observed" == "true" ]] || record_failure "pod_runtime_execute_after_browser_validation_lease_renewal_not_observed"
+      [[ "$runtime_execute_after_browser_active_session_validation_recovery_reentry_observed" == "true" ]] || record_failure "pod_runtime_execute_after_browser_validation_recovery_reentry_not_observed"
+      [[ "$runtime_execute_after_browser_active_session_validation_restart_continuity_observed" == "true" ]] || record_failure "pod_runtime_execute_after_browser_validation_restart_continuity_not_observed"
+      [[ "$runtime_execute_after_browser_active_session_validation_device_proof_required" == "false" ]] || record_failure "pod_runtime_execute_after_browser_validation_device_proof_still_required"
       [[ "$runtime_execute_after_browser_active_session_device_proof_status" == "verified" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_status_unexpected"
       [[ "$runtime_execute_after_browser_active_session_device_proof_observed" == "true" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_observed_unexpected"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_live_proof_required" == "false" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_live_proof_still_required"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_expected_artifact_count" -ge 1 ]] || record_failure "pod_runtime_execute_after_browser_device_proof_expected_artifact_count_invalid"
+      [[ "$runtime_execute_after_browser_active_session_device_proof_captured_artifact_count" -ge "$runtime_execute_after_browser_active_session_device_proof_expected_artifact_count" ]] || record_failure "pod_runtime_execute_after_browser_device_proof_captured_artifact_count_invalid"
     else
       [[ "$runtime_execute_after_browser_active_session_observed" == "false" ]] || record_failure "pod_runtime_execute_after_browser_active_session_observed_unexpected"
       [[ "$runtime_execute_after_browser_active_session_validation_status" == "pending_device_proof" ]] || record_failure "pod_runtime_execute_after_browser_validation_status_unexpected"
@@ -438,8 +452,15 @@ jq -n \
   --arg runtimeExecuteAfterBrowserActiveSessionRecoveryReentryReady "$runtime_execute_after_browser_active_session_recovery_reentry_ready" \
   --arg runtimeExecuteAfterBrowserActiveSessionRestartContinuityReady "$runtime_execute_after_browser_active_session_restart_continuity_ready" \
   --arg runtimeExecuteAfterBrowserActiveSessionValidationStatus "$runtime_execute_after_browser_active_session_validation_status" \
+  --arg runtimeExecuteAfterBrowserActiveSessionValidationLeaseRenewalObserved "$runtime_execute_after_browser_active_session_validation_lease_renewal_observed" \
+  --arg runtimeExecuteAfterBrowserActiveSessionValidationRecoveryReentryObserved "$runtime_execute_after_browser_active_session_validation_recovery_reentry_observed" \
+  --arg runtimeExecuteAfterBrowserActiveSessionValidationRestartContinuityObserved "$runtime_execute_after_browser_active_session_validation_restart_continuity_observed" \
+  --arg runtimeExecuteAfterBrowserActiveSessionValidationDeviceProofRequired "$runtime_execute_after_browser_active_session_validation_device_proof_required" \
   --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofStatus "$runtime_execute_after_browser_active_session_device_proof_status" \
   --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofObserved "$runtime_execute_after_browser_active_session_device_proof_observed" \
+  --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofLiveProofRequired "$runtime_execute_after_browser_active_session_device_proof_live_proof_required" \
+  --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofExpectedArtifactCount "$runtime_execute_after_browser_active_session_device_proof_expected_artifact_count" \
+  --arg runtimeExecuteAfterBrowserActiveSessionDeviceProofCapturedArtifactCount "$runtime_execute_after_browser_active_session_device_proof_captured_artifact_count" \
   --arg toolExecuteOk "$tool_execute_ok" \
   --arg toolExecuteTaskId "$tool_execute_task_id" \
   --arg toolExecuteToolId "$tool_execute_tool_id" \
@@ -529,8 +550,15 @@ jq -n \
       activeSessionRecoveryReentryReady: ($runtimeExecuteAfterBrowserActiveSessionRecoveryReentryReady == "true"),
       activeSessionRestartContinuityReady: ($runtimeExecuteAfterBrowserActiveSessionRestartContinuityReady == "true"),
       activeSessionValidationStatus: (if $runtimeExecuteAfterBrowserActiveSessionValidationStatus == "" then null else $runtimeExecuteAfterBrowserActiveSessionValidationStatus end),
+      activeSessionValidationLeaseRenewalObserved: ($runtimeExecuteAfterBrowserActiveSessionValidationLeaseRenewalObserved == "true"),
+      activeSessionValidationRecoveryReentryObserved: ($runtimeExecuteAfterBrowserActiveSessionValidationRecoveryReentryObserved == "true"),
+      activeSessionValidationRestartContinuityObserved: ($runtimeExecuteAfterBrowserActiveSessionValidationRestartContinuityObserved == "true"),
+      activeSessionValidationDeviceProofRequired: ($runtimeExecuteAfterBrowserActiveSessionValidationDeviceProofRequired == "true"),
       activeSessionDeviceProofStatus: (if $runtimeExecuteAfterBrowserActiveSessionDeviceProofStatus == "" then null else $runtimeExecuteAfterBrowserActiveSessionDeviceProofStatus end),
-      activeSessionDeviceProofObserved: ($runtimeExecuteAfterBrowserActiveSessionDeviceProofObserved == "true")
+      activeSessionDeviceProofObserved: ($runtimeExecuteAfterBrowserActiveSessionDeviceProofObserved == "true"),
+      activeSessionDeviceProofLiveProofRequired: ($runtimeExecuteAfterBrowserActiveSessionDeviceProofLiveProofRequired == "true"),
+      activeSessionDeviceProofExpectedArtifactCount: ($runtimeExecuteAfterBrowserActiveSessionDeviceProofExpectedArtifactCount | tonumber),
+      activeSessionDeviceProofCapturedArtifactCount: ($runtimeExecuteAfterBrowserActiveSessionDeviceProofCapturedArtifactCount | tonumber)
     },
     toolExecute: {
       ok: ($toolExecuteOk == "true"),
@@ -589,8 +617,8 @@ printf 'browser_lane.desktop_materialize ok=%s profile=%s ready=%s count=%s\n' \
   "$desktop_materialize_ok" "$desktop_materialize_profile_id" "$desktop_materialize_home_ready" "$desktop_materialize_execution_count"
 printf 'browser_lane.runtime_execute ok=%s task=%s home=%s\n' \
   "$runtime_execute_ok" "$runtime_execute_task_id" "$runtime_execute_runtime_home_ready"
-printf 'browser_lane.runtime_execute_after_browser ok=%s task=%s long_lived=%s process=%s supervision=%s active_session=%s validation=%s device_proof=%s\n' \
-  "$runtime_execute_after_browser_ok" "$runtime_execute_after_browser_task_id" "$runtime_execute_after_browser_long_lived_process_ready" "$runtime_execute_after_browser_process_status" "$runtime_execute_after_browser_supervision_status" "$runtime_execute_after_browser_active_session_status" "$runtime_execute_after_browser_active_session_validation_status" "$runtime_execute_after_browser_active_session_device_proof_status"
+printf 'browser_lane.runtime_execute_after_browser ok=%s task=%s long_lived=%s process=%s supervision=%s active_session=%s validation=%s validation_lease=%s validation_reentry=%s validation_restart=%s device_proof=%s artifacts=%s/%s\n' \
+  "$runtime_execute_after_browser_ok" "$runtime_execute_after_browser_task_id" "$runtime_execute_after_browser_long_lived_process_ready" "$runtime_execute_after_browser_process_status" "$runtime_execute_after_browser_supervision_status" "$runtime_execute_after_browser_active_session_status" "$runtime_execute_after_browser_active_session_validation_status" "$runtime_execute_after_browser_active_session_validation_lease_renewal_observed" "$runtime_execute_after_browser_active_session_validation_recovery_reentry_observed" "$runtime_execute_after_browser_active_session_validation_restart_continuity_observed" "$runtime_execute_after_browser_active_session_device_proof_status" "$runtime_execute_after_browser_active_session_device_proof_captured_artifact_count" "$runtime_execute_after_browser_active_session_device_proof_expected_artifact_count"
 printf 'browser_lane.tool_execute ok=%s task=%s tool=%s\n' \
   "$tool_execute_ok" "$tool_execute_task_id" "$tool_execute_tool_id"
 printf 'browser_lane.plugin_execute ok=%s task=%s plugin=%s home=%s count=%s profile_source=%s\n' \

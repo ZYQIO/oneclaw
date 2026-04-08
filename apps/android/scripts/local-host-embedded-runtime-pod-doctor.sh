@@ -25,7 +25,7 @@ What it does:
 Notes:
   - This wrapper is for diagnosis and validation prep, so it can still exit 0 even when the result is unhealthy
   - When the first browser-lane pass reaches live proof with OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=1, doctor now automatically reruns one confirm-only browser-lane pass with OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0
-  - The confirm-only rerun now also checks that browser replay, long-lived process readiness, active-session observation, recovery re-entry, and restart continuity stay aligned with the first live-proof capture
+  - The confirm-only rerun now also checks that browser replay, long-lived process readiness, active-session observation, recovery re-entry, restart continuity, validation observations, and proof-artifact counts stay aligned with the first live-proof capture
   - Pass OPENCLAW_ANDROID_LOCAL_HOST_BROWSER_START=0 when you want only the confirm-only rerun after completing the external browser auth flow
 EOF
 }
@@ -184,8 +184,15 @@ browser_runtime_after_browser_active_session_observed="false"
 browser_runtime_after_browser_active_session_recovery_reentry_ready="false"
 browser_runtime_after_browser_active_session_restart_continuity_ready="false"
 browser_runtime_after_browser_active_session_validation_status=""
+browser_runtime_after_browser_active_session_validation_lease_renewal_observed="false"
+browser_runtime_after_browser_active_session_validation_recovery_reentry_observed="false"
+browser_runtime_after_browser_active_session_validation_restart_continuity_observed="false"
+browser_runtime_after_browser_active_session_validation_device_proof_required="false"
 browser_runtime_after_browser_active_session_device_proof_status=""
 browser_runtime_after_browser_active_session_device_proof_observed="false"
+browser_runtime_after_browser_active_session_device_proof_live_proof_required="false"
+browser_runtime_after_browser_active_session_device_proof_expected_artifact_count="0"
+browser_runtime_after_browser_active_session_device_proof_captured_artifact_count="0"
 confirm_browser_smoke_required=false
 confirm_browser_smoke_executed=false
 confirm_browser_smoke_exit_code=0
@@ -208,8 +215,15 @@ confirm_browser_runtime_after_browser_active_session_observed="false"
 confirm_browser_runtime_after_browser_active_session_recovery_reentry_ready="false"
 confirm_browser_runtime_after_browser_active_session_restart_continuity_ready="false"
 confirm_browser_runtime_after_browser_active_session_validation_status=""
+confirm_browser_runtime_after_browser_active_session_validation_lease_renewal_observed="false"
+confirm_browser_runtime_after_browser_active_session_validation_recovery_reentry_observed="false"
+confirm_browser_runtime_after_browser_active_session_validation_restart_continuity_observed="false"
+confirm_browser_runtime_after_browser_active_session_validation_device_proof_required="false"
 confirm_browser_runtime_after_browser_active_session_device_proof_status=""
 confirm_browser_runtime_after_browser_active_session_device_proof_observed="false"
+confirm_browser_runtime_after_browser_active_session_device_proof_live_proof_required="false"
+confirm_browser_runtime_after_browser_active_session_device_proof_expected_artifact_count="0"
+confirm_browser_runtime_after_browser_active_session_device_proof_captured_artifact_count="0"
 confirm_browser_live_proof_continuity_checked=false
 confirm_browser_live_proof_continuity_preserved=false
 confirm_browser_live_proof_continuity_failed_checks=""
@@ -230,8 +244,15 @@ if [[ "$browser_smoke_executed" == "true" ]]; then
   browser_runtime_after_browser_active_session_recovery_reentry_ready="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionRecoveryReentryReady // false' "$BROWSER_SMOKE_SUMMARY")"
   browser_runtime_after_browser_active_session_restart_continuity_ready="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionRestartContinuityReady // false' "$BROWSER_SMOKE_SUMMARY")"
   browser_runtime_after_browser_active_session_validation_status="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationStatus // ""' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_validation_lease_renewal_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationLeaseRenewalObserved // false' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_validation_recovery_reentry_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationRecoveryReentryObserved // false' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_validation_restart_continuity_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationRestartContinuityObserved // false' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_validation_device_proof_required="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationDeviceProofRequired // false' "$BROWSER_SMOKE_SUMMARY")"
   browser_runtime_after_browser_active_session_device_proof_status="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofStatus // ""' "$BROWSER_SMOKE_SUMMARY")"
   browser_runtime_after_browser_active_session_device_proof_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofObserved // false' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_device_proof_live_proof_required="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofLiveProofRequired // false' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_device_proof_expected_artifact_count="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofExpectedArtifactCount // 0' "$BROWSER_SMOKE_SUMMARY")"
+  browser_runtime_after_browser_active_session_device_proof_captured_artifact_count="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofCapturedArtifactCount // 0' "$BROWSER_SMOKE_SUMMARY")"
 fi
 
 if [[ "$browser_smoke_ok" == "true" && "$browser_mainline_status" == "process_runtime_active_session_live_proof_captured" && "$BROWSER_START" != "0" ]]; then
@@ -269,8 +290,15 @@ if [[ "$browser_smoke_ok" == "true" && "$browser_mainline_status" == "process_ru
   confirm_browser_runtime_after_browser_active_session_recovery_reentry_ready="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionRecoveryReentryReady // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
   confirm_browser_runtime_after_browser_active_session_restart_continuity_ready="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionRestartContinuityReady // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
   confirm_browser_runtime_after_browser_active_session_validation_status="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationStatus // ""' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_validation_lease_renewal_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationLeaseRenewalObserved // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_validation_recovery_reentry_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationRecoveryReentryObserved // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_validation_restart_continuity_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationRestartContinuityObserved // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_validation_device_proof_required="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionValidationDeviceProofRequired // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
   confirm_browser_runtime_after_browser_active_session_device_proof_status="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofStatus // ""' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
   confirm_browser_runtime_after_browser_active_session_device_proof_observed="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofObserved // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_device_proof_live_proof_required="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofLiveProofRequired // false' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_device_proof_expected_artifact_count="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofExpectedArtifactCount // 0' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
+  confirm_browser_runtime_after_browser_active_session_device_proof_captured_artifact_count="$(jq -r '.runtimeExecuteAfterBrowser.activeSessionDeviceProofCapturedArtifactCount // 0' "$CONFIRM_BROWSER_SMOKE_SUMMARY")"
   confirm_browser_live_proof_continuity_checked=true
 
   if [[ "$browser_replay_ready" != "$confirm_browser_replay_ready" ]]; then
@@ -303,11 +331,32 @@ if [[ "$browser_smoke_ok" == "true" && "$browser_mainline_status" == "process_ru
   if [[ "$browser_runtime_after_browser_active_session_validation_status" != "$confirm_browser_runtime_after_browser_active_session_validation_status" ]]; then
     confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionValidationStatus")"
   fi
+  if [[ "$browser_runtime_after_browser_active_session_validation_lease_renewal_observed" != "$confirm_browser_runtime_after_browser_active_session_validation_lease_renewal_observed" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionValidationLeaseRenewalObserved")"
+  fi
+  if [[ "$browser_runtime_after_browser_active_session_validation_recovery_reentry_observed" != "$confirm_browser_runtime_after_browser_active_session_validation_recovery_reentry_observed" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionValidationRecoveryReentryObserved")"
+  fi
+  if [[ "$browser_runtime_after_browser_active_session_validation_restart_continuity_observed" != "$confirm_browser_runtime_after_browser_active_session_validation_restart_continuity_observed" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionValidationRestartContinuityObserved")"
+  fi
+  if [[ "$browser_runtime_after_browser_active_session_validation_device_proof_required" != "$confirm_browser_runtime_after_browser_active_session_validation_device_proof_required" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionValidationDeviceProofRequired")"
+  fi
   if [[ "$browser_runtime_after_browser_active_session_device_proof_status" != "$confirm_browser_runtime_after_browser_active_session_device_proof_status" ]]; then
     confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionDeviceProofStatus")"
   fi
   if [[ "$browser_runtime_after_browser_active_session_device_proof_observed" != "$confirm_browser_runtime_after_browser_active_session_device_proof_observed" ]]; then
     confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionDeviceProofObserved")"
+  fi
+  if [[ "$browser_runtime_after_browser_active_session_device_proof_live_proof_required" != "$confirm_browser_runtime_after_browser_active_session_device_proof_live_proof_required" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionDeviceProofLiveProofRequired")"
+  fi
+  if [[ "$browser_runtime_after_browser_active_session_device_proof_expected_artifact_count" != "$confirm_browser_runtime_after_browser_active_session_device_proof_expected_artifact_count" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionDeviceProofExpectedArtifactCount")"
+  fi
+  if [[ "$browser_runtime_after_browser_active_session_device_proof_captured_artifact_count" != "$confirm_browser_runtime_after_browser_active_session_device_proof_captured_artifact_count" ]]; then
+    confirm_browser_live_proof_continuity_failed_checks="$(append_csv_value "$confirm_browser_live_proof_continuity_failed_checks" "activeSessionDeviceProofCapturedArtifactCount")"
   fi
 
   if [[ -z "$confirm_browser_live_proof_continuity_failed_checks" ]]; then
@@ -503,12 +552,26 @@ jq_args=(
   --arg browserRuntimeAfterBrowserSupervisionStatus "$browser_runtime_after_browser_supervision_status"
   --arg browserRuntimeAfterBrowserActiveSessionStatus "$browser_runtime_after_browser_active_session_status"
   --arg browserRuntimeAfterBrowserActiveSessionValidationStatus "$browser_runtime_after_browser_active_session_validation_status"
+  --arg browserRuntimeAfterBrowserActiveSessionValidationLeaseRenewalObserved "$browser_runtime_after_browser_active_session_validation_lease_renewal_observed"
+  --arg browserRuntimeAfterBrowserActiveSessionValidationRecoveryReentryObserved "$browser_runtime_after_browser_active_session_validation_recovery_reentry_observed"
+  --arg browserRuntimeAfterBrowserActiveSessionValidationRestartContinuityObserved "$browser_runtime_after_browser_active_session_validation_restart_continuity_observed"
+  --arg browserRuntimeAfterBrowserActiveSessionValidationDeviceProofRequired "$browser_runtime_after_browser_active_session_validation_device_proof_required"
   --arg browserRuntimeAfterBrowserActiveSessionDeviceProofStatus "$browser_runtime_after_browser_active_session_device_proof_status"
+  --arg browserRuntimeAfterBrowserActiveSessionDeviceProofLiveProofRequired "$browser_runtime_after_browser_active_session_device_proof_live_proof_required"
+  --arg browserRuntimeAfterBrowserActiveSessionDeviceProofExpectedArtifactCount "$browser_runtime_after_browser_active_session_device_proof_expected_artifact_count"
+  --arg browserRuntimeAfterBrowserActiveSessionDeviceProofCapturedArtifactCount "$browser_runtime_after_browser_active_session_device_proof_captured_artifact_count"
   --arg confirmBrowserRuntimeAfterBrowserProcessStatus "$confirm_browser_runtime_after_browser_process_status"
   --arg confirmBrowserRuntimeAfterBrowserSupervisionStatus "$confirm_browser_runtime_after_browser_supervision_status"
   --arg confirmBrowserRuntimeAfterBrowserActiveSessionStatus "$confirm_browser_runtime_after_browser_active_session_status"
   --arg confirmBrowserRuntimeAfterBrowserActiveSessionValidationStatus "$confirm_browser_runtime_after_browser_active_session_validation_status"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionValidationLeaseRenewalObserved "$confirm_browser_runtime_after_browser_active_session_validation_lease_renewal_observed"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionValidationRecoveryReentryObserved "$confirm_browser_runtime_after_browser_active_session_validation_recovery_reentry_observed"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionValidationRestartContinuityObserved "$confirm_browser_runtime_after_browser_active_session_validation_restart_continuity_observed"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionValidationDeviceProofRequired "$confirm_browser_runtime_after_browser_active_session_validation_device_proof_required"
   --arg confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofStatus "$confirm_browser_runtime_after_browser_active_session_device_proof_status"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofLiveProofRequired "$confirm_browser_runtime_after_browser_active_session_device_proof_live_proof_required"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofExpectedArtifactCount "$confirm_browser_runtime_after_browser_active_session_device_proof_expected_artifact_count"
+  --arg confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofCapturedArtifactCount "$confirm_browser_runtime_after_browser_active_session_device_proof_captured_artifact_count"
   --argjson podSmokeExitCode "$pod_smoke_exit_code"
   --argjson podSmokeOk "$(bool_json "$pod_smoke_ok")"
   --argjson browserSmokeExecuted "$(bool_json "$browser_smoke_executed")"
@@ -657,8 +720,15 @@ jq "${jq_args[@]}" '
               activeSessionRecoveryReentryReady: $browserRuntimeAfterBrowserActiveSessionRecoveryReentryReady,
               activeSessionRestartContinuityReady: $browserRuntimeAfterBrowserActiveSessionRestartContinuityReady,
               activeSessionValidationStatus: (if $browserRuntimeAfterBrowserActiveSessionValidationStatus == "" then null else $browserRuntimeAfterBrowserActiveSessionValidationStatus end),
+              activeSessionValidationLeaseRenewalObserved: ($browserRuntimeAfterBrowserActiveSessionValidationLeaseRenewalObserved == "true"),
+              activeSessionValidationRecoveryReentryObserved: ($browserRuntimeAfterBrowserActiveSessionValidationRecoveryReentryObserved == "true"),
+              activeSessionValidationRestartContinuityObserved: ($browserRuntimeAfterBrowserActiveSessionValidationRestartContinuityObserved == "true"),
+              activeSessionValidationDeviceProofRequired: ($browserRuntimeAfterBrowserActiveSessionValidationDeviceProofRequired == "true"),
               activeSessionDeviceProofStatus: (if $browserRuntimeAfterBrowserActiveSessionDeviceProofStatus == "" then null else $browserRuntimeAfterBrowserActiveSessionDeviceProofStatus end),
-              activeSessionDeviceProofObserved: $browserRuntimeAfterBrowserActiveSessionDeviceProofObserved
+              activeSessionDeviceProofObserved: $browserRuntimeAfterBrowserActiveSessionDeviceProofObserved,
+              activeSessionDeviceProofLiveProofRequired: ($browserRuntimeAfterBrowserActiveSessionDeviceProofLiveProofRequired == "true"),
+              activeSessionDeviceProofExpectedArtifactCount: ($browserRuntimeAfterBrowserActiveSessionDeviceProofExpectedArtifactCount | tonumber),
+              activeSessionDeviceProofCapturedArtifactCount: ($browserRuntimeAfterBrowserActiveSessionDeviceProofCapturedArtifactCount | tonumber)
             }
           end
         ),
@@ -677,8 +747,15 @@ jq "${jq_args[@]}" '
               activeSessionRecoveryReentryReady: $confirmBrowserRuntimeAfterBrowserActiveSessionRecoveryReentryReady,
               activeSessionRestartContinuityReady: $confirmBrowserRuntimeAfterBrowserActiveSessionRestartContinuityReady,
               activeSessionValidationStatus: (if $confirmBrowserRuntimeAfterBrowserActiveSessionValidationStatus == "" then null else $confirmBrowserRuntimeAfterBrowserActiveSessionValidationStatus end),
+              activeSessionValidationLeaseRenewalObserved: ($confirmBrowserRuntimeAfterBrowserActiveSessionValidationLeaseRenewalObserved == "true"),
+              activeSessionValidationRecoveryReentryObserved: ($confirmBrowserRuntimeAfterBrowserActiveSessionValidationRecoveryReentryObserved == "true"),
+              activeSessionValidationRestartContinuityObserved: ($confirmBrowserRuntimeAfterBrowserActiveSessionValidationRestartContinuityObserved == "true"),
+              activeSessionValidationDeviceProofRequired: ($confirmBrowserRuntimeAfterBrowserActiveSessionValidationDeviceProofRequired == "true"),
               activeSessionDeviceProofStatus: (if $confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofStatus == "" then null else $confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofStatus end),
-              activeSessionDeviceProofObserved: $confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofObserved
+              activeSessionDeviceProofObserved: $confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofObserved,
+              activeSessionDeviceProofLiveProofRequired: ($confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofLiveProofRequired == "true"),
+              activeSessionDeviceProofExpectedArtifactCount: ($confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofExpectedArtifactCount | tonumber),
+              activeSessionDeviceProofCapturedArtifactCount: ($confirmBrowserRuntimeAfterBrowserActiveSessionDeviceProofCapturedArtifactCount | tonumber)
             }
           end
         )

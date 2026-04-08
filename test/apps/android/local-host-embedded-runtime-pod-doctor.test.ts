@@ -99,8 +99,15 @@ function buildBrowserSummary(overrides: Record<string, unknown> = {}) {
       activeSessionRecoveryReentryReady: true,
       activeSessionRestartContinuityReady: true,
       activeSessionValidationStatus: "validated",
+      activeSessionValidationLeaseRenewalObserved: true,
+      activeSessionValidationRecoveryReentryObserved: true,
+      activeSessionValidationRestartContinuityObserved: true,
+      activeSessionValidationDeviceProofRequired: false,
       activeSessionDeviceProofStatus: "verified",
       activeSessionDeviceProofObserved: true,
+      activeSessionDeviceProofLiveProofRequired: false,
+      activeSessionDeviceProofExpectedArtifactCount: 3,
+      activeSessionDeviceProofCapturedArtifactCount: 3,
     },
     ...overrides,
   };
@@ -220,8 +227,15 @@ describe("local-host-embedded-runtime-pod-doctor", () => {
           activeSessionRecoveryReentryReady: true,
           activeSessionRestartContinuityReady: false,
           activeSessionValidationStatus: "validated",
+          activeSessionValidationLeaseRenewalObserved: true,
+          activeSessionValidationRecoveryReentryObserved: true,
+          activeSessionValidationRestartContinuityObserved: true,
+          activeSessionValidationDeviceProofRequired: false,
           activeSessionDeviceProofStatus: "verified",
           activeSessionDeviceProofObserved: true,
+          activeSessionDeviceProofLiveProofRequired: false,
+          activeSessionDeviceProofExpectedArtifactCount: 3,
+          activeSessionDeviceProofCapturedArtifactCount: 3,
         },
       }),
     });
@@ -238,6 +252,46 @@ describe("local-host-embedded-runtime-pod-doctor", () => {
     );
     expect(summary.confirmBrowserLaneSmoke.liveProofContinuity.failedChecks).toContain(
       "activeSessionRestartContinuityReady",
+    );
+  });
+
+  it("downgrades to hardening pending when confirm replay loses proof artifacts", () => {
+    const { summary } = runScenario({
+      browserConfirmSummary: buildBrowserSummary({
+        runtimeExecuteAfterBrowser: {
+          longLivedProcessReady: true,
+          processStatus: "standby",
+          supervisionStatus: "active",
+          activeSessionStatus: "ready",
+          activeSessionObserved: true,
+          activeSessionRecoveryReentryReady: true,
+          activeSessionRestartContinuityReady: true,
+          activeSessionValidationStatus: "validated",
+          activeSessionValidationLeaseRenewalObserved: true,
+          activeSessionValidationRecoveryReentryObserved: true,
+          activeSessionValidationRestartContinuityObserved: true,
+          activeSessionValidationDeviceProofRequired: false,
+          activeSessionDeviceProofStatus: "verified",
+          activeSessionDeviceProofObserved: true,
+          activeSessionDeviceProofLiveProofRequired: false,
+          activeSessionDeviceProofExpectedArtifactCount: 3,
+          activeSessionDeviceProofCapturedArtifactCount: 2,
+        },
+      }),
+    });
+
+    expect(summary.classification).toBe(
+      "process_runtime_lane_hardening_pending",
+    );
+    expect(summary.confirmBrowserLaneSmoke.liveProofReplayed).toBe(false);
+    expect(summary.confirmBrowserLaneSmoke.liveProofContinuity.checked).toBe(
+      true,
+    );
+    expect(summary.confirmBrowserLaneSmoke.liveProofContinuity.preserved).toBe(
+      false,
+    );
+    expect(summary.confirmBrowserLaneSmoke.liveProofContinuity.failedChecks).toContain(
+      "activeSessionDeviceProofCapturedArtifactCount",
     );
   });
 
