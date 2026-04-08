@@ -891,6 +891,10 @@ class PodHandlerTest {
       "process_runtime_active_session_live_proof",
       payload.getValue("recommendedNextSlice").jsonPrimitive.content,
     )
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:doctor -- --json",
+      payload.getValue("recommendedProofCommand").jsonPrimitive.content,
+    )
   }
 
   @Test
@@ -954,6 +958,17 @@ class PodHandlerTest {
     assertEquals(
       "process_runtime_lane_hardening",
       payload.getValue("recommendedNextSlice").jsonPrimitive.content,
+    )
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3",
+      payload.getValue("recommendedProofCommand").jsonPrimitive.content,
+    )
+    assertTrue(
+      payload
+        .getValue("recommendedNextStep")
+        .jsonPrimitive
+        .content
+        .contains("embedded-runtime-pod:stability -- --json --iterations 3"),
     )
     val capturedLiveProofPayload =
       json

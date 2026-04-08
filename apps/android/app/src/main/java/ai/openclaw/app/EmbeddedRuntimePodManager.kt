@@ -1269,6 +1269,16 @@ fun describeEmbeddedRuntimeDesktopRuntime(
           },
         )
         put(
+          "recommendedProofCommand",
+          JsonPrimitive(
+            if (desktopReplay.processActiveSessionDeviceProofObserved) {
+              "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3"
+            } else {
+              "pnpm android:local-host:embedded-runtime-pod:doctor -- --json"
+            },
+          ),
+        )
+        put(
           "recommendedNextSlice",
           JsonPrimitive(
             when {
@@ -1352,7 +1362,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !desktopReplay.processActiveSessionDeviceProofObserved ->
                 "Reinstall the current debug app on-device, rerun doctor plus the bounded smoke scripts, and capture one live detached session proof bundle with observed lease renewal, recovery re-entry, and restart continuity."
               else ->
-                "Keep doctor plus the bounded smoke scripts boringly green so the captured live detached-session proof becomes the new baseline before widening browser, tools, or plugins again."
+                "Keep pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3, doctor, and the bounded smoke scripts boringly green so the captured live detached-session proof becomes the new baseline before widening browser, tools, or plugins again."
             },
           ),
         )
