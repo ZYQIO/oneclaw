@@ -3169,6 +3169,11 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
         buildJsonArray {
           add(JsonPrimitive(processActiveSessionDeviceProofProofCommand))
           if (processActiveSessionDeviceProofObserved) {
+            add(
+              JsonPrimitive(
+                "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations",
+              ),
+            )
             add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
           }
           add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:smoke"))

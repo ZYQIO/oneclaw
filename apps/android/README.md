@@ -341,6 +341,7 @@ Use this when the question is no longer "can one doctor pass succeed?" but "does
 ```bash
 pnpm android:local-host:embedded-runtime-pod:stability
 pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3
+pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations
 ```
 
 The stability wrapper:
@@ -351,14 +352,18 @@ The stability wrapper:
 - requires each iteration to keep `recommendedAction=preserve-live-proof-baseline`
 - requires each iteration to keep `confirmBrowserLaneSmoke.liveProofReplayed=true` and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`
 - requires the browser-aligned runtime summary to keep validation observations and captured-vs-expected proof artifact counts healthy
+- can optionally insert one explicit adb app restart between iterations with `--restart-app-between-iterations`
 - writes one combined `summary.json` and exits non-zero when any iteration regresses
 
 Useful overrides:
 
 - `OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_ITERATIONS=5`
 - `OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_DELAY_SEC=2`
+- `OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_RESTART_APP_BETWEEN_ITERATIONS=1`
+- `OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb`
+- `ANDROID_SERIAL=<device-serial>`
 
-On April 8, 2026, the same `PFEM10` lane passed `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` with `passedIterationCount=3`, `failedIterationCount=0`, `classifications=["process_runtime_active_session_live_proof_captured"]`, and `recommendedNextSlices=["process_runtime_lane_hardening"]`.
+On April 8, 2026, the same `PFEM10` lane passed both `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` and the stronger `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`, with the restart-perturbation run also reporting `perturbationMode="app_restart_between_iterations"`, `perturbationAppliedCount=2`, `perturbationFailureCount=0`, and the same captured live-proof classification on all three doctor passes. The next hardening pass should therefore prefer a longer soak rather than reopening the plain replay question.
 
 ## Local Host Doctor
 

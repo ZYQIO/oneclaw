@@ -6,6 +6,10 @@ DOCTOR_SCRIPT="${OPENCLAW_ANDROID_LOCAL_HOST_EMBEDDED_RUNTIME_POD_DOCTOR_SCRIPT:
 ARTIFACT_DIR="${OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR:-$(mktemp -d -t openclaw-android-runtime-stability.XXXXXX)}"
 ITERATIONS="${OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_ITERATIONS:-3}"
 DELAY_SEC="${OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_DELAY_SEC:-0}"
+ADB_BIN="${OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN:-adb}"
+APP_PACKAGE="${OPENCLAW_ANDROID_LOCAL_HOST_APP_PACKAGE:-ai.openclaw.app}"
+APP_COMPONENT="${OPENCLAW_ANDROID_LOCAL_HOST_APP_COMPONENT:-ai.openclaw.app/.MainActivity}"
+RESTART_APP_BETWEEN_ITERATIONS="${OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_RESTART_APP_BETWEEN_ITERATIONS:-0}"
 JSON=false
 
 usage() {
@@ -14,6 +18,7 @@ Usage:
   ./apps/android/scripts/local-host-embedded-runtime-pod-stability.sh
   ./apps/android/scripts/local-host-embedded-runtime-pod-stability.sh --json
   ./apps/android/scripts/local-host-embedded-runtime-pod-stability.sh --iterations 5 --delay-sec 2
+  ./apps/android/scripts/local-host-embedded-runtime-pod-stability.sh --iterations 3 --restart-app-between-iterations
 
 What it does:
   1. Runs the embedded-runtime pod doctor multiple times
@@ -25,11 +30,19 @@ Notes:
   - This wrapper exits non-zero when any iteration regresses
   - OPENCLAW_ANDROID_LOCAL_HOST_TOKEN and browser-related env overrides still pass through to doctor
   - Each iteration writes its own summary.json under artifacts/iterations/<nn>/
+  - Pass --restart-app-between-iterations when you want one explicit adb force-stop/start perturbation before each follow-up doctor run
 EOF
 }
 
 require_cmd() {
   local name=$1
+  if [[ "$name" == */* ]]; then
+    if [[ ! -x "$name" ]]; then
+      echo "$name required but missing." >&2
+      exit 1
+    fi
+    return
+  fi
   if ! command -v "$name" >/dev/null 2>&1; then
     echo "$name required but missing." >&2
     exit 1
@@ -42,6 +55,21 @@ is_positive_integer() {
 
 is_nonnegative_number() {
   [[ "${1:-}" =~ ^[0-9]+([.][0-9]+)?$ ]]
+}
+
+bool_json() {
+  if [[ "${1:-false}" == "true" ]]; then
+    printf 'true'
+  else
+    printf 'false'
+  fi
+}
+
+restart_app_between_iterations() {
+  local stdout_path=$1
+  : >"$stdout_path"
+  "$ADB_BIN" shell am force-stop "$APP_PACKAGE" >"$stdout_path" 2>&1
+  "$ADB_BIN" shell am start -W -n "$APP_COMPONENT" >>"$stdout_path" 2>&1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -70,6 +98,34 @@ while [[ $# -gt 0 ]]; do
       DELAY_SEC=$2
       shift 2
       ;;
+    --adb-bin)
+      if [[ $# -lt 2 ]]; then
+        echo "--adb-bin requires a value." >&2
+        exit 1
+      fi
+      ADB_BIN=$2
+      shift 2
+      ;;
+    --app-package)
+      if [[ $# -lt 2 ]]; then
+        echo "--app-package requires a value." >&2
+        exit 1
+      fi
+      APP_PACKAGE=$2
+      shift 2
+      ;;
+    --app-component)
+      if [[ $# -lt 2 ]]; then
+        echo "--app-component requires a value." >&2
+        exit 1
+      fi
+      APP_COMPONENT=$2
+      shift 2
+      ;;
+    --restart-app-between-iterations)
+      RESTART_APP_BETWEEN_ITERATIONS=1
+      shift
+      ;;
     --)
       shift
       ;;
@@ -94,6 +150,15 @@ if ! is_nonnegative_number "$DELAY_SEC"; then
   exit 1
 fi
 
+if [[ "$RESTART_APP_BETWEEN_ITERATIONS" != "0" && "$RESTART_APP_BETWEEN_ITERATIONS" != "1" ]]; then
+  echo "Restart-app-between-iterations must be 0 or 1." >&2
+  exit 1
+fi
+
+if [[ "$RESTART_APP_BETWEEN_ITERATIONS" == "1" ]]; then
+  require_cmd "$ADB_BIN"
+fi
+
 mkdir -p "$ARTIFACT_DIR/iterations"
 
 meta_files=()
@@ -104,6 +169,7 @@ for ((i = 1; i <= ITERATIONS; i += 1)); do
   stdout_path="$iteration_dir/doctor.stdout.txt"
   summary_path="$iteration_dir/summary.json"
   iteration_meta_path="$iteration_dir/iteration.json"
+  perturbation_stdout_path="$iteration_dir/between-iterations-restart.stdout.txt"
 
   mkdir -p "$iteration_dir"
 
@@ -115,6 +181,26 @@ for ((i = 1; i <= ITERATIONS; i += 1)); do
     doctor_exit_code=$?
   fi
 
+  perturbation_requested=false
+  perturbation_executed=false
+  perturbation_exit_code=0
+  perturbation_mode="none"
+  perturbation_stdout_json=null
+
+  if [[ "$RESTART_APP_BETWEEN_ITERATIONS" == "1" ]]; then
+    perturbation_requested=true
+    perturbation_mode="app_restart_between_iterations"
+    if [[ "$i" -lt "$ITERATIONS" ]]; then
+      perturbation_executed=true
+      perturbation_stdout_json="$perturbation_stdout_path"
+      if restart_app_between_iterations "$perturbation_stdout_path"; then
+        perturbation_exit_code=0
+      else
+        perturbation_exit_code=$?
+      fi
+    fi
+  fi
+
   if [[ -f "$summary_path" ]]; then
     jq -n \
       --argjson iteration "$i" \
@@ -122,6 +208,13 @@ for ((i = 1; i <= ITERATIONS; i += 1)); do
       --arg stdoutPath "$stdout_path" \
       --arg summaryPath "$summary_path" \
       --argjson exitCode "$doctor_exit_code" \
+      --argjson perturbationRequested "$(bool_json "$perturbation_requested")" \
+      --argjson perturbationExecuted "$(bool_json "$perturbation_executed")" \
+      --arg perturbationMode "$perturbation_mode" \
+      --arg perturbationStdoutPath "$perturbation_stdout_json" \
+      --argjson perturbationExitCode "$perturbation_exit_code" \
+      --arg appPackage "$APP_PACKAGE" \
+      --arg appComponent "$APP_COMPONENT" \
       --slurpfile doctor "$summary_path" '
       def add_reason($condition; $label):
         if $condition then [$label] else [] end;
@@ -162,6 +255,28 @@ for ((i = 1; i <= ITERATIONS; i += 1)); do
               preserved: ($d.confirmBrowserLaneSmoke.liveProofContinuity.preserved // null),
               failedChecks: ($d.confirmBrowserLaneSmoke.liveProofContinuity.failedChecks // [])
             }
+          },
+          betweenIterationsPerturbation: {
+            requested: $perturbationRequested,
+            executed: $perturbationExecuted,
+            mode: (if $perturbationRequested then $perturbationMode else "none" end),
+            exitCode: (if $perturbationExecuted then $perturbationExitCode else null end),
+            ok: (
+              if $perturbationExecuted then
+                ($perturbationExitCode == 0)
+              else
+                null
+              end
+            ),
+            stdoutPath: (
+              if $perturbationExecuted then
+                $perturbationStdoutPath
+              else
+                null
+              end
+            ),
+            appPackage: (if $perturbationRequested then $appPackage else null end),
+            appComponent: (if $perturbationRequested then $appComponent else null end)
           }
         } as $iterationSummary
       | $iterationSummary + {
@@ -188,6 +303,7 @@ for ((i = 1; i <= ITERATIONS; i += 1)); do
             + add_reason(($iterationSummary.confirmBrowserLaneSmoke.liveProofReplayed // false) != true; "live_proof_not_replayed")
             + add_reason(($iterationSummary.confirmBrowserLaneSmoke.liveProofContinuity.checked // false) != true; "live_proof_continuity_not_checked")
             + add_reason(($iterationSummary.confirmBrowserLaneSmoke.liveProofContinuity.preserved // false) != true; "live_proof_continuity_not_preserved")
+            + add_reason(($iterationSummary.betweenIterationsPerturbation.executed // false) == true and ($iterationSummary.betweenIterationsPerturbation.ok // false) != true; "between_iteration_perturbation_failed")
           )
         }
       | .ok = (.failureReasons | length == 0)
@@ -212,6 +328,7 @@ for ((i = 1; i <= ITERATIONS; i += 1)); do
         verifiedFileCount: null,
         browserLaneSmoke: null,
         confirmBrowserLaneSmoke: null,
+        betweenIterationsPerturbation: null,
         failureReasons: (
           if $exitCode == 0 then
             ["missing_doctor_summary"]
@@ -247,6 +364,23 @@ jq -s \
       doctorScriptPath: $doctorScript,
       iterationsRequested: $iterationsRequested,
       delaySec: $delaySec,
+      perturbationMode: (
+        if any($iterations[]; .betweenIterationsPerturbation?.requested == true) then
+          "app_restart_between_iterations"
+        else
+          "none"
+        end
+      ),
+      perturbationAppliedCount: (
+        $iterations
+        | map(select(.betweenIterationsPerturbation?.executed == true))
+        | length
+      ),
+      perturbationFailureCount: (
+        $iterations
+        | map(select(.betweenIterationsPerturbation?.executed == true and .betweenIterationsPerturbation?.ok != true))
+        | length
+      ),
       passedIterationCount: ($iterations | map(select(.ok == true)) | length),
       failedIterationCount: ($iterations | map(select(.ok != true)) | length),
       failedIterations: (
@@ -332,13 +466,17 @@ printf 'runtime_pod_stability.ok=%s iterations=%s passed=%s failed=%s\n' \
 
 jq -r '
   .iterations[]
-  | "runtime_pod_stability.iteration=\(.iterationId) ok=\(.ok) classification=\(.classification // "null") continuity=\(.confirmBrowserLaneSmoke.liveProofContinuity.preserved // "null") artifacts=\(.browserLaneSmoke.activeSessionDeviceProofCapturedArtifactCount // "null")/\(.browserLaneSmoke.activeSessionDeviceProofExpectedArtifactCount // "null") failed_reasons=\((.failureReasons | if length == 0 then "none" else join(",") end))"
+  | "runtime_pod_stability.iteration=\(.iterationId) ok=\(.ok) classification=\(.classification // "null") continuity=\(.confirmBrowserLaneSmoke.liveProofContinuity.preserved // "null") perturbation=\(.betweenIterationsPerturbation.mode // "none") perturbation_ok=\(.betweenIterationsPerturbation.ok // "null") artifacts=\(.browserLaneSmoke.activeSessionDeviceProofCapturedArtifactCount // "null")/\(.browserLaneSmoke.activeSessionDeviceProofExpectedArtifactCount // "null") failed_reasons=\((.failureReasons | if length == 0 then "none" else join(",") end))"
 ' "$SUMMARY_JSON"
 
 printf 'runtime_pod_stability.classifications=%s\n' \
   "$(jq -r '.classifications | if length == 0 then "none" else join(",") end' "$SUMMARY_JSON")"
 printf 'runtime_pod_stability.next_slices=%s\n' \
   "$(jq -r '.recommendedNextSlices | if length == 0 then "none" else join(",") end' "$SUMMARY_JSON")"
+printf 'runtime_pod_stability.perturbation=%s applied=%s failed=%s\n' \
+  "$(jq -r '.perturbationMode' "$SUMMARY_JSON")" \
+  "$(jq -r '.perturbationAppliedCount' "$SUMMARY_JSON")" \
+  "$(jq -r '.perturbationFailureCount' "$SUMMARY_JSON")"
 printf 'runtime_pod_stability.summary=%s\n' "$SUMMARY_JSON"
 
 if [[ "$overall_ok" == "true" ]]; then

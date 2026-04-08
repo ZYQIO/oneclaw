@@ -150,6 +150,34 @@ esac
 `;
 }
 
+function buildAdbScript(
+  tempRoot: string,
+  options: { failOnCall?: number } = {},
+) {
+  const countFile = path.join(tempRoot, "adb-count.txt");
+  const logFile = path.join(tempRoot, "adb-log.txt");
+  return `#!/usr/bin/env bash
+set -euo pipefail
+
+count=0
+if [[ -f "${countFile}" ]]; then
+  count="$(cat "${countFile}")"
+fi
+count=$((count + 1))
+printf '%s' "$count" >"${countFile}"
+printf '%s\\n' "$*" >>"${logFile}"
+
+if [[ "$count" == "${options.failOnCall ?? 0}" ]]; then
+  echo "adb failure on call $count" >&2
+  exit 1
+fi
+
+if [[ "$#" -ge 4 && "$1" == "shell" && "$2" == "am" && "$3" == "start" ]]; then
+  echo "Status: ok"
+fi
+`;
+}
+
 function writeExecutableScript(filePath: string, content: string) {
   writeFileSync(filePath, content);
   chmodSync(filePath, 0o755);
@@ -159,6 +187,8 @@ function runScenario(options: {
   json?: boolean;
   iterations?: number;
   runs: Array<{ summary?: unknown; exitCode?: number }>;
+  restartAppBetweenIterations?: boolean;
+  adbFailOnCall?: number;
 }) {
   const tempRoot = mkdtempSync(
     path.join(os.tmpdir(), "openclaw-runtime-stability-"),
@@ -171,6 +201,15 @@ function runScenario(options: {
   const doctorScript = path.join(tempRoot, "doctor.sh");
   writeExecutableScript(doctorScript, buildDoctorScript(tempRoot, options.runs));
 
+  let adbScript: string | undefined;
+  if (options.restartAppBetweenIterations) {
+    adbScript = path.join(tempRoot, "adb");
+    writeExecutableScript(
+      adbScript,
+      buildAdbScript(tempRoot, { failOnCall: options.adbFailOnCall }),
+    );
+  }
+
   const result = spawnSync(
     "bash",
     [
@@ -179,6 +218,9 @@ function runScenario(options: {
       String(options.iterations ?? options.runs.length),
       "--delay-sec",
       "0",
+      ...(options.restartAppBetweenIterations
+        ? ["--restart-app-between-iterations"]
+        : []),
       ...(options.json ? ["--json"] : []),
     ],
     {
@@ -189,6 +231,9 @@ function runScenario(options: {
         OPENCLAW_ANDROID_LOCAL_HOST_ARTIFACT_DIR: artifactDir,
         OPENCLAW_ANDROID_LOCAL_HOST_EMBEDDED_RUNTIME_POD_DOCTOR_SCRIPT:
           doctorScript,
+        ...(adbScript
+          ? { OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN: adbScript }
+          : {}),
       },
     },
   );
@@ -196,7 +241,7 @@ function runScenario(options: {
   const summary = JSON.parse(
     readFileSync(path.join(artifactDir, "summary.json"), "utf8"),
   );
-  return { result, summary };
+  return { result, summary, tempRoot };
 }
 
 afterEach(() => {
@@ -222,6 +267,30 @@ describe("local-host-embedded-runtime-pod-stability", () => {
     expect(summary.liveProofReplayedCount).toBe(2);
     expect(summary.continuityPreservedCount).toBe(2);
     expect(summary.stableCapturedArtifactCount).toBe(3);
+  });
+
+  it("can perturb the lane with an app restart between iterations", () => {
+    const { result, summary, tempRoot } = runScenario({
+      runs: [
+        { summary: buildDoctorSummary() },
+        { summary: buildDoctorSummary() },
+      ],
+      restartAppBetweenIterations: true,
+    });
+
+    expect(result.status).toBe(0);
+    expect(summary.ok).toBe(true);
+    expect(summary.perturbationMode).toBe("app_restart_between_iterations");
+    expect(summary.perturbationAppliedCount).toBe(1);
+    expect(summary.perturbationFailureCount).toBe(0);
+    expect(summary.iterations[0].betweenIterationsPerturbation.executed).toBe(true);
+    expect(summary.iterations[0].betweenIterationsPerturbation.ok).toBe(true);
+    expect(summary.iterations[0].betweenIterationsPerturbation.appPackage).toBe(
+      "ai.openclaw.app",
+    );
+    const restartLog = readFileSync(path.join(tempRoot, "adb-log.txt"), "utf8");
+    expect(restartLog).toContain("shell am force-stop ai.openclaw.app");
+    expect(restartLog).toContain("shell am start -W -n ai.openclaw.app/.MainActivity");
   });
 
   it("fails when a later doctor iteration drops back to hardening pending", () => {
@@ -255,6 +324,26 @@ describe("local-host-embedded-runtime-pod-stability", () => {
     );
     expect(summary.failedIterations[0].failureReasons).toContain(
       "live_proof_continuity_not_preserved",
+    );
+  });
+
+  it("fails when the between-iteration app restart perturbation fails", () => {
+    const { result, summary } = runScenario({
+      runs: [
+        { summary: buildDoctorSummary() },
+        { summary: buildDoctorSummary() },
+      ],
+      restartAppBetweenIterations: true,
+      adbFailOnCall: 2,
+    });
+
+    expect(result.status).toBe(1);
+    expect(summary.ok).toBe(false);
+    expect(summary.perturbationAppliedCount).toBe(1);
+    expect(summary.perturbationFailureCount).toBe(1);
+    expect(summary.failedIterations[0].iteration).toBe(1);
+    expect(summary.failedIterations[0].failureReasons).toContain(
+      "between_iteration_perturbation_failed",
     );
   });
 
