@@ -9,6 +9,7 @@
 - Latest completed real-device proof: April 8, 2026 `PFEM10` replay reached `classification=process_runtime_active_session_live_proof_captured` on payload `0.17.0`
 - Latest repo-side proof: April 6, 2026 targeted validation confirmed the repeated-replay live-proof capture path on payload `0.17.0`
 - Latest hardening proof: the April 8, 2026 `PFEM10` doctor rerun again auto-ran one confirm-only browser-lane replay and left both `confirmBrowserLaneSmoke.liveProofReplayed=true` and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`
+- Latest stability proof: on April 8, 2026 `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` passed on `PFEM10` with `passedIterationCount=3`, `failedIterationCount=0`, `stableCapturedArtifactCount=3`, and `stableExpectedArtifactCount=3`
 - Latest hardening guard: `local-host-embedded-runtime-pod-doctor.sh` now also compares the confirm-only replay against the first live-proof capture and records `confirmBrowserLaneSmoke.liveProofContinuity` so replay hardening is not reduced to checking the top-level classification alone
 - Latest browser-lane hardening: `local-host-embedded-runtime-browser-lane-smoke.sh` now carries validation/device-proof observations such as lease renewal, recovery re-entry, restart continuity, and captured-vs-expected proof artifact counts into `runtimeExecuteAfterBrowser`, and treats regressions there as smoke failures
 
@@ -48,6 +49,9 @@
   - Latest completed real-device proof is the April 8, 2026 run on `PFEM10`.
   - Final verified real-device outcome from that run: `classification=process_runtime_active_session_live_proof_captured`.
   - The same doctor artifact also records `browserLaneSmoke.summary.runtimeExecuteAfterBrowser.longLivedProcessReady=true`, `processStatus=standby`, `supervisionStatus=active`, `activeSessionStatus=ready`, `activeSessionObserved=true`, `activeSessionValidationStatus=validated`, `activeSessionDeviceProofStatus=verified`, and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`.
+- `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3`
+  - Passed on April 8, 2026 on `PFEM10`.
+  - The aggregated summary reports `ok=true`, `passedIterationCount=3`, `failedIterationCount=0`, `classifications=["process_runtime_active_session_live_proof_captured"]`, and `recommendedNextSlices=["process_runtime_lane_hardening"]`.
 
 ## Current Risks
 
@@ -59,5 +63,6 @@
 ## Recommended Next Move
 
 - Keep the current `PFEM10` replay boringly repeatable at `classification=process_runtime_active_session_live_proof_captured`, and preserve the new `runtimeExecuteAfterBrowser` artifact in `browser-lane-smoke`.
+- Prefer `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` when the question is "did replay stay boringly repeatable?", then drill into one iteration's doctor artifacts only if that aggregate summary fails.
 - Treat `process_runtime_lane_hardening` as the next slice instead of reopening the earlier plugin-lane decision.
 - Keep the current `doctor` + `smoke` + `browser-lane:smoke` path boringly replayable before widening the branch surface again.

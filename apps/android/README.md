@@ -334,6 +334,32 @@ Common outcomes:
 - `classification=process_runtime_active_session_device_proof_bootstrapped`: the branch now also leaves a structured active-session-device-proof artifact on disk, and the next step is to capture one real live detached active-session proof on-device
 - `classification=process_runtime_active_session_live_proof_captured`: the branch now also captures one bounded live active-session proof on-device, and the next step is to keep that proof replayable while hardening the lane
 
+## Embedded Runtime Pod Stability
+
+Use this when the question is no longer "can one doctor pass succeed?" but "does the replay stay boringly repeatable across several doctor reruns?"
+
+```bash
+pnpm android:local-host:embedded-runtime-pod:stability
+pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3
+```
+
+The stability wrapper:
+
+- runs `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` multiple times
+- stores every iteration under its own `artifacts/iterations/<nn>/` directory
+- requires each iteration to keep `classification=process_runtime_active_session_live_proof_captured`
+- requires each iteration to keep `recommendedAction=preserve-live-proof-baseline`
+- requires each iteration to keep `confirmBrowserLaneSmoke.liveProofReplayed=true` and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`
+- requires the browser-aligned runtime summary to keep validation observations and captured-vs-expected proof artifact counts healthy
+- writes one combined `summary.json` and exits non-zero when any iteration regresses
+
+Useful overrides:
+
+- `OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_ITERATIONS=5`
+- `OPENCLAW_ANDROID_LOCAL_HOST_STABILITY_DELAY_SEC=2`
+
+On April 8, 2026, the same `PFEM10` lane passed `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` with `passedIterationCount=3`, `failedIterationCount=0`, `classifications=["process_runtime_active_session_live_proof_captured"]`, and `recommendedNextSlices=["process_runtime_lane_hardening"]`.
+
 ## Local Host Doctor
 
 Use this when you want one repo command to bootstrap the debug token, rerun smoke, and automatically fall through to the OpenAI network probe only when the failure really looks like upstream Codex connectivity.

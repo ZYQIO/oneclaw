@@ -12,6 +12,7 @@ Last updated / 最后更新: April 8, 2026 / 2026 年 4 月 8 日
 - `pod.desktop.materialize` now materializes that bundle into `filesDir/openclaw/embedded-desktop-home/<version>/`.
 - `pod.runtime.execute(taskId=runtime-smoke)` now replays the materialized desktop profile and environment/supervisor manifests into app-private runtime state, and also leaves health-report, restart-contract, process-model, activation-contract, supervision-contract, observation-contract, recovery-contract, detached-launch-contract, supervisor-loop-contract, active-session-contract, active-session-validation, and active-session-device-proof bootstrap artifacts when desktop home is present.
 - The new repeated-replay live active-session proof is both repo-verified and still freshly replayed on-device: on April 8, 2026 the same `PFEM10` phone again reached `classification=process_runtime_active_session_live_proof_captured` on payload `0.17.0`.
+- The branch now also has a replay-stability wrapper: on April 8, 2026 `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` finished with `passedIterationCount=3`, `failedIterationCount=0`, and stable proof-artifact counts on the same `PFEM10` lane.
 - This branch still does **not** have full executable desktop parity yet.
 
 ## What Is Already Landed / 已落地内容
@@ -52,6 +53,7 @@ Last updated / 最后更新: April 8, 2026 / 2026 年 4 月 8 日
 2. Treat `desktop_home_replay`, `environment_supervision`, and the first allowlisted plugin lane as landed bootstrap rather than open hypotheses.
 3. Keep the packaged browser lane, desktop-home supervision artifacts, tool replay, and plugin replay boringly stable on-device.
 4. Keep the refreshed `PFEM10` replay boringly repeatable with `classification=process_runtime_active_session_live_proof_captured`, then use the browser-aligned `runtimeExecuteAfterBrowser` artifact to harden replayability rather than reopening another repo-only bootstrap slice.
+5. Prefer the new stability wrapper when you want to prove repeatability rather than inspect a single doctor pass.
 
 ## Verification Status / 验证状态
 
@@ -65,12 +67,14 @@ Last updated / 最后更新: April 8, 2026 / 2026 年 4 月 8 日
 - Later on April 6, 2026, the same `PFEM10` device replayed that `0.17.0` build end to end: `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` converged to `classification=process_runtime_active_session_live_proof_captured`, the updated browser-lane smoke reran `runtime-smoke` after browser replay was ready, yielding `runtimeExecuteAfterBrowser.longLivedProcessReady=true`, `processStatus=standby`, `supervisionStatus=active`, `activeSessionStatus=ready`, `activeSessionObserved=true`, `activeSessionValidationStatus=validated`, and `activeSessionDeviceProofStatus=verified`, and the same doctor pass now also auto-ran one confirm-only browser-lane rerun with `confirmBrowserLaneSmoke.required=true`, `executed=true`, `ok=true`, `mainlineStatus=process_runtime_active_session_live_proof_captured`, and `liveProofReplayed=true`. The remaining gap is therefore lane hardening and replayability rather than live active-session proof capture itself.
 - On April 8, 2026, the same `PFEM10` device reran that `0.17.0` doctor lane again and still converged to `classification=process_runtime_active_session_live_proof_captured`; both the initial and confirm browser-lane passes kept `activeSessionValidationLeaseRenewalObserved=true`, `activeSessionValidationRecoveryReentryObserved=true`, `activeSessionValidationRestartContinuityObserved=true`, `activeSessionDeviceProofExpectedArtifactCount=3`, and `activeSessionDeviceProofCapturedArtifactCount=3`, so the branch still reads as replay-hardening rather than proof-capture work.
 - Repo-side hardening now also teaches the doctor wrapper to compare that confirm-only rerun against the first live-proof capture instead of checking only the top-level classification: `confirmBrowserLaneSmoke.liveProofContinuity` now records whether browser replay, long-lived process readiness, active-session observation, lease renewal, recovery re-entry, restart continuity, validation status, device-proof status, and proof-artifact counts all stayed aligned across the two passes.
+- On April 8, 2026, the same `PFEM10` lane also passed `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3`, which means three consecutive doctor runs all kept `classification=process_runtime_active_session_live_proof_captured`, `recommendedNextSlice=process_runtime_lane_hardening`, `liveProofReplayed=true`, and `liveProofContinuity.preserved=true`.
 - The clean targeted Android verification lane is green again after making browser-auth state reads safe under Robolectric when `EncryptedSharedPreferences` cannot reach `AndroidKeyStore`; `EmbeddedRuntimePodStatusTest`, `PodHandlerTest`, `InvokeCommandRegistryTest`, `LocalHostNodesToolingTest`, `LocalHostRemoteAccessServerTest`, and `OpenClawProtocolConstantsTest` all pass in the clean rerun.
 - That first materialize rerun also surfaced a real repo bug: remote `/invoke/capabilities` advertised `pod.desktop.materialize`, but `/invoke` returned `INVALID_REQUEST: unknown command` because `InvokeCommandRegistry` was missing `OpenClawPodCommand.DesktopMaterialize`. The branch now fixes that mismatch.
 - The existing device-facing verification entrypoints remain:
-  - `pnpm android:local-host:embedded-runtime-pod:doctor`
-  - `pnpm android:local-host:embedded-runtime-pod:smoke`
-  - `pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke`
+- `pnpm android:local-host:embedded-runtime-pod:doctor`
+- `pnpm android:local-host:embedded-runtime-pod:stability`
+- `pnpm android:local-host:embedded-runtime-pod:smoke`
+- `pnpm android:local-host:embedded-runtime-pod:browser-lane:smoke`
 - The device-side queue is tracked in `apps/android/local-host-desktop-runtime-verification-queue-20260403.md`.
 
 ## Do Not Misread / 不要误判
