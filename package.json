@@ -523,6 +523,7 @@
     "android:local-host:embedded-runtime-pod:doctor": "bash apps/android/scripts/local-host-embedded-runtime-pod-doctor.sh",
     "android:local-host:embedded-runtime-pod:prepare": "pnpm exec tsx apps/android/scripts/local-host-embedded-runtime-pod-prepare.ts",
     "android:local-host:embedded-runtime-pod:smoke": "bash apps/android/scripts/local-host-embedded-runtime-pod-smoke.sh",
+    "android:local-host:embedded-runtime-pod:soak": "bash apps/android/scripts/local-host-embedded-runtime-pod-soak.sh",
     "android:local-host:embedded-runtime-pod:stability": "bash apps/android/scripts/local-host-embedded-runtime-pod-stability.sh",
     "android:local-host:embedded-runtime-pod:sync-assets": "pnpm exec tsx apps/android/scripts/local-host-embedded-runtime-pod-sync-assets.ts",
     "android:local-host:openai-network": "bash apps/android/scripts/local-host-openai-network-probe.sh",

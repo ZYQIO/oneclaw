@@ -341,7 +341,7 @@ Use this when the question is no longer "can one doctor pass succeed?" but "does
 ```bash
 pnpm android:local-host:embedded-runtime-pod:stability
 pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3
-pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations
+pnpm android:local-host:embedded-runtime-pod:soak -- --json
 ```
 
 The stability wrapper:
@@ -363,7 +363,21 @@ Useful overrides:
 - `OPENCLAW_ANDROID_LOCAL_HOST_ADB_BIN=/path/to/adb`
 - `ANDROID_SERIAL=<device-serial>`
 
-On April 8, 2026, the same `PFEM10` lane passed both `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` and the stronger `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`, with the restart-perturbation run also reporting `perturbationMode="app_restart_between_iterations"`, `perturbationAppliedCount=2`, `perturbationFailureCount=0`, and the same captured live-proof classification on all three doctor passes. The next hardening pass should therefore prefer a longer soak rather than reopening the plain replay question.
+When you want the longer hardening lane directly, use the soak wrapper:
+
+```bash
+pnpm android:local-host:embedded-runtime-pod:soak
+pnpm android:local-host:embedded-runtime-pod:soak -- --json
+```
+
+It reuses the stability wrapper, but defaults to `--iterations 5 --restart-app-between-iterations` and rewrites the aggregate summary so `packageCommand=pnpm android:local-host:embedded-runtime-pod:soak`.
+
+On April 10, 2026, the same `PFEM10` lane passed all three replay-hardening entrypoints:
+- `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3`
+- `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`
+- `pnpm android:local-host:embedded-runtime-pod:soak -- --json`
+
+The new soak run reported `packageCommand="pnpm android:local-host:embedded-runtime-pod:soak"`, `iterationsRequested=5`, `perturbationAppliedCount=4`, `perturbationFailureCount=0`, `passedIterationCount=5`, `failedIterationCount=0`, and `classifications=["process_runtime_active_session_live_proof_captured"]`.
 
 ## Local Host Doctor
 

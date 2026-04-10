@@ -3,9 +3,9 @@
 ## Immediate Tasks
 
 1. Keep the refreshed `PFEM10` replay boringly repeatable on payload `0.17.0`.
-   - Current state: on April 8, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` again converged to `classification=process_runtime_active_session_live_proof_captured`, the browser-lane smoke records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, `activeSessionDeviceProofStatus=verified`, and the doctor wrapper's confirm-only browser-lane pass still leaves both `confirmBrowserLaneSmoke.liveProofReplayed=true` and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`.
-   - Current replay guard: the new `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` wrapper already passed on the same `PFEM10` lane with `passedIterationCount=3`, `failedIterationCount=0`, and stable captured-vs-expected proof artifact counts.
-   - Current stronger guard: the same `PFEM10` device also already passed `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`, so replay now stays green through two explicit force-stop/start perturbations as well.
+   - Current state: on April 10, 2026 `pnpm android:local-host:embedded-runtime-pod:doctor -- --json` still converged to `classification=process_runtime_active_session_live_proof_captured`, the browser-lane smoke records `runtimeExecuteAfterBrowser.activeSessionObserved=true`, `activeSessionValidationStatus=validated`, `activeSessionDeviceProofStatus=verified`, and the doctor wrapper's confirm-only browser-lane pass still leaves both `confirmBrowserLaneSmoke.liveProofReplayed=true` and `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true`.
+   - Current replay guard: `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3` already passed on the same `PFEM10` lane with `passedIterationCount=3`, `failedIterationCount=0`, and stable captured-vs-expected proof artifact counts.
+   - Current stronger guard: the same `PFEM10` device also already passed both `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations` and the new `pnpm android:local-host:embedded-runtime-pod:soak -- --json`, so replay now stays green through two explicit force-stop/start perturbations and then through a five-iteration restart-perturbation soak as well.
    - Current guardrail: the doctor summary now also exposes `confirmBrowserLaneSmoke.liveProofContinuity`, and the browser-lane smoke now carries validation/device-proof observations such as lease renewal, recovery re-entry, restart continuity, and captured-vs-expected proof artifact counts into `runtimeExecuteAfterBrowser`.
    - Exit criteria: repeated `doctor` / `browser-lane:smoke` reruns on the current build keep converging to `classification=process_runtime_active_session_live_proof_captured`, keep leaving the browser-aligned runtime summary in place, keep preserving `confirmBrowserLaneSmoke.liveProofReplayed=true`, and keep reporting `confirmBrowserLaneSmoke.liveProofContinuity.preserved=true` without losing lease-renewal or proof-artifact completeness, including after explicit app-restart perturbations.
 
@@ -20,8 +20,8 @@
 ## Short-Term Tasks
 
 1. Keep the current real-device replay boringly repeatable.
-   - Re-run `doctor`, `smoke`, `browser-lane:smoke`, and the new `stability -- --restart-app-between-iterations` lane after each meaningful desktop-runtime slice.
-   - Exit criteria: the branch still converges to the expected top-level classification after reinstall, token bootstrap, explicit app restarts between stability iterations, and a longer restart-perturbation soak rather than only the first three-iteration replay.
+   - Re-run `doctor`, `smoke`, `browser-lane:smoke`, and `pnpm android:local-host:embedded-runtime-pod:soak -- --json` after each meaningful desktop-runtime slice.
+   - Exit criteria: the branch still converges to the expected top-level classification after reinstall, token bootstrap, explicit app restarts between stability iterations, and the formal five-iteration restart-perturbation soak.
 
 2. Keep the active-session-device-proof contract and the live-proof checklist aligned.
    - Focus on observable process state, lease ownership, lease-renewal observation, restart generation, recovery re-entry semantics, restart continuity, proof-artifact completeness, and the browser-aligned `runtimeExecuteAfterBrowser` artifact rather than widening browser/tools/plugins again.

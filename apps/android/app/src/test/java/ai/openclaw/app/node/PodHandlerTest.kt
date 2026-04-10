@@ -963,6 +963,10 @@ class PodHandlerTest {
       "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3",
       payload.getValue("recommendedProofCommand").jsonPrimitive.content,
     )
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:soak -- --json",
+      payload.getValue("recommendedHardeningCommand").jsonPrimitive.content,
+    )
     assertTrue(
       payload
         .getValue("recommendedNextStep")
@@ -975,7 +979,7 @@ class PodHandlerTest {
         .getValue("recommendedNextStep")
         .jsonPrimitive
         .content
-        .contains("--restart-app-between-iterations"),
+        .contains("embedded-runtime-pod:soak -- --json"),
     )
     val capturedLiveProofPayload =
       json
@@ -988,13 +992,17 @@ class PodHandlerTest {
       "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3",
       capturedLiveProofPayload.getValue("proofCommand").jsonPrimitive.content,
     )
+    assertEquals(
+      "pnpm android:local-host:embedded-runtime-pod:soak -- --json",
+      capturedLiveProofPayload.getValue("hardeningCommand").jsonPrimitive.content,
+    )
     val proofCommands = capturedLiveProofPayload.getValue("proofCommands").jsonArray
     assertEquals(
       "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3",
       proofCommands.first().jsonPrimitive.content,
     )
     assertEquals(
-      "pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations",
+      "pnpm android:local-host:embedded-runtime-pod:soak -- --json",
       proofCommands[1].jsonPrimitive.content,
     )
     assertEquals(
