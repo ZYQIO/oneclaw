@@ -3169,6 +3169,10 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
           "hardeningCommand",
           JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:soak -- --json"),
         )
+        put(
+          "refreshCommand",
+          JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:refresh -- --json"),
+        )
       }
       put(
         "proofCommands",
@@ -3176,6 +3180,7 @@ private fun executeEmbeddedRuntimeDesktopProfileReplay(
           add(JsonPrimitive(processActiveSessionDeviceProofProofCommand))
           if (processActiveSessionDeviceProofObserved) {
             add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:soak -- --json"))
+            add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:refresh -- --json"))
             add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:doctor -- --json"))
           }
           add(JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:smoke"))

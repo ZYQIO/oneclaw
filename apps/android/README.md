@@ -342,6 +342,7 @@ Use this when the question is no longer "can one doctor pass succeed?" but "does
 pnpm android:local-host:embedded-runtime-pod:stability
 pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3
 pnpm android:local-host:embedded-runtime-pod:soak -- --json
+pnpm android:local-host:embedded-runtime-pod:refresh -- --json
 ```
 
 The stability wrapper:
@@ -372,12 +373,23 @@ pnpm android:local-host:embedded-runtime-pod:soak -- --json
 
 It reuses the stability wrapper, but defaults to `--iterations 5 --restart-app-between-iterations` and rewrites the aggregate summary so `packageCommand=pnpm android:local-host:embedded-runtime-pod:soak`.
 
-On April 10, 2026, the same `PFEM10` lane passed all three replay-hardening entrypoints:
+When you want to prove the reinstall perturbation path too, use the refresh wrapper:
+
+```bash
+pnpm android:local-host:embedded-runtime-pod:refresh
+pnpm android:local-host:embedded-runtime-pod:refresh -- --json
+```
+
+It reinstalls the current debug app, auto-discovers `ANDROID_HOME` / `ANDROID_SDK_ROOT` when the current shell is missing them, falls back to `adb install -r -d` when `pnpm android:install` fails on the device, re-exports the local-host bearer token without persisting it into artifacts, and then runs the formal soak wrapper with that fresh token.
+
+On April 10, 2026, the same `PFEM10` lane passed all four replay-hardening entrypoints:
 - `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3`
 - `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`
 - `pnpm android:local-host:embedded-runtime-pod:soak -- --json`
+- `pnpm android:local-host:embedded-runtime-pod:refresh -- --json`
 
 The new soak run reported `packageCommand="pnpm android:local-host:embedded-runtime-pod:soak"`, `iterationsRequested=5`, `perturbationAppliedCount=4`, `perturbationFailureCount=0`, `passedIterationCount=5`, `failedIterationCount=0`, and `classifications=["process_runtime_active_session_live_proof_captured"]`.
+The new refresh run also reported `androidSdkRoot="/Users/zouxiaoyi/Library/Android/sdk"`, `install.finalMethod="adb_install_debug_apk"`, `install.primary.ok=false`, `install.fallback.used=true`, `install.fallback.ok=true`, `token.tokenRedacted=true`, `passedIterationCount=5`, `failedIterationCount=0`, and the same captured live-proof classification.
 
 ## Local Host Doctor
 

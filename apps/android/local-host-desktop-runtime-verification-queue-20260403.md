@@ -23,6 +23,7 @@ Record the exact real-device verification steps for this branch, the already-com
 - On April 10, 2026, the same `PFEM10` lane still passed `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3`, so three consecutive doctor runs all kept `classification=process_runtime_active_session_live_proof_captured`, `recommendedNextSlice=process_runtime_lane_hardening`, `liveProofReplayed=true`, and `liveProofContinuity.preserved=true`. / 2026 年 4 月 10 日，同一条 `PFEM10` 真机 lane 仍然通过了 `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3`，这意味着连续三轮 doctor 都保持了 `classification=process_runtime_active_session_live_proof_captured`、`recommendedNextSlice=process_runtime_lane_hardening`、`liveProofReplayed=true` 与 `liveProofContinuity.preserved=true`。
 - 同一天稍晚，同一条 `PFEM10` 真机 lane 还通过了 `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`，这意味着即便 wrapper 在各轮 doctor 之间强制停止并重新拉起 `ai.openclaw.app`，整条 replay 也依然保持绿色；聚合 summary 回报 `perturbationMode=app_restart_between_iterations`、`perturbationAppliedCount=2`、`perturbationFailureCount=0`、`passedIterationCount=3` 与 `failedIterationCount=0`。 / Later that same day, the same `PFEM10` lane also passed `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations`, so the replay remained green even when the wrapper force-stopped and relaunched `ai.openclaw.app` between doctor iterations; the aggregate summary reported `perturbationMode=app_restart_between_iterations`, `perturbationAppliedCount=2`, `perturbationFailureCount=0`, `passedIterationCount=3`, and `failedIterationCount=0`.
 - On April 10, 2026, the same `PFEM10` lane also passed `pnpm android:local-host:embedded-runtime-pod:soak -- --json`, so the replay remained green through a five-iteration restart-perturbation soak too; the aggregate summary reported `packageCommand=pnpm android:local-host:embedded-runtime-pod:soak`, `iterationsRequested=5`, `perturbationMode=app_restart_between_iterations`, `perturbationAppliedCount=4`, `perturbationFailureCount=0`, `passedIterationCount=5`, and `failedIterationCount=0`. / 2026 年 4 月 10 日，同一条 `PFEM10` 真机 lane 还通过了 `pnpm android:local-host:embedded-runtime-pod:soak -- --json`，这意味着整条 replay 在五轮 restart-perturbation soak 中也依然保持绿色；聚合 summary 回报 `packageCommand=pnpm android:local-host:embedded-runtime-pod:soak`、`iterationsRequested=5`、`perturbationMode=app_restart_between_iterations`、`perturbationAppliedCount=4`、`perturbationFailureCount=0`、`passedIterationCount=5` 与 `failedIterationCount=0`。
+- Later that same day, the same `PFEM10` lane also passed `pnpm android:local-host:embedded-runtime-pod:refresh -- --json`, so the reinstall perturbation path now also reconverges through one formal wrapper even when `pnpm android:install` fails first; the aggregate summary reported `androidSdkRoot=/Users/zouxiaoyi/Library/Android/sdk`, `install.finalMethod=adb_install_debug_apk`, `install.primary.ok=false`, `install.fallback.used=true`, `install.fallback.ok=true`, `token.tokenRedacted=true`, `passedIterationCount=5`, and `failedIterationCount=0`. / 同一天稍晚，同一条 `PFEM10` 真机 lane 还通过了 `pnpm android:local-host:embedded-runtime-pod:refresh -- --json`，这意味着即便 `pnpm android:install` 先失败，重装扰动路径现在也能通过一条正式 wrapper 重新收敛；聚合 summary 回报 `androidSdkRoot=/Users/zouxiaoyi/Library/Android/sdk`、`install.finalMethod=adb_install_debug_apk`、`install.primary.ok=false`、`install.fallback.used=true`、`install.fallback.ok=true`、`token.tokenRedacted=true`、`passedIterationCount=5` 与 `failedIterationCount=0`。
 
 ## Current Commands / 当前要跑的命令
 
@@ -95,6 +96,12 @@ pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 
 pnpm android:local-host:embedded-runtime-pod:soak -- --json
 ```
 
+10. When you want to prove reinstall plus token-bootstrap perturbation directly, run the refresh wrapper.
+
+```bash
+pnpm android:local-host:embedded-runtime-pod:refresh -- --json
+```
+
 ## Expected Results / 预期结果
 
 - Step 0 should collapse the current state into one top-level classification and leave one combined `summary.json`.
@@ -108,6 +115,7 @@ pnpm android:local-host:embedded-runtime-pod:soak -- --json
 - Step 7 should now also leave `ok=true`, `passedIterationCount=3`, `failedIterationCount=0`, `classifications=["process_runtime_active_session_live_proof_captured"]`, and `recommendedNextSlices=["process_runtime_lane_hardening"]`.
 - Step 8 should now also leave `ok=true`, `perturbationMode=app_restart_between_iterations`, `perturbationAppliedCount=2`, `perturbationFailureCount=0`, `passedIterationCount=3`, `failedIterationCount=0`, and `classifications=["process_runtime_active_session_live_proof_captured"]`.
 - Step 9 should now also leave `ok=true`, `packageCommand=pnpm android:local-host:embedded-runtime-pod:soak`, `iterationsRequested=5`, `perturbationAppliedCount=4`, `perturbationFailureCount=0`, `passedIterationCount=5`, `failedIterationCount=0`, and `classifications=["process_runtime_active_session_live_proof_captured"]`.
+- Step 10 should now also leave `ok=true`, `androidSdkRoot=/Users/zouxiaoyi/Library/Android/sdk`, `install.finalMethod=adb_install_debug_apk`, `install.primary.ok=false`, `install.fallback.used=true`, `install.fallback.ok=true`, `token.tokenRedacted=true`, `passedIterationCount=5`, `failedIterationCount=0`, and `classifications=["process_runtime_active_session_live_proof_captured"]`.
 
 ## Artifacts To Keep / 建议保留的产物
 
@@ -117,6 +125,7 @@ pnpm android:local-host:embedded-runtime-pod:soak -- --json
 - The `summary.json` from `pnpm android:local-host:embedded-runtime-pod:stability`, plus the three per-iteration doctor summaries under `iterations/`.
 - The `summary.json` from the restart-perturbation `pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 --restart-app-between-iterations` run, plus its per-iteration restart logs under `iterations/*/between-iterations-restart.stdout.txt`.
 - The `summary.json` from `pnpm android:local-host:embedded-runtime-pod:soak -- --json`, plus its five per-iteration doctor summaries and restart logs under `iterations/*/`.
+- The `summary.json` from `pnpm android:local-host:embedded-runtime-pod:refresh -- --json`, plus the redacted `token-export.json`, the install logs, and the nested soak artifact bundle.
 - The `pod-runtime-execute.json` artifact that captures the initial `runtime-smoke` replay.
 - The `pod-runtime-execute-after-browser.json` artifact that captures the browser-aligned runtime state after replay becomes ready, including `longLivedProcessReady`, `processStatus`, `supervisionStatus`, and active-session readiness.
 - The direct `pod.desktop.materialize` artifact set that includes `active-profile.json` and `desktop-materialize.json`.

@@ -1316,6 +1316,10 @@ fun describeEmbeddedRuntimeDesktopRuntime(
             "recommendedHardeningCommand",
             JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:soak -- --json"),
           )
+          put(
+            "recommendedRefreshCommand",
+            JsonPrimitive("pnpm android:local-host:embedded-runtime-pod:refresh -- --json"),
+          )
         }
         put(
           "recommendedNextStep",
@@ -1368,7 +1372,7 @@ fun describeEmbeddedRuntimeDesktopRuntime(
               !desktopReplay.processActiveSessionDeviceProofObserved ->
                 "Reinstall the current debug app on-device, rerun doctor plus the bounded smoke scripts, and capture one live detached session proof bundle with observed lease renewal, recovery re-entry, and restart continuity."
               else ->
-                "Keep pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 green, then prefer pnpm android:local-host:embedded-runtime-pod:soak -- --json alongside doctor and the bounded smoke scripts so the captured live detached-session proof stays boringly green through a longer restart-perturbation soak before widening browser, tools, or plugins again."
+                "Keep pnpm android:local-host:embedded-runtime-pod:stability -- --json --iterations 3 green, then prefer pnpm android:local-host:embedded-runtime-pod:soak -- --json for longer replay hardening and pnpm android:local-host:embedded-runtime-pod:refresh -- --json whenever a reinstall plus token-bootstrap perturbation should still reconverge before widening browser, tools, or plugins again."
             },
           ),
         )
